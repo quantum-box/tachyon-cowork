@@ -18,9 +18,9 @@ fn file_info_from_path(path: &std::path::Path) -> Option<FileInfo> {
     let metadata = fs::metadata(path).ok()?;
     let name = path.file_name()?.to_string_lossy().to_string();
     let ext = path.extension().map(|e| e.to_string_lossy().to_string());
-    let mime = ext.as_ref().and_then(|e| {
-        mime_guess::from_ext(e).first().map(|m| m.to_string())
-    });
+    let mime = ext
+        .as_ref()
+        .and_then(|e| mime_guess::from_ext(e).first().map(|m| m.to_string()));
     let modified = metadata.modified().ok().map(|t| {
         let dt: chrono::DateTime<chrono::Utc> = t.into();
         dt.to_rfc3339()

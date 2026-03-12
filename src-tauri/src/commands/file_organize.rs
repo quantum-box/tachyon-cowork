@@ -50,9 +50,7 @@ pub async fn organize_files(directory: String, strategy: String) -> Result<Organ
                     .map(|e| e.to_string_lossy().to_lowercase())
                     .unwrap_or_default();
                 match ext.as_str() {
-                    "jpg" | "jpeg" | "png" | "gif" | "bmp" | "svg" | "webp" => {
-                        "画像".to_string()
-                    }
+                    "jpg" | "jpeg" | "png" | "gif" | "bmp" | "svg" | "webp" => "画像".to_string(),
                     "mp4" | "avi" | "mov" | "mkv" | "wmv" => "動画".to_string(),
                     "mp3" | "wav" | "flac" | "aac" | "ogg" => "音楽".to_string(),
                     "pdf" => "PDF".to_string(),
@@ -258,10 +256,7 @@ pub async fn get_disk_usage(directory: String) -> Result<DiskUsage, String> {
     let mut dir_count = 0usize;
     let mut by_extension: HashMap<String, ExtensionUsage> = HashMap::new();
 
-    for entry in WalkDir::new(&directory)
-        .into_iter()
-        .filter_map(|e| e.ok())
-    {
+    for entry in WalkDir::new(&directory).into_iter().filter_map(|e| e.ok()) {
         let path = entry.path();
         if path.is_dir() {
             dir_count += 1;
@@ -276,12 +271,10 @@ pub async fn get_disk_usage(directory: String) -> Result<DiskUsage, String> {
             .map(|e| e.to_string_lossy().to_lowercase())
             .unwrap_or_else(|| "(なし)".to_string());
 
-        let usage = by_extension
-            .entry(ext)
-            .or_insert(ExtensionUsage {
-                count: 0,
-                total_size: 0,
-            });
+        let usage = by_extension.entry(ext).or_insert(ExtensionUsage {
+            count: 0,
+            total_size: 0,
+        });
         usage.count += 1;
         usage.total_size += size;
     }
