@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
@@ -13,16 +13,19 @@ import {
   Code,
 } from "lucide-react";
 import type { AgentChunk, Artifact } from "../../lib/types";
+import { CodeBlock } from "../artifact/CodeBlock";
+import { MermaidDiagram } from "../artifact/MermaidDiagram";
 
 type Props = {
   chunk: AgentChunk;
   onOpenArtifact?: (artifact: Artifact) => void;
+  searchQuery?: string;
 };
 
-export function MessageBubble({ chunk, onOpenArtifact }: Props) {
+export function MessageBubble({ chunk, onOpenArtifact, searchQuery }: Props) {
   switch (chunk.type) {
     case "user":
-      return <UserMessage text={chunk.text ?? ""} />;
+      return <UserMessage text={chunk.text ?? ""} searchQuery={searchQuery} />;
     case "say":
     case "assistant":
     case "attempt_completion":
@@ -30,6 +33,7 @@ export function MessageBubble({ chunk, onOpenArtifact }: Props) {
         <AssistantMessage
           text={chunk.text || chunk.content || ""}
           onOpenArtifact={onOpenArtifact}
+          searchQuery={searchQuery}
         />
       );
     case "thinking":
@@ -50,7 +54,7 @@ export function MessageBubble({ chunk, onOpenArtifact }: Props) {
     case "tool_job_started":
       return (
         <div className="flex justify-start mb-2">
-          <div className="text-xs px-3 py-1.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+          <div className="text-xs px-3 py-1.5 rounded-full bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
             Tool Job: {chunk.provider || "unknown"} (
             {chunk.job_id?.slice(0, 8)}...)
           </div>
@@ -59,14 +63,14 @@ export function MessageBubble({ chunk, onOpenArtifact }: Props) {
     case "ask":
       return (
         <div className="flex justify-start mb-3">
-          <div className="max-w-[80%] rounded-2xl rounded-bl-md px-4 py-3 bg-yellow-50 border border-yellow-200 text-sm">
+          <div className="max-w-[80%] rounded-2xl rounded-bl-md px-4 py-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 text-sm text-gray-900 dark:text-gray-100">
             <p className="font-medium mb-2">{chunk.text}</p>
             {chunk.options && (
               <div className="flex flex-wrap gap-2">
                 {chunk.options.map((opt) => (
                   <span
                     key={opt}
-                    className="px-2 py-1 text-xs rounded-lg bg-yellow-100"
+                    className="px-2 py-1 text-xs rounded-lg bg-yellow-100 dark:bg-yellow-800/40 text-yellow-800 dark:text-yellow-300"
                   >
                     {opt}
                   </span>
@@ -81,14 +85,14 @@ export function MessageBubble({ chunk, onOpenArtifact }: Props) {
   }
 }
 
-function UserMessage({ text }: { text: string }) {
+function UserMessage({ text, searchQuery }: { text: string; searchQuery?: string }) {
   return (
     <div className="flex justify-end mb-4 gap-2">
-      <div className="max-w-[75%] rounded-2xl rounded-br-sm px-4 py-3 bg-indigo-600 text-white text-sm whitespace-pre-wrap leading-relaxed">
-        {text}
+      <div className="max-w-[75%] rounded-2xl rounded-br-sm px-4 py-3 bg-indigo-600 dark:bg-indigo-700 text-white text-sm whitespace-pre-wrap leading-relaxed">
+        {searchQuery ? highlightInText(text, searchQuery) : text}
       </div>
-      <div className="shrink-0 w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
-        <User size={16} className="text-indigo-600" />
+      <div className="shrink-0 w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center">
+        <User size={16} className="text-indigo-600 dark:text-indigo-400" />
       </div>
     </div>
   );
@@ -116,9 +120,11 @@ function extractCodeBlocks(text: string): CodeBlockInfo[] {
 function AssistantMessage({
   text,
   onOpenArtifact,
+  searchQuery: _searchQuery,
 }: {
   text: string;
   onOpenArtifact?: (artifact: Artifact) => void;
+  searchQuery?: string;
 }) {
   const codeBlocks = extractCodeBlocks(text);
 
@@ -140,11 +146,49 @@ function AssistantMessage({
 
   return (
     <div className="flex justify-start mb-4 gap-2">
-      <div className="shrink-0 w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
-        <Bot size={16} className="text-gray-600" />
+      <div className="shrink-0 w-8 h-8 rounded-full bg-gray-100 dark:bg-slate-800 flex items-center justify-center">
+        <Bot size={16} className="text-gray-600 dark:text-gray-400" />
       </div>
-      <div className="max-w-[75%] rounded-2xl rounded-bl-sm px-4 py-3 bg-gray-100 text-sm leading-relaxed prose prose-sm max-w-none prose-p:my-1 prose-pre:bg-gray-800 prose-pre:text-gray-100 prose-code:text-indigo-600 prose-code:before:content-[''] prose-code:after:content-['']">
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
+      <div className="max-w-[75%] rounded-2xl rounded-bl-sm px-4 py-3 bg-gray-100 dark:bg-slate-800 text-sm leading-relaxed prose prose-sm max-w-none prose-p:my-1 prose-pre:bg-transparent prose-pre:p-0 prose-code:text-indigo-600 dark:prose-code:text-indigo-400 prose-code:before:content-[''] prose-code:after:content-[''] text-gray-900 dark:text-gray-100 prose-headings:text-gray-900 dark:prose-headings:text-gray-100 prose-strong:text-gray-900 dark:prose-strong:text-gray-100 prose-a:text-indigo-600 dark:prose-a:text-indigo-400">
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
+          components={{
+            code({ className, children, ...props }) {
+              const match = /language-(\w+)/.exec(className || "");
+              const codeString = String(children).replace(/\n$/, "");
+
+              // Check if this is a code block (has language class) vs inline code
+              // react-markdown wraps code blocks in <pre><code>
+              const isInline = !className;
+
+              if (isInline) {
+                return (
+                  <code
+                    className="px-1.5 py-0.5 rounded bg-gray-200 dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 text-xs font-mono"
+                    {...props}
+                  >
+                    {children}
+                  </code>
+                );
+              }
+
+              const language = match?.[1] || "";
+
+              // Mermaid diagram
+              if (language === "mermaid") {
+                return <MermaidDiagram chart={codeString} />;
+              }
+
+              return <CodeBlock code={codeString} language={language} />;
+            },
+            pre({ children }) {
+              // Let the code component handle rendering
+              return <>{children}</>;
+            },
+          }}
+        >
+          {text}
+        </ReactMarkdown>
 
         {/* Artifact buttons for code blocks */}
         {codeBlocks.length > 0 && onOpenArtifact && (
@@ -153,12 +197,12 @@ function AssistantMessage({
               <button
                 key={i}
                 onClick={() => handleOpenCodeBlock(block, i)}
-                className="flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-100 transition-colors"
+                className="flex items-center gap-1.5 rounded-lg border border-indigo-200 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/30 px-2.5 py-1 text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"
               >
                 <Code size={12} />
                 Artifactで開く
                 {codeBlocks.length > 1 && (
-                  <span className="text-indigo-400">
+                  <span className="text-indigo-400 dark:text-indigo-500">
                     ({block.language})
                   </span>
                 )}
@@ -186,7 +230,7 @@ function ThinkingMessage({
       <div className="max-w-[75%]">
         <button
           onClick={() => setExpanded(!expanded)}
-          className="flex items-center gap-1.5 text-xs text-purple-600 hover:text-purple-700 transition-colors"
+          className="flex items-center gap-1.5 text-xs text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors"
         >
           {isFinished ? (
             <CheckCircle size={12} />
@@ -197,7 +241,7 @@ function ThinkingMessage({
           Thinking...
         </button>
         {expanded && text && (
-          <div className="mt-1 px-3 py-2 rounded-lg bg-purple-50 border border-purple-100 text-xs text-purple-800 whitespace-pre-wrap max-h-48 overflow-y-auto">
+          <div className="mt-1 px-3 py-2 rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 text-xs text-purple-800 dark:text-purple-200 whitespace-pre-wrap max-h-48 overflow-y-auto">
             {text}
           </div>
         )}
@@ -216,7 +260,7 @@ function ToolCallMessage({ chunk }: { chunk: AgentChunk }) {
       <div className="max-w-[75%]">
         <button
           onClick={() => setExpanded(!expanded)}
-          className="flex items-center gap-1.5 text-xs text-emerald-600 hover:text-emerald-700 transition-colors"
+          className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors"
         >
           {isPending ? (
             <Loader2 size={12} className="animate-spin" />
@@ -227,7 +271,7 @@ function ToolCallMessage({ chunk }: { chunk: AgentChunk }) {
           {chunk.tool_name || "tool_call"}
         </button>
         {expanded && chunk.tool_arguments && (
-          <pre className="mt-1 px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-100 text-xs overflow-x-auto max-h-48 overflow-y-auto">
+          <pre className="mt-1 px-3 py-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800 text-xs text-gray-800 dark:text-gray-200 overflow-x-auto max-h-48 overflow-y-auto">
             {chunk.tool_arguments}
           </pre>
         )}
@@ -246,14 +290,14 @@ function ToolResultMessage({ chunk }: { chunk: AgentChunk }) {
       <div className="max-w-[75%]">
         <button
           onClick={() => setExpanded(!expanded)}
-          className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-600 transition-colors"
+          className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-slate-400 hover:text-gray-600 dark:hover:text-slate-300 transition-colors"
         >
           <CheckCircle size={12} />
           {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
           Tool Result
         </button>
         {expanded && text && (
-          <pre className="mt-1 px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-xs overflow-x-auto max-h-48 overflow-y-auto">
+          <pre className="mt-1 px-3 py-2 rounded-lg bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-xs text-gray-800 dark:text-gray-200 overflow-x-auto max-h-48 overflow-y-auto">
             {text}
           </pre>
         )}
@@ -265,7 +309,7 @@ function ToolResultMessage({ chunk }: { chunk: AgentChunk }) {
 function UsageMessage({ chunk }: { chunk: AgentChunk }) {
   return (
     <div className="flex justify-center mb-3">
-      <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-gray-50 border border-gray-200 text-[10px] text-gray-400">
+      <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-[10px] text-gray-400 dark:text-slate-500">
         <Coins size={10} />
         {chunk.total_tokens?.toLocaleString()} tokens
         {chunk.total_cost != null && (
@@ -273,5 +317,24 @@ function UsageMessage({ chunk }: { chunk: AgentChunk }) {
         )}
       </div>
     </div>
+  );
+}
+
+/** Highlight matching text within a string */
+function highlightInText(text: string, query: string): ReactNode {
+  if (!query.trim()) return text;
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const parts = text.split(new RegExp(`(${escaped})`, "gi"));
+  return parts.map((part, i) =>
+    part.toLowerCase() === query.toLowerCase() ? (
+      <mark
+        key={i}
+        className="bg-yellow-200/60 text-inherit rounded-sm"
+      >
+        {part}
+      </mark>
+    ) : (
+      part
+    ),
   );
 }

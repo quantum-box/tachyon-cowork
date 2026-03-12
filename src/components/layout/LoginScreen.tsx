@@ -57,7 +57,7 @@ export function LoginScreen({ onLogin }: Props) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-slate-950 p-4 transition-colors duration-150">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <div className="w-14 h-14 rounded-2xl bg-indigo-600 flex items-center justify-center mx-auto mb-4">
@@ -72,27 +72,29 @@ export function LoginScreen({ onLogin }: Props) {
               <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
             </svg>
           </div>
-          <h1 className="text-xl font-bold text-gray-900">Tachyon Cowork</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+            Tachyon Cowork
+          </h1>
+          <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
             AIアシスタントにログイン
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1.5">
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
               API URL
             </label>
             <input
               type="url"
               value={apiBaseUrl}
               onChange={(e) => setApiBaseUrl(e.target.value)}
-              className="w-full px-3 py-2.5 text-sm rounded-xl border border-gray-300 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+              className="w-full px-3 py-2.5 text-sm rounded-xl border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100 outline-none focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 dark:focus:ring-indigo-400/20 transition-colors duration-150"
               required
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1.5">
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
               テナントID
             </label>
             <input
@@ -100,25 +102,25 @@ export function LoginScreen({ onLogin }: Props) {
               value={tenantId}
               onChange={(e) => setTenantId(e.target.value)}
               placeholder="tn_xxxx"
-              className="w-full px-3 py-2.5 text-sm rounded-xl border border-gray-300 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+              className="w-full px-3 py-2.5 text-sm rounded-xl border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100 outline-none focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 dark:focus:ring-indigo-400/20 placeholder:text-gray-400 dark:placeholder:text-slate-500 transition-colors duration-150"
               required
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1.5">
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
               アクセストークン
             </label>
             <input
               type="password"
               value={accessToken}
               onChange={(e) => setAccessToken(e.target.value)}
-              className="w-full px-3 py-2.5 text-sm rounded-xl border border-gray-300 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+              className="w-full px-3 py-2.5 text-sm rounded-xl border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100 outline-none focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 dark:focus:ring-indigo-400/20 transition-colors duration-150"
               required
             />
           </div>
 
           {error && (
-            <div className="px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700">
+            <div className="px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-xs text-red-700 dark:text-red-400">
               {error}
             </div>
           )}
@@ -126,7 +128,7 @@ export function LoginScreen({ onLogin }: Props) {
           <button
             type="submit"
             disabled={isLoading || !apiBaseUrl || !tenantId || !accessToken}
-            className="w-full py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="w-full py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 dark:hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150"
           >
             {isLoading ? "接続中..." : "ログイン"}
           </button>

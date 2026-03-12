@@ -3,6 +3,21 @@ import { AgentChatClient } from "../lib/api-client";
 import type { AgentChunk, AgentExecuteRequest, ChatRoom } from "../lib/types";
 
 const MODEL_KEY = "tachyon-cowork-model";
+const PINNED_KEY = "tachyon-cowork-pinned";
+
+function loadPinnedRooms(): string[] {
+  try {
+    const raw = localStorage.getItem(PINNED_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as string[];
+  } catch {
+    return [];
+  }
+}
+
+function savePinnedRooms(ids: string[]): void {
+  localStorage.setItem(PINNED_KEY, JSON.stringify(ids));
+}
 
 export function useAgentChat(client: AgentChatClient | null) {
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -11,6 +26,7 @@ export function useAgentChat(client: AgentChatClient | null) {
   const [error, setError] = useState<Error | null>(null);
   const [input, setInput] = useState("");
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
+  const [pinnedRooms, setPinnedRooms] = useState<string[]>(loadPinnedRooms);
   const [selectedModel, setSelectedModel] = useState<string>(
     () => localStorage.getItem(MODEL_KEY) ?? "anthropic/claude-sonnet-4-5",
   );
@@ -220,6 +236,16 @@ export function useAgentChat(client: AgentChatClient | null) {
     [client, sessionId, newChat],
   );
 
+  const togglePin = useCallback((roomId: string) => {
+    setPinnedRooms((prev) => {
+      const next = prev.includes(roomId)
+        ? prev.filter((id) => id !== roomId)
+        : [...prev, roomId];
+      savePinnedRooms(next);
+      return next;
+    });
+  }, []);
+
   // Cleanup on unmount
   useEffect(
     () => () => {
@@ -238,6 +264,8 @@ export function useAgentChat(client: AgentChatClient | null) {
     selectedModel,
     setSelectedModel,
     chatRooms,
+    pinnedRooms,
+    togglePin,
     handleSubmit,
     sendMessage,
     newChat,
