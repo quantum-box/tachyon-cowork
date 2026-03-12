@@ -121,9 +121,7 @@ pub async fn write_excel(data: WriteExcelRequest) -> Result<Vec<u8>, String> {
                     }
                     serde_json::Value::Number(n) => {
                         if let Some(f) = n.as_f64() {
-                            worksheet
-                                .write_number(r, c, f)
-                                .map_err(|e| e.to_string())?;
+                            worksheet.write_number(r, c, f).map_err(|e| e.to_string())?;
                         }
                     }
                     serde_json::Value::Bool(b) => {

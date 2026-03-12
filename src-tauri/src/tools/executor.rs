@@ -43,12 +43,10 @@ pub async fn execute_tool(tool_call: ToolCall) -> Result<ToolResult, String> {
         }
         "excel_write" => {
             let data: commands::excel::WriteExcelRequest =
-                serde_json::from_value(tool_call.arguments.clone())
-                    .map_err(|e| e.to_string())?;
+                serde_json::from_value(tool_call.arguments.clone()).map_err(|e| e.to_string())?;
             match commands::excel::write_excel(data).await {
                 Ok(bytes) => {
-                    let b64 =
-                        base64::engine::general_purpose::STANDARD.encode(&bytes);
+                    let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
                     Ok(ToolResult {
                         tool_id,
                         result: serde_json::json!({"base64": b64, "size": bytes.len()}),
