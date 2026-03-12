@@ -1,6 +1,7 @@
-use calamine::{open_workbook, Reader, Xlsx};
+use calamine::{open_workbook, Data, Reader, Xlsx};
 use rust_xlsxwriter::Workbook;
 use serde::{Deserialize, Serialize};
+use std::io::BufReader;
 
 #[derive(Serialize)]
 pub struct ExcelData {
@@ -27,7 +28,8 @@ pub enum CellValue {
 
 #[tauri::command]
 pub async fn read_excel(path: String) -> Result<ExcelData, String> {
-    let mut workbook: Xlsx<_> = open_workbook(&path).map_err(|e| e.to_string())?;
+    let mut workbook: Xlsx<BufReader<std::fs::File>> =
+        open_workbook(&path).map_err(|e: calamine::XlsxError| e.to_string())?;
     let sheet_names = workbook.sheet_names().to_vec();
     let mut sheets = Vec::new();
 
@@ -38,15 +40,16 @@ pub async fn read_excel(path: String) -> Result<ExcelData, String> {
             for row in range.rows() {
                 let cells: Vec<CellValue> = row
                     .iter()
-                    .map(|cell| match cell {
-                        calamine::Data::Empty => CellValue::Empty,
-                        calamine::Data::String(s) => CellValue::String(s.clone()),
-                        calamine::Data::Float(f) => CellValue::Number(*f),
-                        calamine::Data::Int(i) => CellValue::Number(*i as f64),
-                        calamine::Data::Bool(b) => CellValue::Bool(*b),
-                        calamine::Data::Error(e) => CellValue::Error(format!("{:?}", e)),
-                        calamine::Data::DateTime(dt) => CellValue::String(format!("{}", dt)),
-                        _ => CellValue::Empty,
+                    .map(|cell: &Data| match cell {
+                        Data::Empty => CellValue::Empty,
+                        Data::String(s) => CellValue::String(s.clone()),
+                        Data::Float(f) => CellValue::Number(*f),
+                        Data::Int(i) => CellValue::Number(*i as f64),
+                        Data::Bool(b) => CellValue::Bool(*b),
+                        Data::Error(e) => CellValue::Error(format!("{:?}", e)),
+                        Data::DateTime(dt) => CellValue::String(format!("{}", dt)),
+                        Data::DateTimeIso(s) => CellValue::String(s.clone()),
+                        Data::DurationIso(s) => CellValue::String(s.clone()),
                     })
                     .collect();
                 if cells.len() > max_col {
