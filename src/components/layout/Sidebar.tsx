@@ -5,6 +5,7 @@ import {
   Trash2,
   Settings,
   LogOut,
+  FolderOpen,
 } from "lucide-react";
 import type { ChatRoom } from "../../lib/types";
 
@@ -15,6 +16,8 @@ type Props = {
   onSelectSession: (id: string) => void;
   onDeleteRoom: (id: string) => void;
   onLogout: () => void;
+  onToggleTools: () => void;
+  showTools: boolean;
 };
 
 export function Sidebar({
@@ -24,6 +27,8 @@ export function Sidebar({
   onSelectSession,
   onDeleteRoom,
   onLogout,
+  onToggleTools,
+  showTools,
 }: Props) {
   const [search, setSearch] = useState("");
 
@@ -67,6 +72,21 @@ export function Sidebar({
             className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-gray-200 bg-white outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400/20 placeholder:text-gray-400"
           />
         </div>
+      </div>
+
+      {/* File Tools button */}
+      <div className="px-3 pt-3">
+        <button
+          onClick={onToggleTools}
+          className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+            showTools
+              ? "bg-indigo-100 text-indigo-700 border border-indigo-300"
+              : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-100"
+          }`}
+        >
+          <FolderOpen size={14} />
+          ファイルツール
+        </button>
       </div>
 
       {/* Chat list */}

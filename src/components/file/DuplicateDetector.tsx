@@ -1,0 +1,257 @@
+import { useState, useCallback, useMemo } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
+import {
+  FolderOpen,
+  Copy,
+  Loader2,
+  Trash2,
+  Hash,
+  CheckCircle2,
+} from "lucide-react";
+import { formatFileSize } from "../../lib/format";
+
+type DuplicateGroup = {
+  hash: string;
+  size: number;
+  files: string[];
+};
+
+export function DuplicateDetector() {
+  const [directory, setDirectory] = useState("");
+  const [recursive, setRecursive] = useState(true);
+  const [groups, setGroups] = useState<DuplicateGroup[]>([]);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanned, setScanned] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteComplete, setDeleteComplete] = useState(false);
+
+  const handleBrowse = useCallback(async () => {
+    const sel = await open({ directory: true, multiple: false });
+    if (sel && typeof sel === "string") {
+      setDirectory(sel);
+      setGroups([]);
+      setScanned(false);
+      setSelected(new Set());
+      setDeleteComplete(false);
+    }
+  }, []);
+
+  const handleScan = useCallback(async () => {
+    if (!directory) return;
+    setIsScanning(true);
+    setScanned(true);
+    setSelected(new Set());
+    setDeleteComplete(false);
+    try {
+      const dups = await invoke<DuplicateGroup[]>("find_duplicates", {
+        directory,
+        recursive,
+      });
+      setGroups(dups);
+    } catch (err) {
+      console.error("Scan error:", err);
+      setGroups([]);
+    } finally {
+      setIsScanning(false);
+    }
+  }, [directory, recursive]);
+
+  const toggleSelect = useCallback((path: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) {
+        next.delete(path);
+      } else {
+        next.add(path);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleDeleteSelected = useCallback(async () => {
+    if (selected.size === 0) return;
+    setIsDeleting(true);
+    try {
+      for (const path of selected) {
+        await invoke("move_to_trash", { path });
+      }
+      // Remove deleted files from groups
+      setGroups((prev) =>
+        prev
+          .map((g) => ({
+            ...g,
+            files: g.files.filter((f) => !selected.has(f)),
+          }))
+          .filter((g) => g.files.length > 1),
+      );
+      setSelected(new Set());
+      setDeleteComplete(true);
+    } catch (err) {
+      console.error("Delete error:", err);
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [selected]);
+
+  const summary = useMemo(() => {
+    const totalDuplicates = groups.reduce(
+      (sum, g) => sum + (g.files.length - 1),
+      0,
+    );
+    const saveable = groups.reduce(
+      (sum, g) => sum + g.size * (g.files.length - 1),
+      0,
+    );
+    return {
+      groupCount: groups.length,
+      duplicateCount: totalDuplicates,
+      saveable,
+    };
+  }, [groups]);
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Controls */}
+      <div className="p-4 space-y-3 border-b border-gray-200">
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={directory}
+            onChange={(e) => setDirectory(e.target.value)}
+            placeholder="スキャンするフォルダを選択..."
+            className="flex-1 rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20"
+          />
+          <button
+            onClick={handleBrowse}
+            className="shrink-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            <FolderOpen size={16} />
+          </button>
+        </div>
+
+        <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={recursive}
+            onChange={(e) => setRecursive(e.target.checked)}
+            className="accent-indigo-600"
+          />
+          サブフォルダも含める
+        </label>
+
+        <button
+          onClick={handleScan}
+          disabled={!directory || isScanning}
+          className="w-full rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {isScanning ? (
+            <span className="flex items-center justify-center gap-2">
+              <Loader2 size={14} className="animate-spin" />
+              スキャン中...
+            </span>
+          ) : (
+            "スキャン"
+          )}
+        </button>
+      </div>
+
+      {/* Results */}
+      <div className="flex-1 overflow-y-auto">
+        {!scanned && (
+          <div className="flex flex-col items-center justify-center h-full text-gray-400">
+            <Copy size={32} className="mb-2 opacity-50" />
+            <p className="text-sm">フォルダを選択してスキャン</p>
+          </div>
+        )}
+
+        {scanned && !isScanning && groups.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-full text-gray-400">
+            <CheckCircle2 size={32} className="mb-2 opacity-50" />
+            <p className="text-sm">重複ファイルはありませんでした</p>
+          </div>
+        )}
+
+        {groups.length > 0 && (
+          <div className="p-4 space-y-3">
+            {/* Summary */}
+            <div className="rounded-lg bg-amber-50 border border-amber-200 p-3">
+              <div className="text-sm font-medium text-amber-800">
+                {summary.groupCount}グループ, {summary.duplicateCount}
+                個の重複, {formatFileSize(summary.saveable)} 節約可能
+              </div>
+            </div>
+
+            {deleteComplete && (
+              <div className="rounded-lg bg-green-50 border border-green-200 p-3 text-sm text-green-700">
+                選択したファイルをゴミ箱に移動しました
+              </div>
+            )}
+
+            {/* Delete button */}
+            {selected.size > 0 && (
+              <button
+                onClick={handleDeleteSelected}
+                disabled={isDeleting}
+                className="w-full rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 transition-colors"
+              >
+                {isDeleting ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 size={14} className="animate-spin" />
+                    削除中...
+                  </span>
+                ) : (
+                  <span className="flex items-center justify-center gap-2">
+                    <Trash2 size={14} />
+                    選択したファイルをゴミ箱に移動 ({selected.size}件)
+                  </span>
+                )}
+              </button>
+            )}
+
+            {/* Duplicate groups */}
+            {groups.map((group) => (
+              <div
+                key={group.hash}
+                className="rounded-lg border border-gray-200 overflow-hidden"
+              >
+                <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-200">
+                  <Hash size={12} className="text-gray-400" />
+                  <span className="text-xs text-gray-500 font-mono truncate">
+                    {group.hash.slice(0, 16)}...
+                  </span>
+                  <span className="text-xs text-gray-400 ml-auto">
+                    {formatFileSize(group.size)} x {group.files.length}
+                  </span>
+                </div>
+                <div className="divide-y divide-gray-100">
+                  {group.files.map((file, i) => (
+                    <label
+                      key={file}
+                      className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer text-xs"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selected.has(file)}
+                        onChange={() => toggleSelect(file)}
+                        disabled={i === 0}
+                        className="accent-red-600 disabled:opacity-30"
+                      />
+                      <span
+                        className={`truncate ${i === 0 ? "text-green-700 font-medium" : "text-gray-700"}`}
+                      >
+                        {i === 0 && "(保持) "}
+                        {file}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

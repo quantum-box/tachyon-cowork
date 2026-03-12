@@ -21,7 +21,8 @@
     "react-dom": "^19.0.0",
     "react-markdown": "^9.0.1",
     "react-router-dom": "^7.1.0",
-    "remark-gfm": "^4.0.0"
+    "remark-gfm": "^4.0.0",
+    "@tauri-apps/plugin-global-shortcut": "^2.0.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.0",

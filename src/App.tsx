@@ -8,9 +8,11 @@ import { Sidebar } from "./components/layout/Sidebar";
 import { ChatPanel } from "./components/chat/ChatPanel";
 import { ArtifactPanel } from "./components/artifact/ArtifactPanel";
 import { LoginScreen } from "./components/layout/LoginScreen";
+import { ToolsPanel } from "./components/layout/ToolsPanel";
 
 export default function App() {
   const [auth, setAuth] = useState<AuthState | null>(loadAuth);
+  const [showTools, setShowTools] = useState(false);
 
   const client = useMemo(
     () =>
@@ -42,6 +44,14 @@ export default function App() {
     [artifactState],
   );
 
+  const handleToggleTools = useCallback(() => {
+    setShowTools((prev) => !prev);
+  }, []);
+
+  const handleBackToChat = useCallback(() => {
+    setShowTools(false);
+  }, []);
+
   if (!auth) {
     return <LoginScreen onLogin={setAuth} />;
   }
@@ -57,20 +67,26 @@ export default function App() {
           onSelectSession={chat.selectSession}
           onDeleteRoom={chat.deleteRoom}
           onLogout={handleLogout}
+          onToggleTools={handleToggleTools}
+          showTools={showTools}
         />
       </div>
 
-      {/* Main chat area */}
+      {/* Main area */}
       <div className="flex-1 min-w-0">
-        <ChatPanel
-          chat={chat}
-          files={fileHandler.files}
-          fileError={fileHandler.fileError}
-          onFilesAdd={fileHandler.addFiles}
-          onFileRemove={fileHandler.removeFile}
-          onClearFiles={fileHandler.clearFiles}
-          onOpenArtifact={handleOpenArtifact}
-        />
+        {showTools ? (
+          <ToolsPanel onBack={handleBackToChat} />
+        ) : (
+          <ChatPanel
+            chat={chat}
+            files={fileHandler.files}
+            fileError={fileHandler.fileError}
+            onFilesAdd={fileHandler.addFiles}
+            onFileRemove={fileHandler.removeFile}
+            onClearFiles={fileHandler.clearFiles}
+            onOpenArtifact={handleOpenArtifact}
+          />
+        )}
       </div>
 
       {/* Artifact panel (right side) */}

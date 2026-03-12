@@ -1,6 +1,7 @@
 {
+  "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Default capabilities for the Tachyon Cowork desktop app",
+  "description": "Capability for the main window",
   "windows": ["main"],
   "permissions": [
     "core:default",
@@ -8,6 +9,7 @@
     "dialog:default",
     "fs:default",
     "store:default",
-    "notification:default"
+    "notification:default",
+    "global-shortcut:default"
   ]
 }
