@@ -135,7 +135,7 @@ pub async fn write_excel(data: WriteExcelRequest) -> Result<Vec<u8>, String> {
                     serde_json::Value::Null => {}
                     _ => {
                         worksheet
-                            .write_string(r, c, &cell.to_string())
+                            .write_string(r, c, cell.to_string())
                             .map_err(|e| e.to_string())?;
                     }
                 }
