@@ -2,8 +2,11 @@ import { useCallback, useMemo, useState } from "react";
 import { AgentChatClient } from "./lib/api-client";
 import { type AuthState, clearAuth, loadAuth } from "./lib/auth";
 import { useAgentChat } from "./hooks/useAgentChat";
+import { useFileHandler } from "./hooks/useFileHandler";
+import { useArtifact } from "./hooks/useArtifact";
 import { Sidebar } from "./components/layout/Sidebar";
 import { ChatPanel } from "./components/chat/ChatPanel";
+import { ArtifactPanel } from "./components/artifact/ArtifactPanel";
 import { LoginScreen } from "./components/layout/LoginScreen";
 
 export default function App() {
@@ -23,11 +26,21 @@ export default function App() {
   );
 
   const chat = useAgentChat(client);
+  const fileHandler = useFileHandler();
+  const artifactState = useArtifact();
 
   const handleLogout = useCallback(() => {
     clearAuth();
     setAuth(null);
   }, []);
+
+  const handleOpenArtifact = useCallback(
+    (artifact: Parameters<typeof artifactState.openArtifact>[0]) => {
+      artifactState.addArtifact(artifact);
+      artifactState.openArtifact(artifact);
+    },
+    [artifactState],
+  );
 
   if (!auth) {
     return <LoginScreen onLogin={setAuth} />;
@@ -49,8 +62,24 @@ export default function App() {
 
       {/* Main chat area */}
       <div className="flex-1 min-w-0">
-        <ChatPanel chat={chat} />
+        <ChatPanel
+          chat={chat}
+          files={fileHandler.files}
+          fileError={fileHandler.fileError}
+          onFilesAdd={fileHandler.addFiles}
+          onFileRemove={fileHandler.removeFile}
+          onClearFiles={fileHandler.clearFiles}
+          onOpenArtifact={handleOpenArtifact}
+        />
       </div>
+
+      {/* Artifact panel (right side) */}
+      <ArtifactPanel
+        artifact={artifactState.selectedArtifact}
+        isOpen={artifactState.isPanelOpen}
+        onClose={artifactState.closePanel}
+        onDownload={artifactState.downloadArtifact}
+      />
     </div>
   );
 }

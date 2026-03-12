@@ -1,14 +1,15 @@
 import { useEffect, useRef } from "react";
 import { Loader2 } from "lucide-react";
-import type { AgentChunk } from "../../lib/types";
+import type { AgentChunk, Artifact } from "../../lib/types";
 import { MessageBubble } from "./MessageBubble";
 
 type Props = {
   chunks: AgentChunk[];
   isLoading?: boolean;
+  onOpenArtifact?: (artifact: Artifact) => void;
 };
 
-export function MessageList({ chunks, isLoading }: Props) {
+export function MessageList({ chunks, isLoading, onOpenArtifact }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -24,7 +25,11 @@ export function MessageList({ chunks, isLoading }: Props) {
       <div className="max-w-3xl mx-auto">
         {chunks.length === 0 && !isLoading && <EmptyState />}
         {chunks.map((chunk) => (
-          <MessageBubble key={chunk.id} chunk={chunk} />
+          <MessageBubble
+            key={chunk.id}
+            chunk={chunk}
+            onOpenArtifact={onOpenArtifact}
+          />
         ))}
         {isLoading && chunks.length > 0 && (
           <div className="flex justify-start mb-2 gap-2">

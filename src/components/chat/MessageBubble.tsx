@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
@@ -10,19 +10,28 @@ import {
   CheckCircle,
   Loader2,
   Coins,
+  Code,
 } from "lucide-react";
-import type { AgentChunk } from "../../lib/types";
+import type { AgentChunk, Artifact } from "../../lib/types";
 
-type Props = { chunk: AgentChunk };
+type Props = {
+  chunk: AgentChunk;
+  onOpenArtifact?: (artifact: Artifact) => void;
+};
 
-export function MessageBubble({ chunk }: Props) {
+export function MessageBubble({ chunk, onOpenArtifact }: Props) {
   switch (chunk.type) {
     case "user":
       return <UserMessage text={chunk.text ?? ""} />;
     case "say":
     case "assistant":
     case "attempt_completion":
-      return <AssistantMessage text={chunk.text || chunk.content || ""} />;
+      return (
+        <AssistantMessage
+          text={chunk.text || chunk.content || ""}
+          onOpenArtifact={onOpenArtifact}
+        />
+      );
     case "thinking":
       return (
         <ThinkingMessage
@@ -85,7 +94,50 @@ function UserMessage({ text }: { text: string }) {
   );
 }
 
-function AssistantMessage({ text }: { text: string }) {
+/** Parse code blocks from markdown text */
+type CodeBlockInfo = {
+  language: string;
+  code: string;
+};
+
+function extractCodeBlocks(text: string): CodeBlockInfo[] {
+  const regex = /```(\w*)\n([\s\S]*?)```/g;
+  const blocks: CodeBlockInfo[] = [];
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(text)) !== null) {
+    blocks.push({
+      language: match[1] || "plaintext",
+      code: match[2].trimEnd(),
+    });
+  }
+  return blocks;
+}
+
+function AssistantMessage({
+  text,
+  onOpenArtifact,
+}: {
+  text: string;
+  onOpenArtifact?: (artifact: Artifact) => void;
+}) {
+  const codeBlocks = extractCodeBlocks(text);
+
+  const handleOpenCodeBlock = useCallback(
+    (block: CodeBlockInfo, index: number) => {
+      if (!onOpenArtifact) return;
+      const artifact: Artifact = {
+        id: crypto.randomUUID(),
+        type: "code",
+        title: `コードブロック ${index + 1}`,
+        content: block.code,
+        language: block.language,
+        createdAt: new Date().toISOString(),
+      };
+      onOpenArtifact(artifact);
+    },
+    [onOpenArtifact],
+  );
+
   return (
     <div className="flex justify-start mb-4 gap-2">
       <div className="shrink-0 w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
@@ -93,6 +145,27 @@ function AssistantMessage({ text }: { text: string }) {
       </div>
       <div className="max-w-[75%] rounded-2xl rounded-bl-sm px-4 py-3 bg-gray-100 text-sm leading-relaxed prose prose-sm max-w-none prose-p:my-1 prose-pre:bg-gray-800 prose-pre:text-gray-100 prose-code:text-indigo-600 prose-code:before:content-[''] prose-code:after:content-['']">
         <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
+
+        {/* Artifact buttons for code blocks */}
+        {codeBlocks.length > 0 && onOpenArtifact && (
+          <div className="mt-2 flex flex-wrap gap-2 not-prose">
+            {codeBlocks.map((block, i) => (
+              <button
+                key={i}
+                onClick={() => handleOpenCodeBlock(block, i)}
+                className="flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-100 transition-colors"
+              >
+                <Code size={12} />
+                Artifactで開く
+                {codeBlocks.length > 1 && (
+                  <span className="text-indigo-400">
+                    ({block.language})
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
