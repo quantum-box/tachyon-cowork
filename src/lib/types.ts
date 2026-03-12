@@ -1,0 +1,90 @@
+/** Token usage information */
+export type Usage = {
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+};
+
+/** A chunk of agent output (streaming or stored) */
+export type AgentChunk = {
+  type:
+    | "user"
+    | "ask"
+    | "thinking"
+    | "tool_call"
+    | "tool_call_args"
+    | "tool_result"
+    | "tool_call_pending"
+    | "say"
+    | "attempt_completion"
+    | "assistant"
+    | "completion"
+    | "usage"
+    | "tool_job_started";
+  id: string;
+  text?: string;
+  created_at: string;
+  user_id?: string;
+  thinking?: string;
+  tool_name?: string;
+  tool_arguments?: string;
+  tool_result?: string;
+  tool_id?: string;
+  content?: string;
+  result?: string;
+  is_finished?: boolean;
+  isStreaming?: boolean;
+  options?: string[];
+  // usage fields
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
+  total_cost?: number;
+  // tool_job_started fields
+  job_id?: string;
+  provider?: string;
+};
+
+/** Request payload for executing an agent task */
+export type AgentExecuteRequest = {
+  task: string;
+  model?: string;
+  max_requests?: number;
+  tool_access?: ToolAccess;
+};
+
+/** Tool access permissions for agent execution */
+export type ToolAccess = {
+  filesystem?: boolean;
+  command?: boolean;
+  coding_agent_job?: boolean;
+  web_search?: boolean;
+  url_fetch?: boolean;
+  sub_agent?: boolean;
+};
+
+/** Information about a single LLM model */
+export type ModelInfo = {
+  id: string;
+  name: string;
+  provider: string;
+  supported_features: string[];
+  description?: string | null;
+  context_window?: number | null;
+  max_output_tokens?: number | null;
+};
+
+/** A chat room */
+export type ChatRoom = {
+  id: string;
+  name: string;
+  created_at: string;
+};
+
+/** Auth config */
+export type AuthConfig = {
+  apiBaseUrl: string;
+  accessToken: string;
+  tenantId: string;
+  userId?: string;
+};

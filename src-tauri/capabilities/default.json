@@ -1,0 +1,13 @@
+{
+  "identifier": "default",
+  "description": "Default capabilities for the Tachyon Cowork desktop app",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "shell:allow-open",
+    "dialog:default",
+    "fs:default",
+    "store:default",
+    "notification:default"
+  ]
+}
