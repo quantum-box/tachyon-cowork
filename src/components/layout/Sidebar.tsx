@@ -6,29 +6,37 @@ import {
   Settings,
   LogOut,
   FolderOpen,
+  Pin,
+  PinOff,
 } from "lucide-react";
 import type { ChatRoom } from "../../lib/types";
 
 type Props = {
   chatRooms: ChatRoom[];
   activeSessionId: string | null;
+  pinnedRooms: string[];
   onNewChat: () => void;
   onSelectSession: (id: string) => void;
   onDeleteRoom: (id: string) => void;
+  onTogglePin: (id: string) => void;
   onLogout: () => void;
   onToggleTools: () => void;
   showTools: boolean;
+  onOpenSettings: () => void;
 };
 
 export function Sidebar({
   chatRooms,
   activeSessionId,
+  pinnedRooms,
   onNewChat,
   onSelectSession,
   onDeleteRoom,
+  onTogglePin,
   onLogout,
   onToggleTools,
   showTools,
+  onOpenSettings,
 }: Props) {
   const [search, setSearch] = useState("");
 
@@ -38,20 +46,24 @@ export function Sidebar({
       )
     : chatRooms;
 
-  // Group by date
-  const grouped = groupByDate(filtered);
+  // Separate pinned rooms from the rest
+  const pinned = filtered.filter((r) => pinnedRooms.includes(r.id));
+  const unpinned = filtered.filter((r) => !pinnedRooms.includes(r.id));
+
+  // Group unpinned by date
+  const grouped = groupByDate(unpinned);
 
   return (
-    <div className="flex flex-col h-full bg-gray-50 border-r border-gray-200">
+    <div className="flex flex-col h-full bg-gray-50 dark:bg-slate-900 border-r border-gray-200 dark:border-slate-700 transition-colors duration-150">
       {/* Header */}
-      <div className="p-4 border-b border-gray-200">
+      <div className="p-4 border-b border-gray-200 dark:border-slate-700">
         <div className="flex items-center justify-between mb-3">
-          <h1 className="text-sm font-semibold text-gray-800 tracking-tight">
+          <h1 className="text-sm font-semibold text-gray-800 dark:text-gray-200 tracking-tight">
             Tachyon Cowork
           </h1>
           <button
             onClick={onNewChat}
-            className="p-1.5 rounded-lg hover:bg-gray-200 text-gray-600 transition-colors"
+            className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-800 text-gray-600 dark:text-gray-400 transition-colors duration-150"
             title="新しいチャット"
           >
             <MessageSquarePlus size={18} />
@@ -62,14 +74,14 @@ export function Sidebar({
         <div className="relative">
           <Search
             size={14}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500"
           />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="検索..."
-            className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-gray-200 bg-white outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400/20 placeholder:text-gray-400"
+            className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400/20 placeholder:text-gray-400 dark:placeholder:text-slate-500 transition-colors duration-150"
           />
         </div>
       </div>
@@ -80,8 +92,8 @@ export function Sidebar({
           onClick={onToggleTools}
           className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
             showTools
-              ? "bg-indigo-100 text-indigo-700 border border-indigo-300"
-              : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-100"
+              ? "bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-700"
+              : "bg-white dark:bg-slate-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-slate-600 hover:bg-gray-100 dark:hover:bg-slate-700"
           }`}
         >
           <FolderOpen size={14} />
@@ -91,9 +103,31 @@ export function Sidebar({
 
       {/* Chat list */}
       <div className="flex-1 overflow-y-auto py-2">
+        {/* Pinned section */}
+        {pinned.length > 0 && (
+          <div>
+            <div className="px-4 py-1.5 text-[10px] font-medium text-gray-400 dark:text-slate-500 uppercase tracking-wider flex items-center gap-1">
+              <Pin size={10} />
+              ピン留め
+            </div>
+            {pinned.map((room) => (
+              <ChatRoomItem
+                key={room.id}
+                room={room}
+                isActive={room.id === activeSessionId}
+                isPinned={true}
+                onSelect={() => onSelectSession(room.id)}
+                onDelete={() => onDeleteRoom(room.id)}
+                onTogglePin={() => onTogglePin(room.id)}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Date-grouped rooms */}
         {Object.entries(grouped).map(([label, rooms]) => (
           <div key={label}>
-            <div className="px-4 py-1.5 text-[10px] font-medium text-gray-400 uppercase tracking-wider">
+            <div className="px-4 py-1.5 text-[10px] font-medium text-gray-400 dark:text-slate-500 uppercase tracking-wider">
               {label}
             </div>
             {rooms.map((room) => (
@@ -101,27 +135,33 @@ export function Sidebar({
                 key={room.id}
                 room={room}
                 isActive={room.id === activeSessionId}
+                isPinned={false}
                 onSelect={() => onSelectSession(room.id)}
                 onDelete={() => onDeleteRoom(room.id)}
+                onTogglePin={() => onTogglePin(room.id)}
               />
             ))}
           </div>
         ))}
         {filtered.length === 0 && (
-          <div className="px-4 py-8 text-center text-xs text-gray-400">
+          <div className="px-4 py-8 text-center text-xs text-gray-400 dark:text-slate-500">
             {search ? "該当なし" : "チャット履歴はまだありません"}
           </div>
         )}
       </div>
 
       {/* Footer */}
-      <div className="p-3 border-t border-gray-200 flex items-center gap-2">
-        <button className="p-2 rounded-lg hover:bg-gray-200 text-gray-500 transition-colors">
+      <div className="p-3 border-t border-gray-200 dark:border-slate-700 flex items-center gap-2">
+        <button
+          onClick={onOpenSettings}
+          className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-800 text-gray-500 dark:text-slate-400 transition-colors duration-150"
+          title="設定"
+        >
           <Settings size={16} />
         </button>
         <button
           onClick={onLogout}
-          className="p-2 rounded-lg hover:bg-gray-200 text-gray-500 transition-colors"
+          className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-800 text-gray-500 dark:text-slate-400 transition-colors duration-150"
           title="ログアウト"
         >
           <LogOut size={16} />
@@ -134,33 +174,51 @@ export function Sidebar({
 function ChatRoomItem({
   room,
   isActive,
+  isPinned,
   onSelect,
   onDelete,
+  onTogglePin,
 }: {
   room: ChatRoom;
   isActive: boolean;
+  isPinned: boolean;
   onSelect: () => void;
   onDelete: () => void;
+  onTogglePin: () => void;
 }) {
   return (
     <button
       onClick={onSelect}
-      className={`group w-full text-left px-4 py-2 flex items-center gap-2 transition-colors ${
+      className={`group w-full text-left px-4 py-2 flex items-center gap-2 transition-colors duration-150 ${
         isActive
-          ? "bg-indigo-50 text-indigo-700"
-          : "hover:bg-gray-100 text-gray-700"
+          ? "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300"
+          : "hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-700 dark:text-gray-300"
       }`}
     >
-      <span className="flex-1 text-xs truncate">{room.name || "新しいチャット"}</span>
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onDelete();
-        }}
-        className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-gray-200 text-gray-400 hover:text-red-500 transition-all"
-      >
-        <Trash2 size={12} />
-      </button>
+      <span className="flex-1 text-xs truncate">
+        {room.name || "新しいチャット"}
+      </span>
+      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all duration-150">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onTogglePin();
+          }}
+          className="p-1 rounded hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-400 dark:text-slate-500 hover:text-indigo-500 dark:hover:text-indigo-400 transition-all"
+          title={isPinned ? "ピン解除" : "ピン留め"}
+        >
+          {isPinned ? <PinOff size={12} /> : <Pin size={12} />}
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          className="p-1 rounded hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 transition-all"
+        >
+          <Trash2 size={12} />
+        </button>
+      </div>
     </button>
   );
 }

@@ -77,7 +77,10 @@ export function ChatInput({
   const hasContent = input.trim() || files.length > 0;
 
   return (
-    <form onSubmit={onSubmit} className="border-t border-gray-200 bg-white p-4">
+    <form
+      onSubmit={onSubmit}
+      className="border-t border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-950 p-4 transition-colors duration-150"
+    >
       <div className="max-w-3xl mx-auto">
         {/* File preview chips */}
         <FilePreview files={files} onRemove={onFileRemove} />
@@ -88,7 +91,7 @@ export function ChatInput({
             type="button"
             onClick={handlePickFiles}
             disabled={isLoading}
-            className="shrink-0 rounded-2xl p-3 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="shrink-0 rounded-2xl p-3 text-gray-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors duration-150"
             aria-label="ファイルを添付"
           >
             <Paperclip size={18} />
@@ -103,12 +106,12 @@ export function ChatInput({
             placeholder={placeholder ?? "メッセージを入力..."}
             disabled={isLoading}
             rows={1}
-            className="flex-1 resize-none rounded-2xl border border-gray-300 bg-gray-50 px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-50 placeholder:text-gray-400 transition-all"
+            className="flex-1 resize-none rounded-2xl border border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-800 px-4 py-3 text-sm text-gray-900 dark:text-gray-100 outline-none focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 dark:focus:ring-indigo-400/20 disabled:opacity-50 placeholder:text-gray-400 dark:placeholder:text-slate-500 transition-all duration-150"
           />
           <button
             type="submit"
             disabled={!hasContent || isLoading}
-            className="shrink-0 rounded-2xl bg-indigo-600 p-3 text-white hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="shrink-0 rounded-2xl bg-indigo-600 dark:bg-indigo-600 p-3 text-white hover:bg-indigo-700 dark:hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors duration-150"
           >
             <SendHorizonal size={18} />
           </button>
