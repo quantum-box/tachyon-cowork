@@ -3,11 +3,11 @@ name: Tauri Release
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version tag (e.g., v0.1.0)'
+        description: "Version tag (e.g., v0.1.0)"
         required: true
 
 env:
@@ -43,7 +43,7 @@ jobs:
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
         with:
-          key: ${{ matrix.target }}-tauri
+          key: ${{ matrix.target }}-release
           workspaces: src-tauri -> target
 
       - name: Setup Node.js
@@ -72,7 +72,7 @@ jobs:
           args: --target ${{ matrix.target }}
 
       - name: Ad-hoc codesign macOS app
-        if: startsWith(matrix.target, 'x86_64-apple-darwin') || startsWith(matrix.target, 'aarch64-apple-darwin')
+        if: contains(matrix.target, 'apple-darwin')
         run: |
           APP_PATH=$(find src-tauri/target/${{ matrix.target }}/release/bundle/macos -name "*.app" -maxdepth 1 | head -1)
           if [ -n "$APP_PATH" ]; then
@@ -113,12 +113,14 @@ jobs:
             -name "*.exe" -o \
             -name "*.msi" \
           \) -exec cp {} release/ \;
+          echo "Release files:"
           ls -la release/
 
       - name: Generate checksums
         run: |
           cd release
           sha256sum * > checksums-sha256.txt || true
+          cat checksums-sha256.txt
 
       - name: Set version
         id: version

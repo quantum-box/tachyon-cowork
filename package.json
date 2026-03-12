@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port 1420",
-    "build": "tsc -b && vite build",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "tauri": "tauri"
   },

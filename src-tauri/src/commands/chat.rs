@@ -12,8 +12,7 @@ pub async fn get_config() -> Result<AppConfig, String> {
     Ok(AppConfig {
         api_base_url: std::env::var("TACHYON_API_URL")
             .unwrap_or_else(|_| "https://api.tachyon.dev".to_string()),
-        tenant_slug: std::env::var("TACHYON_TENANT_SLUG")
-            .unwrap_or_else(|_| "default".to_string()),
+        tenant_slug: std::env::var("TACHYON_TENANT_SLUG").unwrap_or_else(|_| "default".to_string()),
     })
 }
 
