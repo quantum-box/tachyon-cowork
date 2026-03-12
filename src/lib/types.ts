@@ -119,3 +119,48 @@ export type Artifact = {
   url?: string;
   createdAt: string;
 };
+
+// Excel types
+export type ExcelData = { sheets: SheetData[] };
+export type SheetData = {
+  name: string;
+  rows: CellValue[][];
+  row_count: number;
+  col_count: number;
+};
+export type CellValue =
+  | { type: "Empty" }
+  | { type: "String"; value: string }
+  | { type: "Number"; value: number }
+  | { type: "Bool"; value: boolean }
+  | { type: "Error"; value: string };
+export type WriteExcelRequest = { sheets: WriteSheetData[] };
+export type WriteSheetData = {
+  name: string;
+  headers?: string[];
+  rows: unknown[][];
+  column_widths?: number[];
+};
+
+// PPTX types
+export type PptxMetadata = {
+  slide_count: number;
+  title?: string;
+  slides: SlideInfo[];
+};
+export type SlideInfo = {
+  index: number;
+  title?: string;
+  text_content: string;
+};
+
+// Tool execution types
+export type ToolCall = {
+  name: string;
+  arguments: Record<string, unknown>;
+};
+export type ToolResult = {
+  tool_id: string;
+  result: unknown;
+  error?: string;
+};
