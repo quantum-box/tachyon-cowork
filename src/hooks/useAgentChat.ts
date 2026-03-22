@@ -36,12 +36,10 @@ export function useAgentChat(
   );
   const abortRef = useRef<AbortController | null>(null);
 
-  // Persist model selection
   useEffect(() => {
     localStorage.setItem(MODEL_KEY, selectedModel);
   }, [selectedModel]);
 
-  // Load messages when session changes
   useEffect(() => {
     if (!sessionId || !client) {
       setChunks([]);
@@ -59,7 +57,6 @@ export function useAgentChat(
     };
   }, [sessionId, client]);
 
-  // Fetch chat rooms
   const fetchChatRooms = useCallback(async () => {
     if (!client) return;
     try {
@@ -70,12 +67,10 @@ export function useAgentChat(
     }
   }, [client]);
 
-  // Load rooms on mount
   useEffect(() => {
     fetchChatRooms();
   }, [fetchChatRooms]);
 
-  // Start task: create room if needed, then stream SSE
   const startTask = useCallback(
     async (task: string, newRoomTitle?: string) => {
       if (!client) return;
@@ -90,7 +85,6 @@ export function useAgentChat(
           );
           currentSessionId = room.chatroom.id;
           setSessionId(currentSessionId);
-          // Add to sidebar
           setChatRooms((prev) => [
             {
               id: room.chatroom.id,
@@ -163,7 +157,6 @@ export function useAgentChat(
         setIsLoading(false);
         if (abortRef.current === ac) abortRef.current = null;
 
-        // Refetch to get server-persisted IDs
         if (currentSessionId) {
           try {
             const msgs = await client.getMessages(currentSessionId);
@@ -253,7 +246,6 @@ export function useAgentChat(
     });
   }, []);
 
-  // Cleanup on unmount
   useEffect(
     () => () => {
       abortRef.current?.abort();
