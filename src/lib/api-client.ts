@@ -5,12 +5,19 @@ import type {
   ChatRoom,
   ModelInfo,
 } from "./types";
+import type { TokenManager } from "./token-manager";
 
 export class AgentChatClient {
   private config: AuthConfig;
+  private tokenManager: TokenManager | null = null;
 
   constructor(config: AuthConfig) {
     this.config = config;
+  }
+
+  /** Attach a TokenManager for automatic token refresh. */
+  setTokenManager(tm: TokenManager): void {
+    this.tokenManager = tm;
   }
 
   updateConfig(config: Partial<AuthConfig>) {
@@ -29,6 +36,17 @@ export class AgentChatClient {
     return headers;
   }
 
+  /** Ensure the token is fresh before building headers. */
+  private async getFreshHeaders(): Promise<Record<string, string>> {
+    if (this.tokenManager) {
+      const freshToken = await this.tokenManager.ensureFreshToken();
+      if (freshToken !== this.config.accessToken) {
+        this.config = { ...this.config, accessToken: freshToken };
+      }
+    }
+    return this.getHeaders();
+  }
+
   private buildUrl(path: string): string {
     const base = this.config.apiBaseUrl.replace(/\/+$/, "");
     return `${base}${path}`;
@@ -36,13 +54,33 @@ export class AgentChatClient {
 
   private async request<T>(path: string, options?: RequestInit): Promise<T> {
     const url = this.buildUrl(path);
+    const headers = await this.getFreshHeaders();
     const response = await fetch(url, {
       ...options,
       headers: {
-        ...this.getHeaders(),
+        ...headers,
         ...options?.headers,
       },
     });
+
+    // On 401, try one refresh + retry
+    if (response.status === 401 && this.tokenManager) {
+      const freshToken = await this.tokenManager.ensureFreshToken();
+      this.config = { ...this.config, accessToken: freshToken };
+      const retryHeaders = this.getHeaders();
+      const retryResponse = await fetch(url, {
+        ...options,
+        headers: { ...retryHeaders, ...options?.headers },
+      });
+      if (!retryResponse.ok) {
+        const body = await retryResponse.text().catch(() => "");
+        throw new Error(
+          `Request failed: ${retryResponse.status} ${retryResponse.statusText}${body ? ` - ${body}` : ""}`,
+        );
+      }
+      return (await retryResponse.json()) as T;
+    }
+
     if (!response.ok) {
       const body = await response.text().catch(() => "");
       throw new Error(
@@ -83,9 +121,10 @@ export class AgentChatClient {
 
   async deleteChatroom(id: string): Promise<void> {
     const url = this.buildUrl(`/v1/llms/chatrooms/${id}`);
+    const headers = await this.getFreshHeaders();
     const response = await fetch(url, {
       method: "DELETE",
-      headers: this.getHeaders(),
+      headers,
     });
     if (!response.ok) {
       throw new Error(`Failed to delete chatroom: ${response.status}`);
@@ -101,10 +140,11 @@ export class AgentChatClient {
     const url = this.buildUrl(
       `/v1/llms/sessions/${chatRoomId}/agent/execute`,
     );
+    const headers = await this.getFreshHeaders();
     const response = await fetch(url, {
       method: "POST",
       headers: {
-        ...this.getHeaders(),
+        ...headers,
         Accept: "text/event-stream",
       },
       body: JSON.stringify(args),
