@@ -3,9 +3,11 @@ import { AgentChatClient } from "../lib/api-client";
 import type {
   AgentChunk,
   AgentExecuteRequest,
+  Artifact,
   ChatRoom,
   InlineAttachment,
 } from "../lib/types";
+import { chunkToArtifact } from "./useArtifact";
 
 const MODEL_KEY = "tachyon-cowork-model";
 const PINNED_KEY = "tachyon-cowork-pinned";
@@ -24,7 +26,10 @@ function savePinnedRooms(ids: string[]): void {
   localStorage.setItem(PINNED_KEY, JSON.stringify(ids));
 }
 
-export function useAgentChat(client: AgentChatClient | null) {
+export function useAgentChat(
+  client: AgentChatClient | null,
+  onArtifact?: (artifact: Artifact) => void,
+) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [chunks, setChunks] = useState<AgentChunk[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -37,12 +42,10 @@ export function useAgentChat(client: AgentChatClient | null) {
   );
   const abortRef = useRef<AbortController | null>(null);
 
-  // Persist model selection
   useEffect(() => {
     localStorage.setItem(MODEL_KEY, selectedModel);
   }, [selectedModel]);
 
-  // Load messages when session changes
   useEffect(() => {
     if (!sessionId || !client) {
       setChunks([]);
@@ -60,7 +63,6 @@ export function useAgentChat(client: AgentChatClient | null) {
     };
   }, [sessionId, client]);
 
-  // Fetch chat rooms
   const fetchChatRooms = useCallback(async () => {
     if (!client) return;
     try {
@@ -71,12 +73,10 @@ export function useAgentChat(client: AgentChatClient | null) {
     }
   }, [client]);
 
-  // Load rooms on mount
   useEffect(() => {
     fetchChatRooms();
   }, [fetchChatRooms]);
 
-  // Start task: create room if needed, then stream SSE
   const startTask = useCallback(
     async (task: string, newRoomTitle?: string, attachments?: InlineAttachment[]) => {
       if (!client) return;
@@ -91,7 +91,6 @@ export function useAgentChat(client: AgentChatClient | null) {
           );
           currentSessionId = room.chatroom.id;
           setSessionId(currentSessionId);
-          // Add to sidebar
           setChatRooms((prev) => [
             {
               id: room.chatroom.id,
@@ -149,6 +148,9 @@ export function useAgentChat(client: AgentChatClient | null) {
               }
               const chunk = parsed as AgentChunk;
               setChunks((prev) => [...prev, chunk]);
+              if (chunk.type === "artifact" && onArtifact) {
+                onArtifact(chunkToArtifact(chunk));
+              }
             } catch {
               // skip malformed JSON
             }
@@ -162,7 +164,6 @@ export function useAgentChat(client: AgentChatClient | null) {
         setIsLoading(false);
         if (abortRef.current === ac) abortRef.current = null;
 
-        // Refetch to get server-persisted IDs
         if (currentSessionId) {
           try {
             const msgs = await client.getMessages(currentSessionId);
@@ -173,7 +174,7 @@ export function useAgentChat(client: AgentChatClient | null) {
         }
       }
     },
-    [sessionId, client, selectedModel],
+    [sessionId, client, selectedModel, onArtifact],
   );
 
   const sendMessage = useCallback(
@@ -262,7 +263,6 @@ export function useAgentChat(client: AgentChatClient | null) {
     });
   }, []);
 
-  // Cleanup on unmount
   useEffect(
     () => () => {
       abortRef.current?.abort();

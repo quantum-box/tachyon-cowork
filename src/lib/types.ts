@@ -20,7 +20,8 @@ export type AgentChunk = {
     | "assistant"
     | "completion"
     | "usage"
-    | "tool_job_started";
+    | "tool_job_started"
+    | "artifact";
   id: string;
   text?: string;
   created_at: string;
@@ -45,6 +46,13 @@ export type AgentChunk = {
   provider?: string;
   // vision: image preview data URLs attached to user messages
   imageUrls?: string[];
+  // artifact fields
+  artifact_id?: string;
+  content_type?: string;
+  filename?: string;
+  url?: string;
+  size_bytes?: number;
+  metadata?: Record<string, unknown>;
 };
 
 /** Inline attachment sent as base64 with the agent request */

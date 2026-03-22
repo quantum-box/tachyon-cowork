@@ -71,18 +71,18 @@ export function DiskUsageChart() {
   return (
     <div className="flex flex-col h-full">
       {/* Controls */}
-      <div className="p-4 space-y-3 border-b border-gray-200">
+      <div className="p-4 space-y-3 border-b border-gray-200 dark:border-slate-700">
         <div className="flex items-center gap-2">
           <input
             type="text"
             value={directory}
             onChange={(e) => setDirectory(e.target.value)}
             placeholder="分析するフォルダを選択..."
-            className="flex-1 rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20"
+            className="flex-1 rounded-lg border border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 outline-none focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-1 focus:ring-indigo-500/20 dark:focus:ring-indigo-400/20 placeholder:text-gray-400 dark:placeholder:text-slate-500"
           />
           <button
             onClick={handleBrowse}
-            className="shrink-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+            className="shrink-0 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
           >
             <FolderOpen size={16} />
           </button>
@@ -107,14 +107,14 @@ export function DiskUsageChart() {
       {/* Results */}
       <div className="flex-1 overflow-y-auto">
         {!analyzed && (
-          <div className="flex flex-col items-center justify-center h-full text-gray-400">
+          <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-slate-500">
             <HardDrive size={32} className="mb-2 opacity-50" />
             <p className="text-sm">フォルダを選択して分析</p>
           </div>
         )}
 
         {analyzed && !isLoading && !usage && (
-          <div className="flex flex-col items-center justify-center h-full text-gray-400">
+          <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-slate-500">
             <HardDrive size={32} className="mb-2 opacity-50" />
             <p className="text-sm">分析できませんでした</p>
           </div>
@@ -123,12 +123,12 @@ export function DiskUsageChart() {
         {usage && (
           <div className="p-4 space-y-4">
             {/* Summary */}
-            <div className="rounded-lg bg-indigo-50 border border-indigo-200 p-3">
-              <div className="text-sm font-medium text-indigo-800">
+            <div className="rounded-lg bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 p-3">
+              <div className="text-sm font-medium text-indigo-800 dark:text-indigo-200">
                 合計: {formatFileSize(usage.total_size)},{" "}
                 {usage.file_count.toLocaleString()}ファイル
               </div>
-              <div className="text-xs text-indigo-600 mt-0.5">
+              <div className="text-xs text-indigo-600 dark:text-indigo-400 mt-0.5">
                 {usage.dir_count.toLocaleString()}フォルダ
               </div>
             </div>
@@ -141,14 +141,14 @@ export function DiskUsageChart() {
                 return (
                   <div key={ext}>
                     <div className="flex items-center justify-between text-xs mb-0.5">
-                      <span className="font-medium text-gray-700">
+                      <span className="font-medium text-gray-700 dark:text-gray-300">
                         .{ext}
                       </span>
-                      <span className="text-gray-500">
+                      <span className="text-gray-500 dark:text-slate-400">
                         {formatFileSize(data.total_size)} ({data.count}件)
                       </span>
                     </div>
-                    <div className="h-5 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-5 bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden">
                       <div
                         className={`h-full ${color} rounded-full transition-all`}
                         style={{ width: `${Math.max(pct, 1)}%` }}

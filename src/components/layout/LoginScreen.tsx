@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { type AuthState, saveAuth } from "../../lib/auth";
+import { type AuthState, buildAuthState } from "../../lib/auth";
+import { ChevronDown, ChevronRight } from "lucide-react";
 
 type Props = {
   onLogin: (auth: AuthState) => void;
@@ -9,6 +10,10 @@ export function LoginScreen({ onLogin }: Props) {
   const [apiBaseUrl, setApiBaseUrl] = useState("https://api.tachyon.dev");
   const [tenantId, setTenantId] = useState("");
   const [accessToken, setAccessToken] = useState("");
+  const [refreshToken, setRefreshToken] = useState("");
+  const [clientId, setClientId] = useState("");
+  const [clientSecret, setClientSecret] = useState("");
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,20 +38,28 @@ export function LoginScreen({ onLogin }: Props) {
       }
 
       const userInfo = await res.json();
-      const auth: AuthState = {
+      const auth = buildAuthState({
         apiBaseUrl,
         accessToken,
         tenantId,
         userId: userInfo.sub || userInfo.user_id,
-      };
-      saveAuth(auth);
+        refreshToken: refreshToken || undefined,
+        clientId: clientId || undefined,
+        clientSecret: clientSecret || undefined,
+      });
       onLogin(auth);
     } catch (e) {
       // If auth endpoint fails, still save and try (dev mode)
       if (e instanceof TypeError && e.message.includes("fetch")) {
         // Network error - save anyway for development
-        const auth: AuthState = { apiBaseUrl, accessToken, tenantId };
-        saveAuth(auth);
+        const auth = buildAuthState({
+          apiBaseUrl,
+          accessToken,
+          tenantId,
+          refreshToken: refreshToken || undefined,
+          clientId: clientId || undefined,
+          clientSecret: clientSecret || undefined,
+        });
         onLogin(auth);
       } else {
         setError(e instanceof Error ? e.message : "認証エラー");
@@ -55,6 +68,9 @@ export function LoginScreen({ onLogin }: Props) {
       setIsLoading(false);
     }
   };
+
+  const inputClass =
+    "w-full px-3 py-2.5 text-sm rounded-xl border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100 outline-none focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 dark:focus:ring-indigo-400/20 placeholder:text-gray-400 dark:placeholder:text-slate-500 transition-colors duration-150";
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-slate-950 p-4 transition-colors duration-150">
@@ -89,7 +105,7 @@ export function LoginScreen({ onLogin }: Props) {
               type="url"
               value={apiBaseUrl}
               onChange={(e) => setApiBaseUrl(e.target.value)}
-              className="w-full px-3 py-2.5 text-sm rounded-xl border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100 outline-none focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 dark:focus:ring-indigo-400/20 transition-colors duration-150"
+              className={inputClass}
               required
             />
           </div>
@@ -102,7 +118,7 @@ export function LoginScreen({ onLogin }: Props) {
               value={tenantId}
               onChange={(e) => setTenantId(e.target.value)}
               placeholder="tn_xxxx"
-              className="w-full px-3 py-2.5 text-sm rounded-xl border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100 outline-none focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 dark:focus:ring-indigo-400/20 placeholder:text-gray-400 dark:placeholder:text-slate-500 transition-colors duration-150"
+              className={inputClass}
               required
             />
           </div>
@@ -114,9 +130,64 @@ export function LoginScreen({ onLogin }: Props) {
               type="password"
               value={accessToken}
               onChange={(e) => setAccessToken(e.target.value)}
-              className="w-full px-3 py-2.5 text-sm rounded-xl border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100 outline-none focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 dark:focus:ring-indigo-400/20 transition-colors duration-150"
+              className={inputClass}
               required
             />
+          </div>
+
+          {/* Collapsible advanced section for token refresh */}
+          <div>
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="flex items-center gap-1 text-xs text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300 transition-colors duration-150"
+            >
+              {showAdvanced ? (
+                <ChevronDown size={14} />
+              ) : (
+                <ChevronRight size={14} />
+              )}
+              トークン自動更新（オプション）
+            </button>
+
+            {showAdvanced && (
+              <div className="mt-3 space-y-3 pl-1 border-l-2 border-indigo-200 dark:border-indigo-800 ml-1">
+                <div className="pl-3">
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                    リフレッシュトークン
+                  </label>
+                  <input
+                    type="password"
+                    value={refreshToken}
+                    onChange={(e) => setRefreshToken(e.target.value)}
+                    placeholder="省略時はトークン期限切れで再ログイン"
+                    className={inputClass}
+                  />
+                </div>
+                <div className="pl-3">
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                    クライアントID
+                  </label>
+                  <input
+                    type="text"
+                    value={clientId}
+                    onChange={(e) => setClientId(e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+                <div className="pl-3">
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                    クライアントシークレット
+                  </label>
+                  <input
+                    type="password"
+                    value={clientSecret}
+                    onChange={(e) => setClientSecret(e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           {error && (
