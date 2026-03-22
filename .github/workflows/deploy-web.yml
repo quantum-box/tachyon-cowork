@@ -1,4 +1,4 @@
-name: Deploy Web (Cloudflare Pages)
+name: Deploy Web (Cloudflare Workers)
 
 on:
   push:
@@ -10,7 +10,7 @@ on:
 
 jobs:
   deploy:
-    name: Build & Deploy to Cloudflare Pages
+    name: Build & Deploy to Cloudflare Workers
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -30,9 +30,9 @@ jobs:
       - name: Build
         run: npx vite build
 
-      - name: Deploy to Cloudflare Pages
+      - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist --project-name=cowork --branch=main
+          command: deploy
