@@ -1,0 +1,12 @@
+# Cloudflare Worker with Static Assets for web deployment
+# Deployed to cowork.txcloud.app via txcloud-proxy KV routing
+name = "cowork"
+compatibility_date = "2024-09-23"
+
+# Serve the Vite SPA build output as static assets
+[assets]
+directory = "dist"
+
+# SPA routing: serve index.html for all unmatched paths
+html_handling = "auto-trailing-slash"
+not_found_handling = "single-page-application"
