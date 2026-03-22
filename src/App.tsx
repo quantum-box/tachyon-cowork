@@ -1,6 +1,7 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AgentChatClient } from "./lib/api-client";
-import { type AuthState, clearAuth, loadAuth } from "./lib/auth";
+import { type AuthState, clearAuth, loadAuth, saveAuth } from "./lib/auth";
+import { TokenManager } from "./lib/token-manager";
 import { useAgentChat } from "./hooks/useAgentChat";
 import { useFileHandler } from "./hooks/useFileHandler";
 import { useArtifact } from "./hooks/useArtifact";
@@ -21,18 +22,68 @@ export default function App() {
 
   const { theme, setTheme } = useTheme();
 
-  const client = useMemo(
-    () =>
-      auth
-        ? new AgentChatClient({
-            apiBaseUrl: auth.apiBaseUrl,
-            accessToken: auth.accessToken,
-            tenantId: auth.tenantId,
-            userId: auth.userId,
-          })
-        : null,
-    [auth],
-  );
+  // ── Token Manager ─────────────────────────────────────────────────
+  const tokenManagerRef = useRef<TokenManager | null>(null);
+  const clientRef = useRef<AgentChatClient | null>(null);
+
+  const handleAuthError = useCallback(() => {
+    tokenManagerRef.current?.dispose();
+    tokenManagerRef.current = null;
+    clearAuth();
+    setAuth(null);
+  }, []);
+
+  const handleTokenRefreshed = useCallback((newAuth: AuthState) => {
+    setAuth(newAuth);
+    clientRef.current?.updateConfig({ accessToken: newAuth.accessToken });
+  }, []);
+
+  // Initialize / teardown TokenManager with auth lifecycle
+  useEffect(() => {
+    if (!auth) {
+      tokenManagerRef.current?.dispose();
+      tokenManagerRef.current = null;
+      return;
+    }
+
+    if (tokenManagerRef.current) {
+      tokenManagerRef.current.updateAuth(auth);
+    } else {
+      tokenManagerRef.current = new TokenManager(auth, {
+        onTokenRefreshed: handleTokenRefreshed,
+        onAuthError: handleAuthError,
+      });
+    }
+
+    // Attach to existing client if available
+    if (clientRef.current && tokenManagerRef.current) {
+      clientRef.current.setTokenManager(tokenManagerRef.current);
+    }
+
+    return () => {
+      tokenManagerRef.current?.dispose();
+      tokenManagerRef.current = null;
+    };
+  }, [auth, handleAuthError, handleTokenRefreshed]);
+
+  // ── API Client ────────────────────────────────────────────────────
+  const client = useMemo(() => {
+    if (!auth) {
+      clientRef.current = null;
+      return null;
+    }
+    const c = new AgentChatClient({
+      apiBaseUrl: auth.apiBaseUrl,
+      accessToken: auth.accessToken,
+      tenantId: auth.tenantId,
+      userId: auth.userId,
+    });
+    if (tokenManagerRef.current) {
+      c.setTokenManager(tokenManagerRef.current);
+    }
+    clientRef.current = c;
+    return c;
+  }, [auth]);
 
   const fileHandler = useFileHandler();
   const artifactState = useArtifact();
@@ -48,8 +99,15 @@ export default function App() {
   const chat = useAgentChat(client, handleArtifactFromSSE);
 
   const handleLogout = useCallback(() => {
+    tokenManagerRef.current?.dispose();
+    tokenManagerRef.current = null;
     clearAuth();
     setAuth(null);
+  }, []);
+
+  const handleLogin = useCallback((newAuth: AuthState) => {
+    saveAuth(newAuth);
+    setAuth(newAuth);
   }, []);
 
   const handleOpenArtifact = useCallback(
@@ -92,7 +150,7 @@ export default function App() {
   );
 
   if (!auth) {
-    return <LoginScreen onLogin={setAuth} />;
+    return <LoginScreen onLogin={handleLogin} />;
   }
 
   return (
