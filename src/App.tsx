@@ -184,6 +184,7 @@ export default function App() {
             onFilesAdd={fileHandler.addFiles}
             onFileRemove={fileHandler.removeFile}
             onClearFiles={fileHandler.clearFiles}
+            toInlineAttachments={fileHandler.toInlineAttachments}
             onOpenArtifact={handleOpenArtifact}
             isSearchOpen={searchOpen}
             onSearchClose={() => setSearchOpen(false)}

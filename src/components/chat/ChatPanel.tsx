@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { useAgentChat } from "../../hooks/useAgentChat";
-import type { Artifact, FileAttachment } from "../../lib/types";
+import type { Artifact, FileAttachment, InlineAttachment } from "../../lib/types";
 import { FileDropZone } from "../file/FileDropZone";
 import { MessageList } from "./MessageList";
 import { ChatInput } from "./ChatInput";
@@ -13,6 +13,7 @@ type Props = {
   onFilesAdd: (fileList: FileList) => void;
   onFileRemove: (id: string) => void;
   onClearFiles: () => void;
+  toInlineAttachments: () => InlineAttachment[];
   onOpenArtifact: (artifact: Artifact) => void;
   isSearchOpen: boolean;
   onSearchClose: () => void;
@@ -25,6 +26,7 @@ export function ChatPanel({
   onFilesAdd,
   onFileRemove,
   onClearFiles,
+  toInlineAttachments,
   onOpenArtifact,
   isSearchOpen,
   onSearchClose,
@@ -34,8 +36,10 @@ export function ChatPanel({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!chat.input.trim() && files.length === 0) return;
-    // Clear files after submitting
-    chat.handleSubmit(e);
+    const attachments = files.length > 0 ? toInlineAttachments() : undefined;
+    const msg = chat.input.trim();
+    chat.setInput("");
+    chat.sendMessage(msg, attachments);
     onClearFiles();
   };
 

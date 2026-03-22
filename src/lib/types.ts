@@ -44,6 +44,8 @@ export type AgentChunk = {
   // tool_job_started fields
   job_id?: string;
   provider?: string;
+  // vision: image preview data URLs attached to user messages
+  imageUrls?: string[];
   // artifact fields
   artifact_id?: string;
   content_type?: string;
@@ -114,6 +116,14 @@ export type FileAttachment = {
   data?: Uint8Array;
   url?: string;
   preview?: string; // base64 data URL for image thumbnails
+  isVision?: boolean; // true if the file is a vision-capable image
+};
+
+/** A single version snapshot of an artifact */
+export type ArtifactVersion = {
+  version: number;
+  content: string;
+  createdAt: string;
 };
 
 /** A single version snapshot of an artifact */
