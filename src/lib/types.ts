@@ -45,12 +45,20 @@ export type AgentChunk = {
   provider?: string;
 };
 
+/** Inline attachment sent as base64 with the agent request */
+export type InlineAttachment = {
+  filename: string;
+  content_type: string;
+  data: string; // base64-encoded
+};
+
 /** Request payload for executing an agent task */
 export type AgentExecuteRequest = {
   task: string;
   model?: string;
   max_requests?: number;
   tool_access?: ToolAccess;
+  attachments?: InlineAttachment[];
 };
 
 /** Tool access permissions for agent execution */

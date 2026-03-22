@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AgentChatClient } from "../lib/api-client";
-import type { AgentChunk, AgentExecuteRequest, ChatRoom } from "../lib/types";
+import type {
+  AgentChunk,
+  AgentExecuteRequest,
+  ChatRoom,
+  InlineAttachment,
+} from "../lib/types";
 
 const MODEL_KEY = "tachyon-cowork-model";
 const PINNED_KEY = "tachyon-cowork-pinned";
@@ -73,7 +78,7 @@ export function useAgentChat(client: AgentChatClient | null) {
 
   // Start task: create room if needed, then stream SSE
   const startTask = useCallback(
-    async (task: string, newRoomTitle?: string) => {
+    async (task: string, newRoomTitle?: string, attachments?: InlineAttachment[]) => {
       if (!client) return;
       setIsLoading(true);
       setError(null);
@@ -111,6 +116,7 @@ export function useAgentChat(client: AgentChatClient | null) {
           task,
           model: selectedModel,
           max_requests: 10,
+          ...(attachments && attachments.length > 0 && { attachments }),
         };
         const response = await client.executeAgent(currentSessionId, args);
         if (!response.body) throw new Error("Response body is null");
@@ -171,7 +177,7 @@ export function useAgentChat(client: AgentChatClient | null) {
   );
 
   const sendMessage = useCallback(
-    async (message: string) => {
+    async (message: string, attachments?: InlineAttachment[]) => {
       const trimmed = message.trim();
       if (!trimmed || isLoading) return;
 
@@ -182,7 +188,7 @@ export function useAgentChat(client: AgentChatClient | null) {
         created_at: new Date().toISOString(),
       };
       setChunks((prev) => [...prev, userChunk]);
-      await startTask(trimmed);
+      await startTask(trimmed, undefined, attachments);
     },
     [isLoading, startTask],
   );

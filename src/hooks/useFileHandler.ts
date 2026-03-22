@@ -1,7 +1,15 @@
 import { useCallback, useState } from "react";
-import type { FileAttachment } from "../lib/types";
+import type { FileAttachment, InlineAttachment } from "../lib/types";
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
+
+function uint8ArrayToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -61,5 +69,16 @@ export function useFileHandler() {
     setFileError(null);
   }, []);
 
-  return { files, fileError, addFiles, removeFile, clearFiles };
+  /** Convert current files to InlineAttachment[] for the API request */
+  const toInlineAttachments = useCallback((): InlineAttachment[] => {
+    return files
+      .filter((f) => f.data)
+      .map((f) => ({
+        filename: f.name,
+        content_type: f.type || "application/octet-stream",
+        data: uint8ArrayToBase64(f.data!),
+      }));
+  }, [files]);
+
+  return { files, fileError, addFiles, removeFile, clearFiles, toInlineAttachments };
 }
