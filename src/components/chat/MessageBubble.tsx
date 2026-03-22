@@ -11,6 +11,8 @@ import {
   Loader2,
   Coins,
   Code,
+  X,
+  ZoomIn,
 } from "lucide-react";
 import type { AgentChunk, Artifact } from "../../lib/types";
 import { CodeBlock } from "../artifact/CodeBlock";
@@ -25,7 +27,13 @@ type Props = {
 export function MessageBubble({ chunk, onOpenArtifact, searchQuery }: Props) {
   switch (chunk.type) {
     case "user":
-      return <UserMessage text={chunk.text ?? ""} searchQuery={searchQuery} />;
+      return (
+        <UserMessage
+          text={chunk.text ?? ""}
+          imageUrls={chunk.imageUrls}
+          searchQuery={searchQuery}
+        />
+      );
     case "say":
     case "assistant":
     case "attempt_completion":
@@ -85,16 +93,82 @@ export function MessageBubble({ chunk, onOpenArtifact, searchQuery }: Props) {
   }
 }
 
-function UserMessage({ text, searchQuery }: { text: string; searchQuery?: string }) {
+function UserMessage({
+  text,
+  imageUrls,
+  searchQuery,
+}: {
+  text: string;
+  imageUrls?: string[];
+  searchQuery?: string;
+}) {
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const hasImages = imageUrls && imageUrls.length > 0;
+
   return (
-    <div className="flex justify-end mb-4 gap-2">
-      <div className="max-w-[75%] rounded-2xl rounded-br-sm px-4 py-3 bg-indigo-600 dark:bg-indigo-700 text-white text-sm whitespace-pre-wrap leading-relaxed">
-        {searchQuery ? highlightInText(text, searchQuery) : text}
+    <>
+      <div className="flex justify-end mb-4 gap-2">
+        <div className="max-w-[75%] rounded-2xl rounded-br-sm px-4 py-3 bg-indigo-600 dark:bg-indigo-700 text-white text-sm leading-relaxed">
+          {/* Image thumbnails */}
+          {hasImages && (
+            <div className="flex flex-wrap gap-2 mb-2">
+              {imageUrls.map((url, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setLightboxUrl(url)}
+                  className="group relative rounded-lg overflow-hidden ring-1 ring-white/20 hover:ring-white/50 transition-all"
+                >
+                  <img
+                    src={url}
+                    alt={`添付画像 ${i + 1}`}
+                    className="h-24 w-24 object-cover"
+                  />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                    <ZoomIn
+                      size={16}
+                      className="text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow"
+                    />
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="whitespace-pre-wrap">
+            {searchQuery ? highlightInText(text, searchQuery) : text}
+          </div>
+        </div>
+        <div className="shrink-0 w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center">
+          <User size={16} className="text-indigo-600 dark:text-indigo-400" />
+        </div>
       </div>
-      <div className="shrink-0 w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center">
-        <User size={16} className="text-indigo-600 dark:text-indigo-400" />
-      </div>
-    </div>
+
+      {/* Lightbox */}
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+          onClick={() => setLightboxUrl(null)}
+          onKeyDown={(e) => e.key === "Escape" && setLightboxUrl(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="画像プレビュー"
+        >
+          <button
+            onClick={() => setLightboxUrl(null)}
+            className="absolute top-4 right-4 rounded-full bg-black/50 p-2 text-white hover:bg-black/70 transition-colors"
+            aria-label="閉じる"
+          >
+            <X size={24} />
+          </button>
+          <img
+            src={lightboxUrl}
+            alt="プレビュー"
+            className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
+    </>
   );
 }
 

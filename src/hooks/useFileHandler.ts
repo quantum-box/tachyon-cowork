@@ -1,5 +1,9 @@
 import { useCallback, useState } from "react";
 import type { FileAttachment, InlineAttachment } from "../lib/types";
+import {
+  isVisionAttachment,
+  getVisionValidationError,
+} from "../lib/vision";
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
 
@@ -34,15 +38,31 @@ export function useFileHandler() {
   const addFiles = useCallback(async (fileList: FileList) => {
     setFileError(null);
     const newAttachments: FileAttachment[] = [];
+    const warnings: string[] = [];
 
     for (let i = 0; i < fileList.length; i++) {
       const file = fileList[i];
       if (file.size > MAX_FILE_SIZE) {
-        setFileError(
+        warnings.push(
           `「${file.name}」は${formatFileSize(MAX_FILE_SIZE)}を超えています`,
         );
         continue;
       }
+
+      // Vision-specific validation for image files
+      const isImage = file.type.startsWith("image/");
+      if (isImage) {
+        const visionError = getVisionValidationError({
+          type: file.type,
+          name: file.name,
+          size: file.size,
+        });
+        if (visionError) {
+          warnings.push(visionError);
+          continue;
+        }
+      }
+
       const arrayBuffer = await file.arrayBuffer();
       const preview = await generatePreview(file);
       newAttachments.push({
@@ -52,7 +72,16 @@ export function useFileHandler() {
         type: file.type,
         data: new Uint8Array(arrayBuffer),
         preview,
+        isVision: isVisionAttachment({
+          type: file.type,
+          name: file.name,
+          size: file.size,
+        }),
       });
+    }
+
+    if (warnings.length > 0) {
+      setFileError(warnings.join("\n"));
     }
 
     if (newAttachments.length > 0) {
@@ -80,5 +109,16 @@ export function useFileHandler() {
       }));
   }, [files]);
 
-  return { files, fileError, addFiles, removeFile, clearFiles, toInlineAttachments };
+  /** Check if any attached file is a vision image */
+  const hasVisionImages = files.some((f) => f.isVision);
+
+  return {
+    files,
+    fileError,
+    hasVisionImages,
+    addFiles,
+    removeFile,
+    clearFiles,
+    toInlineAttachments,
+  };
 }
