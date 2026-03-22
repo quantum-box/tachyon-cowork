@@ -20,7 +20,8 @@ export type AgentChunk = {
     | "assistant"
     | "completion"
     | "usage"
-    | "tool_job_started";
+    | "tool_job_started"
+    | "artifact";
   id: string;
   text?: string;
   created_at: string;
@@ -43,6 +44,20 @@ export type AgentChunk = {
   // tool_job_started fields
   job_id?: string;
   provider?: string;
+  // artifact fields
+  artifact_id?: string;
+  content_type?: string;
+  filename?: string;
+  url?: string;
+  size_bytes?: number;
+  metadata?: Record<string, unknown>;
+};
+
+/** Inline attachment sent as base64 with the agent request */
+export type InlineAttachment = {
+  filename: string;
+  content_type: string;
+  data: string; // base64-encoded
 };
 
 /** Request payload for executing an agent task */
@@ -51,6 +66,7 @@ export type AgentExecuteRequest = {
   model?: string;
   max_requests?: number;
   tool_access?: ToolAccess;
+  attachments?: InlineAttachment[];
 };
 
 /** Tool access permissions for agent execution */

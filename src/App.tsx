@@ -34,9 +34,18 @@ export default function App() {
     [auth],
   );
 
-  const chat = useAgentChat(client);
   const fileHandler = useFileHandler();
   const artifactState = useArtifact();
+
+  const handleArtifactFromSSE = useCallback(
+    (artifact: Parameters<typeof artifactState.addArtifact>[0]) => {
+      artifactState.addArtifact(artifact);
+      artifactState.openArtifact(artifact);
+    },
+    [artifactState],
+  );
+
+  const chat = useAgentChat(client, handleArtifactFromSSE);
 
   const handleLogout = useCallback(() => {
     clearAuth();
