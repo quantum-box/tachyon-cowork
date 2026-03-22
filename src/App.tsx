@@ -197,6 +197,7 @@ export default function App() {
         isOpen={artifactState.isPanelOpen}
         onClose={artifactState.closePanel}
         onDownload={artifactState.downloadArtifact}
+        onSwitchVersion={artifactState.switchVersion}
       />
 
       {/* Settings panel */}
