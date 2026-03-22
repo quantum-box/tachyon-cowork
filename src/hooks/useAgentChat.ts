@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AgentChatClient } from "../lib/api-client";
-import type { AgentChunk, AgentExecuteRequest, ChatRoom } from "../lib/types";
+import type { AgentChunk, AgentExecuteRequest, Artifact, ChatRoom } from "../lib/types";
+import { chunkToArtifact } from "./useArtifact";
 
 const MODEL_KEY = "tachyon-cowork-model";
 const PINNED_KEY = "tachyon-cowork-pinned";
@@ -19,7 +20,10 @@ function savePinnedRooms(ids: string[]): void {
   localStorage.setItem(PINNED_KEY, JSON.stringify(ids));
 }
 
-export function useAgentChat(client: AgentChatClient | null) {
+export function useAgentChat(
+  client: AgentChatClient | null,
+  onArtifact?: (artifact: Artifact) => void,
+) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [chunks, setChunks] = useState<AgentChunk[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -143,6 +147,9 @@ export function useAgentChat(client: AgentChatClient | null) {
               }
               const chunk = parsed as AgentChunk;
               setChunks((prev) => [...prev, chunk]);
+              if (chunk.type === "artifact" && onArtifact) {
+                onArtifact(chunkToArtifact(chunk));
+              }
             } catch {
               // skip malformed JSON
             }
@@ -167,7 +174,7 @@ export function useAgentChat(client: AgentChatClient | null) {
         }
       }
     },
-    [sessionId, client, selectedModel],
+    [sessionId, client, selectedModel, onArtifact],
   );
 
   const sendMessage = useCallback(
