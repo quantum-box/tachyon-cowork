@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AgentChatClient } from "../lib/api-client";
-import type { AgentChunk, AgentExecuteRequest, Artifact, ChatRoom } from "../lib/types";
+import type {
+  AgentChunk,
+  AgentExecuteRequest,
+  Artifact,
+  ChatRoom,
+  InlineAttachment,
+} from "../lib/types";
 import { chunkToArtifact } from "./useArtifact";
 
 const MODEL_KEY = "tachyon-cowork-model";
@@ -72,7 +78,7 @@ export function useAgentChat(
   }, [fetchChatRooms]);
 
   const startTask = useCallback(
-    async (task: string, newRoomTitle?: string) => {
+    async (task: string, newRoomTitle?: string, attachments?: InlineAttachment[]) => {
       if (!client) return;
       setIsLoading(true);
       setError(null);
@@ -109,6 +115,7 @@ export function useAgentChat(
           task,
           model: selectedModel,
           max_requests: 10,
+          ...(attachments && attachments.length > 0 && { attachments }),
         };
         const response = await client.executeAgent(currentSessionId, args);
         if (!response.body) throw new Error("Response body is null");
@@ -171,18 +178,28 @@ export function useAgentChat(
   );
 
   const sendMessage = useCallback(
-    async (message: string) => {
+    async (message: string, attachments?: InlineAttachment[]) => {
       const trimmed = message.trim();
-      if (!trimmed || isLoading) return;
+      const hasAttachments = attachments && attachments.length > 0;
+      if ((!trimmed && !hasAttachments) || isLoading) return;
+
+      // Build preview data URLs for image attachments to display in user bubble
+      const imageUrls = attachments
+        ?.filter((a) => a.content_type.startsWith("image/"))
+        .map((a) => `data:${a.content_type};base64,${a.data}`)
+        ?? undefined;
 
       const userChunk: AgentChunk = {
         type: "user",
         id: `user-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
         text: trimmed,
         created_at: new Date().toISOString(),
+        ...(imageUrls && imageUrls.length > 0 && { imageUrls }),
       };
       setChunks((prev) => [...prev, userChunk]);
-      await startTask(trimmed);
+      // Backend requires a non-empty task; use default for image-only sends
+      const taskText = trimmed || "この画像について説明してください";
+      await startTask(taskText, undefined, attachments);
     },
     [isLoading, startTask],
   );
