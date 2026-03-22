@@ -179,16 +179,26 @@ export function useAgentChat(client: AgentChatClient | null) {
   const sendMessage = useCallback(
     async (message: string, attachments?: InlineAttachment[]) => {
       const trimmed = message.trim();
-      if (!trimmed || isLoading) return;
+      const hasAttachments = attachments && attachments.length > 0;
+      if ((!trimmed && !hasAttachments) || isLoading) return;
+
+      // Build preview data URLs for image attachments to display in user bubble
+      const imageUrls = attachments
+        ?.filter((a) => a.content_type.startsWith("image/"))
+        .map((a) => `data:${a.content_type};base64,${a.data}`)
+        ?? undefined;
 
       const userChunk: AgentChunk = {
         type: "user",
         id: `user-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
         text: trimmed,
         created_at: new Date().toISOString(),
+        ...(imageUrls && imageUrls.length > 0 && { imageUrls }),
       };
       setChunks((prev) => [...prev, userChunk]);
-      await startTask(trimmed, undefined, attachments);
+      // Backend requires a non-empty task; use default for image-only sends
+      const taskText = trimmed || "この画像について説明してください";
+      await startTask(taskText, undefined, attachments);
     },
     [isLoading, startTask],
   );
