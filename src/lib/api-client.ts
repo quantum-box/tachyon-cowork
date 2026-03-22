@@ -129,4 +129,24 @@ export class AgentChatClient {
     );
     return data.models;
   }
+
+  /** Download a file from a presigned URL as a Blob. */
+  async downloadFromUrl(url: string): Promise<{ blob: Blob; filename: string }> {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Download failed: ${response.status} ${response.statusText}`);
+    }
+    const blob = await response.blob();
+    const disposition = response.headers.get("Content-Disposition");
+    let filename = "download";
+    if (disposition) {
+      const match = /filename[^;=\n]*=["']?([^"';\n]+)/.exec(disposition);
+      if (match?.[1]) filename = match[1];
+    } else {
+      const urlPath = new URL(url).pathname;
+      const lastSegment = urlPath.split("/").pop();
+      if (lastSegment && lastSegment.includes(".")) filename = lastSegment;
+    }
+    return { blob, filename };
+  }
 }

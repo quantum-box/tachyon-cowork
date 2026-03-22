@@ -11,8 +11,10 @@ import {
   Loader2,
   Coins,
   Code,
+  FileDown,
 } from "lucide-react";
 import type { AgentChunk, Artifact } from "../../lib/types";
+import { chunkToArtifact } from "../../hooks/useArtifact";
 import { CodeBlock } from "../artifact/CodeBlock";
 import { MermaidDiagram } from "../artifact/MermaidDiagram";
 
@@ -60,6 +62,8 @@ export function MessageBubble({ chunk, onOpenArtifact, searchQuery }: Props) {
           </div>
         </div>
       );
+    case "artifact":
+      return <ArtifactMessage chunk={chunk} onOpenArtifact={onOpenArtifact} />;
     case "ask":
       return (
         <div className="flex justify-start mb-3">
@@ -316,6 +320,46 @@ function UsageMessage({ chunk }: { chunk: AgentChunk }) {
           <span className="ml-1">${chunk.total_cost.toFixed(4)}</span>
         )}
       </div>
+    </div>
+  );
+}
+
+function formatFileSize(bytes?: number): string {
+  if (bytes == null) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function ArtifactMessage({
+  chunk,
+  onOpenArtifact,
+}: {
+  chunk: AgentChunk;
+  onOpenArtifact?: (artifact: Artifact) => void;
+}) {
+  const handleOpen = useCallback(() => {
+    if (!onOpenArtifact) return;
+    onOpenArtifact(chunkToArtifact(chunk));
+  }, [chunk, onOpenArtifact]);
+
+  return (
+    <div className="flex justify-start mb-3 gap-2">
+      <div className="w-8 h-8 shrink-0 rounded-full bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
+        <FileDown size={16} className="text-violet-600 dark:text-violet-400" />
+      </div>
+      <button
+        onClick={handleOpen}
+        className="max-w-[75%] rounded-2xl rounded-bl-sm px-4 py-3 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 text-left hover:bg-violet-100 dark:hover:bg-violet-900/30 transition-colors cursor-pointer"
+      >
+        <p className="text-sm font-medium text-violet-800 dark:text-violet-200 truncate">
+          {chunk.filename || "\u30D5\u30A1\u30A4\u30EB"}
+        </p>
+        <p className="text-xs text-violet-500 dark:text-violet-400 mt-0.5">
+          {chunk.content_type}
+          {chunk.size_bytes ? ` \u00B7 ${formatFileSize(chunk.size_bytes)}` : ""}
+        </p>
+      </button>
     </div>
   );
 }
