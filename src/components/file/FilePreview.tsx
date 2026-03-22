@@ -45,7 +45,7 @@ export function FilePreview({ files, onRemove }: FilePreviewProps) {
         return (
           <div
             key={file.id}
-            className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs text-gray-700"
+            className="flex items-center gap-2 rounded-lg border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 px-3 py-1.5 text-xs text-gray-700 dark:text-gray-300"
           >
             {file.preview ? (
               <img
@@ -54,17 +54,17 @@ export function FilePreview({ files, onRemove }: FilePreviewProps) {
                 className="h-6 w-6 rounded object-cover"
               />
             ) : (
-              <Icon size={14} className="shrink-0 text-gray-400" />
+              <Icon size={14} className="shrink-0 text-gray-400 dark:text-slate-500" />
             )}
             <span className="max-w-[120px] truncate">{file.name}</span>
-            <span className="text-gray-400">{formatSize(file.size)}</span>
+            <span className="text-gray-400 dark:text-slate-500">{formatSize(file.size)}</span>
             <button
               type="button"
               onClick={() => onRemove(file.id)}
-              className="ml-0.5 rounded-full p-0.5 hover:bg-gray-200 transition-colors"
+              className="ml-0.5 rounded-full p-0.5 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors"
               aria-label={`${file.name}を削除`}
             >
-              <X size={12} className="text-gray-500" />
+              <X size={12} className="text-gray-500 dark:text-slate-400" />
             </button>
           </div>
         );

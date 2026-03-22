@@ -34,7 +34,7 @@ function CsvTable({ content }: { content: string }) {
             {header.map((cell, i) => (
               <th
                 key={i}
-                className="border border-gray-300 bg-gray-100 px-3 py-1.5 text-left font-medium text-gray-700"
+                className="border border-gray-300 dark:border-slate-600 bg-gray-100 dark:bg-slate-700 px-3 py-1.5 text-left font-medium text-gray-700 dark:text-gray-300"
               >
                 {cell}
               </th>
@@ -47,7 +47,7 @@ function CsvTable({ content }: { content: string }) {
               {row.map((cell, ci) => (
                 <td
                   key={ci}
-                  className="border border-gray-200 px-3 py-1.5 text-gray-600"
+                  className="border border-gray-200 dark:border-slate-700 px-3 py-1.5 text-gray-600 dark:text-gray-400"
                 >
                   {cell}
                 </td>
@@ -70,7 +70,7 @@ function ArtifactContent({
       return <CodeBlock code={artifact.content} language={artifact.language} />;
     case "markdown":
       return (
-        <div className="prose prose-sm max-w-none px-1">
+        <div className="prose prose-sm dark:prose-invert max-w-none px-1">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>
             {artifact.content}
           </ReactMarkdown>
@@ -99,7 +99,7 @@ function ArtifactContent({
       );
     default:
       return (
-        <div className="flex flex-col items-center justify-center gap-3 py-12 text-gray-400">
+        <div className="flex flex-col items-center justify-center gap-3 py-12 text-gray-400 dark:text-slate-500">
           <p className="text-sm">
             このファイル形式のプレビューは対応していません
           </p>
@@ -125,23 +125,23 @@ export function ArtifactPanel({
 
   return (
     <div
-      className={`shrink-0 h-full border-l border-gray-200 bg-white flex flex-col transition-all duration-300 ease-in-out overflow-hidden ${
+      className={`shrink-0 h-full border-l border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-950 flex flex-col transition-all duration-300 ease-in-out overflow-hidden ${
         isOpen ? "w-96" : "w-0 border-l-0"
       }`}
     >
       {artifact && (
         <>
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
-            <h3 className="text-sm font-semibold text-gray-800 truncate">
+          <div className="flex items-center justify-between border-b border-gray-200 dark:border-slate-700 px-4 py-3">
+            <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">
               {artifact.title}
             </h3>
             <button
               onClick={onClose}
-              className="rounded-lg p-1.5 hover:bg-gray-100 transition-colors"
+              className="rounded-lg p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
               aria-label="パネルを閉じる"
             >
-              <X size={16} className="text-gray-500" />
+              <X size={16} className="text-gray-500 dark:text-slate-400" />
             </button>
           </div>
 
@@ -151,17 +151,17 @@ export function ArtifactPanel({
           </div>
 
           {/* Footer */}
-          <div className="flex items-center gap-2 border-t border-gray-200 px-4 py-3">
+          <div className="flex items-center gap-2 border-t border-gray-200 dark:border-slate-700 px-4 py-3">
             <button
               onClick={() => onDownload(artifact)}
-              className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 transition-colors"
+              className="flex items-center gap-1.5 rounded-lg bg-indigo-600 dark:bg-indigo-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 dark:hover:bg-indigo-600 transition-colors"
             >
               <Download size={14} />
               ダウンロード
             </button>
             <button
               onClick={handleCopy}
-              className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              className="flex items-center gap-1.5 rounded-lg border border-gray-300 dark:border-slate-600 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
             >
               {copied ? (
                 <>

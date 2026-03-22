@@ -26,7 +26,7 @@ export function ExcelPreview({ data }: Props) {
 
   if (!sheet) {
     return (
-      <div className="p-4 text-gray-500 text-sm">
+      <div className="p-4 text-gray-500 dark:text-slate-400 text-sm">
         データがありません
       </div>
     );
@@ -36,26 +36,26 @@ export function ExcelPreview({ data }: Props) {
   const hasMore = sheet.rows.length > rowLimit;
 
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+    <div className="border border-gray-200 dark:border-slate-700 rounded-lg overflow-hidden bg-white dark:bg-slate-900">
       {/* Header */}
-      <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-200">
-        <FileSpreadsheet size={16} className="text-emerald-600" />
-        <span className="text-sm font-medium text-gray-700">
+      <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700">
+        <FileSpreadsheet size={16} className="text-emerald-600 dark:text-emerald-400" />
+        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
           Excel ({sheet.row_count} 行 x {sheet.col_count} 列)
         </span>
       </div>
 
       {/* Sheet tabs */}
       {data.sheets.length > 1 && (
-        <div className="flex border-b border-gray-200 bg-gray-50 overflow-x-auto">
+        <div className="flex border-b border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 overflow-x-auto">
           {data.sheets.map((s, i) => (
             <button
               key={s.name}
               onClick={() => handleSheetChange(i)}
-              className={`px-3 py-1.5 text-xs border-r border-gray-200 whitespace-nowrap transition-colors ${
+              className={`px-3 py-1.5 text-xs border-r border-gray-200 dark:border-slate-700 whitespace-nowrap transition-colors ${
                 i === activeSheet
-                  ? "bg-white text-emerald-700 font-medium"
-                  : "text-gray-500 hover:bg-gray-100"
+                  ? "bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-400 font-medium"
+                  : "text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700"
               }`}
             >
               {s.name}
@@ -68,14 +68,14 @@ export function ExcelPreview({ data }: Props) {
       <div className="overflow-auto max-h-[400px]">
         <table className="w-full text-xs border-collapse">
           <thead className="sticky top-0 z-10">
-            <tr className="bg-gray-100">
-              <th className="px-2 py-1.5 text-center text-gray-400 font-normal border-r border-b border-gray-200 w-10">
+            <tr className="bg-gray-100 dark:bg-slate-700">
+              <th className="px-2 py-1.5 text-center text-gray-400 dark:text-slate-500 font-normal border-r border-b border-gray-200 dark:border-slate-600 w-10">
                 #
               </th>
               {Array.from({ length: sheet.col_count }, (_, i) => (
                 <th
                   key={i}
-                  className="px-2 py-1.5 text-left font-medium text-gray-600 border-r border-b border-gray-200 min-w-[80px]"
+                  className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-400 border-r border-b border-gray-200 dark:border-slate-600 min-w-[80px]"
                 >
                   {columnLabel(i)}
                 </th>
@@ -86,9 +86,9 @@ export function ExcelPreview({ data }: Props) {
             {visibleRows.map((row, rowIdx) => (
               <tr
                 key={rowIdx}
-                className={rowIdx % 2 === 0 ? "bg-white" : "bg-gray-50/50"}
+                className={rowIdx % 2 === 0 ? "bg-white dark:bg-slate-900" : "bg-gray-50/50 dark:bg-slate-800/50"}
               >
-                <td className="px-2 py-1 text-center text-gray-400 border-r border-b border-gray-100 tabular-nums">
+                <td className="px-2 py-1 text-center text-gray-400 dark:text-slate-500 border-r border-b border-gray-100 dark:border-slate-800 tabular-nums">
                   {rowIdx + 1}
                 </td>
                 {Array.from({ length: sheet.col_count }, (_, colIdx) => {
@@ -96,7 +96,7 @@ export function ExcelPreview({ data }: Props) {
                   return (
                     <td
                       key={colIdx}
-                      className={`px-2 py-1 border-r border-b border-gray-100 ${cellAlignment(cell)}`}
+                      className={`px-2 py-1 border-r border-b border-gray-100 dark:border-slate-800 text-gray-700 dark:text-gray-300 ${cellAlignment(cell)}`}
                     >
                       {renderCell(cell)}
                     </td>
@@ -110,10 +110,10 @@ export function ExcelPreview({ data }: Props) {
 
       {/* Load more */}
       {hasMore && (
-        <div className="flex justify-center py-2 border-t border-gray-200 bg-gray-50">
+        <div className="flex justify-center py-2 border-t border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800">
           <button
             onClick={handleLoadMore}
-            className="px-4 py-1.5 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded transition-colors"
+            className="px-4 py-1.5 text-xs text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded transition-colors"
           >
             さらに読み込む ({sheet.rows.length - rowLimit} 行)
           </button>
