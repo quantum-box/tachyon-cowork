@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { saveFile } from "../lib/tauri-bridge";
-import type { AgentChunk, Artifact } from "../lib/types";
+import type { AgentChunk, Artifact, ArtifactVersion } from "../lib/types";
 
 /** Map content_type from SSE to Artifact type */
 function inferArtifactType(
@@ -69,13 +69,16 @@ function extensionForType(type: Artifact["type"]): string {
 /** Convert an artifact SSE chunk into an Artifact */
 export function chunkToArtifact(chunk: AgentChunk): Artifact {
   const type = inferArtifactType(chunk.content_type, chunk.filename);
+  const now = chunk.created_at;
   return {
     id: chunk.artifact_id || chunk.id,
     type,
     title: chunk.filename || "Artifact",
     content: chunk.content || "",
     url: chunk.url,
-    createdAt: chunk.created_at,
+    createdAt: now,
+    versions: [{ version: 1, content: chunk.content || "", createdAt: now }],
+    currentVersion: 1,
   };
 }
 
@@ -87,16 +90,65 @@ export function useArtifact() {
   const [isPanelOpen, setIsPanelOpen] = useState(false);
 
   const addArtifact = useCallback((artifact: Artifact) => {
-    setArtifacts((prev) => [...prev, artifact]);
+    // Ensure versioning fields are set
+    const versioned: Artifact = {
+      ...artifact,
+      versions: artifact.versions ?? [
+        { version: 1, content: artifact.content, createdAt: artifact.createdAt },
+      ],
+      currentVersion: artifact.currentVersion ?? 1,
+    };
+
+    setArtifacts((prev) => {
+      // If artifact with same id already exists, add as new version
+      const existingIdx = prev.findIndex((a) => a.id === versioned.id);
+      if (existingIdx !== -1) {
+        const existing = prev[existingIdx];
+        const newVersion = (existing.versions?.length ?? 0) + 1;
+        const newVersionEntry: ArtifactVersion = {
+          version: newVersion,
+          content: versioned.content,
+          createdAt: versioned.createdAt,
+        };
+        const updated: Artifact = {
+          ...existing,
+          content: versioned.content,
+          versions: [...(existing.versions ?? []), newVersionEntry],
+          currentVersion: newVersion,
+        };
+        const next = [...prev];
+        next[existingIdx] = updated;
+        return next;
+      }
+      return [...prev, versioned];
+    });
   }, []);
 
   const openArtifact = useCallback((artifact: Artifact) => {
-    setSelectedArtifact(artifact);
+    // Ensure versioning fields
+    const versioned: Artifact = {
+      ...artifact,
+      versions: artifact.versions ?? [
+        { version: 1, content: artifact.content, createdAt: artifact.createdAt },
+      ],
+      currentVersion: artifact.currentVersion ?? 1,
+    };
+    setSelectedArtifact(versioned);
     setIsPanelOpen(true);
   }, []);
 
   const closePanel = useCallback(() => {
     setIsPanelOpen(false);
+  }, []);
+
+  /** Switch to a specific version of the selected artifact */
+  const switchVersion = useCallback((version: number) => {
+    setSelectedArtifact((prev) => {
+      if (!prev || !prev.versions) return prev;
+      const v = prev.versions.find((ver) => ver.version === version);
+      if (!v) return prev;
+      return { ...prev, content: v.content, currentVersion: version };
+    });
   }, []);
 
   const downloadArtifact = useCallback(async (artifact: Artifact) => {
@@ -134,5 +186,6 @@ export function useArtifact() {
     openArtifact,
     closePanel,
     downloadArtifact,
+    switchVersion,
   };
 }
