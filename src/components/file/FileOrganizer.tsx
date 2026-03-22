@@ -107,7 +107,7 @@ export function FileOrganizer() {
   return (
     <div className="flex flex-col h-full">
       {/* Controls */}
-      <div className="p-4 space-y-4 border-b border-gray-200">
+      <div className="p-4 space-y-4 border-b border-gray-200 dark:border-slate-700">
         {/* Directory input */}
         <div className="flex items-center gap-2">
           <input
@@ -115,11 +115,11 @@ export function FileOrganizer() {
             value={directory}
             onChange={(e) => setDirectory(e.target.value)}
             placeholder="整理するフォルダを選択..."
-            className="flex-1 rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20"
+            className="flex-1 rounded-lg border border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 outline-none focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-1 focus:ring-indigo-500/20 dark:focus:ring-indigo-400/20 placeholder:text-gray-400 dark:placeholder:text-slate-500"
           />
           <button
             onClick={handleBrowse}
-            className="shrink-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+            className="shrink-0 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
           >
             <FolderOpen size={16} />
           </button>
@@ -127,7 +127,7 @@ export function FileOrganizer() {
 
         {/* Strategy selection */}
         <div className="space-y-2">
-          <label className="text-xs font-medium text-gray-600">
+          <label className="text-xs font-medium text-gray-600 dark:text-gray-400">
             分類方法
           </label>
           <div className="space-y-1.5">
@@ -136,8 +136,8 @@ export function FileOrganizer() {
                 key={s.value}
                 className={`flex items-start gap-3 p-2.5 rounded-lg border cursor-pointer transition-colors ${
                   strategy === s.value
-                    ? "border-indigo-300 bg-indigo-50"
-                    : "border-gray-200 bg-white hover:bg-gray-50"
+                    ? "border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/20"
+                    : "border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700"
                 }`}
               >
                 <input
@@ -149,10 +149,10 @@ export function FileOrganizer() {
                   className="mt-0.5 accent-indigo-600"
                 />
                 <div>
-                  <div className="text-sm font-medium text-gray-800">
+                  <div className="text-sm font-medium text-gray-800 dark:text-gray-200">
                     {s.label}
                   </div>
-                  <div className="text-xs text-gray-500">{s.description}</div>
+                  <div className="text-xs text-gray-500 dark:text-slate-400">{s.description}</div>
                 </div>
               </label>
             ))}
@@ -180,11 +180,11 @@ export function FileOrganizer() {
         {plan && !results && (
           <div className="p-4 space-y-3">
             {/* Summary */}
-            <div className="rounded-lg bg-blue-50 border border-blue-200 p-3">
-              <div className="text-sm font-medium text-blue-800 mb-1">
+            <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-3">
+              <div className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-1">
                 整理プラン
               </div>
-              <div className="text-xs text-blue-700">
+              <div className="text-xs text-blue-700 dark:text-blue-300">
                 {plan.summary.total_files}ファイルを
                 {Object.keys(plan.summary.categories).length}
                 カテゴリに分類します
@@ -194,7 +194,7 @@ export function FileOrganizer() {
                   ([cat, count]) => (
                     <span
                       key={cat}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs"
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-xs"
                     >
                       {cat}: {count}
                     </span>
@@ -208,22 +208,22 @@ export function FileOrganizer() {
               {plan.operations.map((op, i) => (
                 <div
                   key={i}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded bg-gray-50 text-xs"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded bg-gray-50 dark:bg-slate-800 text-xs"
                 >
                   {op.operation === "create_dir" ? (
                     <>
-                      <FolderPlus size={12} className="text-amber-500 shrink-0" />
-                      <span className="text-gray-600 truncate">
+                      <FolderPlus size={12} className="text-amber-500 dark:text-amber-400 shrink-0" />
+                      <span className="text-gray-600 dark:text-gray-400 truncate">
                         フォルダ作成: {op.destination.split("/").pop() ?? op.destination.split("\\").pop()}
                       </span>
                     </>
                   ) : (
                     <>
-                      <span className="text-gray-600 truncate flex-1 min-w-0">
+                      <span className="text-gray-600 dark:text-gray-400 truncate flex-1 min-w-0">
                         {op.source.split("/").pop() ?? op.source.split("\\").pop()}
                       </span>
-                      <ArrowRight size={12} className="text-gray-400 shrink-0" />
-                      <span className="text-indigo-600 truncate flex-1 min-w-0 text-right">
+                      <ArrowRight size={12} className="text-gray-400 dark:text-slate-500 shrink-0" />
+                      <span className="text-indigo-600 dark:text-indigo-400 truncate flex-1 min-w-0 text-right">
                         {op.destination.split("/").pop() ?? op.destination.split("\\").pop()}
                       </span>
                     </>
@@ -251,7 +251,7 @@ export function FileOrganizer() {
               <button
                 onClick={handleCancel}
                 disabled={isExecuting}
-                className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                className="flex-1 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-50 transition-colors"
               >
                 キャンセル
               </button>
@@ -265,24 +265,24 @@ export function FileOrganizer() {
             <div
               className={`rounded-lg p-3 border ${
                 failCount === 0
-                  ? "bg-green-50 border-green-200"
-                  : "bg-amber-50 border-amber-200"
+                  ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800"
+                  : "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800"
               }`}
             >
               <div className="flex items-center gap-2 text-sm font-medium mb-1">
                 {failCount === 0 ? (
                   <>
-                    <CheckCircle2 size={16} className="text-green-600" />
-                    <span className="text-green-800">完了</span>
+                    <CheckCircle2 size={16} className="text-green-600 dark:text-green-400" />
+                    <span className="text-green-800 dark:text-green-200">完了</span>
                   </>
                 ) : (
                   <>
-                    <XCircle size={16} className="text-amber-600" />
-                    <span className="text-amber-800">一部エラー</span>
+                    <XCircle size={16} className="text-amber-600 dark:text-amber-400" />
+                    <span className="text-amber-800 dark:text-amber-200">一部エラー</span>
                   </>
                 )}
               </div>
-              <div className="text-xs text-gray-600">
+              <div className="text-xs text-gray-600 dark:text-gray-400">
                 成功: {successCount} / 失敗: {failCount}
               </div>
             </div>
@@ -292,7 +292,7 @@ export function FileOrganizer() {
               .map((r, i) => (
                 <div
                   key={i}
-                  className="px-3 py-2 rounded bg-red-50 border border-red-200 text-xs text-red-700"
+                  className="px-3 py-2 rounded bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-xs text-red-700 dark:text-red-400"
                 >
                   {r.source.split("/").pop() ?? r.source.split("\\").pop()}: {r.error}
                 </div>
@@ -300,7 +300,7 @@ export function FileOrganizer() {
 
             <button
               onClick={handleCancel}
-              className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              className="w-full rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
             >
               戻る
             </button>
@@ -308,7 +308,7 @@ export function FileOrganizer() {
         )}
 
         {!plan && !results && (
-          <div className="flex flex-col items-center justify-center h-full text-gray-400">
+          <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-slate-500">
             <FolderOpen size={32} className="mb-2 opacity-50" />
             <p className="text-sm">フォルダを選択してプランを作成</p>
           </div>

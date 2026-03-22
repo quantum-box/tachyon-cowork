@@ -62,10 +62,10 @@ export function FileDropZone({ children, onFilesDropped }: FileDropZoneProps) {
     >
       {children}
       {isDragging && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-indigo-500/10 backdrop-blur-sm">
-          <div className="flex flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-indigo-400 bg-white/80 px-12 py-10">
-            <Paperclip size={32} className="text-indigo-500" />
-            <p className="text-sm font-medium text-indigo-700">
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-indigo-500/10 dark:bg-indigo-500/20 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-indigo-400 dark:border-indigo-500 bg-white/80 dark:bg-slate-900/80 px-12 py-10">
+            <Paperclip size={32} className="text-indigo-500 dark:text-indigo-400" />
+            <p className="text-sm font-medium text-indigo-700 dark:text-indigo-300">
               ファイルをドロップして添付
             </p>
           </div>
