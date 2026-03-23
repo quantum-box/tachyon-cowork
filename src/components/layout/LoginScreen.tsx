@@ -1,12 +1,16 @@
 import { useState } from "react";
 import { type AuthState, buildAuthState } from "../../lib/auth";
+import { startOAuth2Login, getOAuth2Config } from "../../lib/oauth2";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
 type Props = {
   onLogin: (auth: AuthState) => void;
+  oauthError?: string | null;
 };
 
-export function LoginScreen({ onLogin }: Props) {
+export function LoginScreen({ onLogin, oauthError }: Props) {
+  const oauth2Config = getOAuth2Config();
+  const hasOAuth2 = !!oauth2Config.clientId;
   const [apiBaseUrl, setApiBaseUrl] = useState("https://api.tachyon.dev");
   const [tenantId, setTenantId] = useState("");
   const [accessToken, setAccessToken] = useState("");
@@ -95,6 +99,34 @@ export function LoginScreen({ onLogin }: Props) {
             AIアシスタントにログイン
           </p>
         </div>
+
+        {oauthError && (
+          <div className="mb-4 px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-xs text-red-700 dark:text-red-400">
+            OAuth2 error: {oauthError}
+          </div>
+        )}
+
+        {hasOAuth2 && (
+          <div className="mb-6">
+            <button
+              type="button"
+              onClick={() => startOAuth2Login()}
+              className="w-full py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 dark:hover:bg-indigo-500 transition-colors duration-150"
+            >
+              Cognitoでログイン
+            </button>
+            <div className="relative my-5">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300 dark:border-slate-700" />
+              </div>
+              <div className="relative flex justify-center text-xs">
+                <span className="bg-gray-50 dark:bg-slate-950 px-2 text-gray-400 dark:text-slate-500">
+                  または手動でトークン入力
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

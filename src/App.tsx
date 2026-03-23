@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AgentChatClient } from "./lib/api-client";
-import { type AuthState, clearAuth, loadAuth, saveAuth } from "./lib/auth";
+import { type AuthState, buildAuthState, clearAuth, loadAuth, saveAuth } from "./lib/auth";
 import { TokenManager } from "./lib/token-manager";
+import {
+  exchangeCodeForTokens,
+  getCallbackCode,
+  getCallbackError,
+  getOAuth2Config,
+} from "./lib/oauth2";
+import { decodeJwtPayload } from "./lib/jwt";
 import { useAgentChat } from "./hooks/useAgentChat";
 import { useFileHandler } from "./hooks/useFileHandler";
 import { useArtifact } from "./hooks/useArtifact";
@@ -16,11 +23,48 @@ import { SettingsPanel } from "./components/layout/SettingsPanel";
 
 export default function App() {
   const [auth, setAuth] = useState<AuthState | null>(loadAuth);
+  const [oauthError, setOauthError] = useState<string | null>(null);
   const [showTools, setShowTools] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
 
   const { theme, setTheme } = useTheme();
+
+  // ── OAuth2 Callback Handler ──────────────────────────────────────
+  useEffect(() => {
+    const error = getCallbackError();
+    if (error) {
+      setOauthError(error);
+      window.history.replaceState({}, "", "/");
+      return;
+    }
+
+    const code = getCallbackCode();
+    if (!code) return;
+
+    // Clear the URL immediately to avoid re-processing
+    window.history.replaceState({}, "", "/");
+
+    exchangeCodeForTokens(code)
+      .then((tokens) => {
+        const config = getOAuth2Config();
+        const payload = decodeJwtPayload(tokens.access_token);
+        const newAuth = buildAuthState({
+          apiBaseUrl: import.meta.env.VITE_API_BASE_URL ?? "https://api.n1.tachy.one",
+          accessToken: tokens.access_token,
+          tenantId: import.meta.env.VITE_DEFAULT_TENANT_ID ?? "",
+          userId: payload?.sub,
+          refreshToken: tokens.refresh_token,
+          clientId: config.clientId,
+        });
+        saveAuth(newAuth);
+        setAuth(newAuth);
+      })
+      .catch((err) => {
+        console.error("OAuth2 token exchange failed:", err);
+        setOauthError(err instanceof Error ? err.message : "Token exchange failed");
+      });
+  }, []);
 
   // ── Token Manager ─────────────────────────────────────────────────
   const tokenManagerRef = useRef<TokenManager | null>(null);
@@ -150,7 +194,7 @@ export default function App() {
   );
 
   if (!auth) {
-    return <LoginScreen onLogin={handleLogin} />;
+    return <LoginScreen onLogin={handleLogin} oauthError={oauthError} />;
   }
 
   return (
