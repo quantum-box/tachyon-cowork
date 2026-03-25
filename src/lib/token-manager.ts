@@ -1,5 +1,6 @@
 import { type AuthState, saveAuth } from "./auth";
 import { getTokenExpiresAt, isTokenExpiringSoon } from "./jwt";
+import { getOAuth2Config } from "./oauth2";
 
 /** How early (ms) before expiry we attempt a proactive refresh. */
 const REFRESH_MARGIN_MS = 5 * 60 * 1000; // 5 minutes
@@ -136,7 +137,12 @@ export class TokenManager {
     if (clientId) body.client_id = clientId;
     if (clientSecret) body.client_secret = clientSecret;
 
-    const tokenUrl = `${apiBaseUrl.replace(/\/+$/, "")}/oauth2/token`;
+    // Use Cognito domain for token refresh (not the API base URL)
+    const oauthConfig = getOAuth2Config();
+    const tokenHost = oauthConfig.domain
+      ? oauthConfig.domain.replace(/\/+$/, "")
+      : apiBaseUrl.replace(/\/+$/, "");
+    const tokenUrl = `${tokenHost}/oauth2/token`;
 
     try {
       const res = await fetch(tokenUrl, {
