@@ -1,4 +1,4 @@
-import { getTokenExpiresAt } from "./jwt";
+import { getTokenExpiresAt, isTokenExpired } from "./jwt";
 
 const STORAGE_KEY = "tachyon-cowork-auth";
 
@@ -18,7 +18,22 @@ export function loadAuth(): AuthState | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    return JSON.parse(raw) as AuthState;
+    const state = JSON.parse(raw) as AuthState;
+
+    // Validate required fields — incomplete auth must not bypass login
+    if (!state.accessToken || !state.apiBaseUrl || !state.tenantId) {
+      localStorage.removeItem(STORAGE_KEY);
+      return null;
+    }
+
+    // If the access token is expired and there's no refresh token,
+    // clear stale auth so the login screen is shown.
+    if (isTokenExpired(state.accessToken) && !state.refreshToken) {
+      localStorage.removeItem(STORAGE_KEY);
+      return null;
+    }
+
+    return state;
   } catch {
     return null;
   }
