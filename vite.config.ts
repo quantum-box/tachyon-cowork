@@ -10,6 +10,7 @@ export default defineConfig({
   server: {
     port: 1420,
     strictPort: isTauri,
+    allowedHosts: true,
   },
   envPrefix: ["VITE_", "TAURI_ENV_"],
   build: {

@@ -1,12 +1,17 @@
 import { useState } from "react";
 import { type AuthState, buildAuthState } from "../../lib/auth";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { startOAuth2Login, getOAuth2Config } from "../../lib/oauth2";
+import { ChevronDown, ChevronRight, Loader2 } from "lucide-react";
 
 type Props = {
   onLogin: (auth: AuthState) => void;
+  oauthError?: string | null;
+  isExchangingToken?: boolean;
 };
 
-export function LoginScreen({ onLogin }: Props) {
+export function LoginScreen({ onLogin, oauthError, isExchangingToken }: Props) {
+  const oauth2Config = getOAuth2Config();
+  const hasOAuth2 = !!oauth2Config.clientId;
   const [apiBaseUrl, setApiBaseUrl] = useState("https://api.tachyon.dev");
   const [tenantId, setTenantId] = useState("");
   const [accessToken, setAccessToken] = useState("");
@@ -14,6 +19,7 @@ export function LoginScreen({ onLogin }: Props) {
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showManual, setShowManual] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -92,118 +98,170 @@ export function LoginScreen({ onLogin }: Props) {
             Tachyon Cowork
           </h1>
           <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
-            AIアシスタントにログイン
+            AIアシスタントにサインイン
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-              API URL
-            </label>
-            <input
-              type="url"
-              value={apiBaseUrl}
-              onChange={(e) => setApiBaseUrl(e.target.value)}
-              className={inputClass}
-              required
-            />
+        {oauthError && (
+          <div className="mb-4 px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-xs text-red-700 dark:text-red-400">
+            サインインエラー: {oauthError}
           </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-              テナントID
-            </label>
-            <input
-              type="text"
-              value={tenantId}
-              onChange={(e) => setTenantId(e.target.value)}
-              placeholder="tn_xxxx"
-              className={inputClass}
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-              アクセストークン
-            </label>
-            <input
-              type="password"
-              value={accessToken}
-              onChange={(e) => setAccessToken(e.target.value)}
-              className={inputClass}
-              required
-            />
-          </div>
+        )}
 
-          {/* Collapsible advanced section for token refresh */}
-          <div>
+        {isExchangingToken && (
+          <div className="flex flex-col items-center gap-3 py-8">
+            <Loader2 size={24} className="animate-spin text-indigo-600 dark:text-indigo-400" />
+            <p className="text-sm text-gray-500 dark:text-slate-400">
+              サインイン処理中...
+            </p>
+          </div>
+        )}
+
+        {!isExchangingToken && hasOAuth2 && (
+          <div className="mb-6">
             <button
               type="button"
-              onClick={() => setShowAdvanced(!showAdvanced)}
-              className="flex items-center gap-1 text-xs text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300 transition-colors duration-150"
+              onClick={() => startOAuth2Login()}
+              className="w-full py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 dark:hover:bg-indigo-500 transition-colors duration-150"
             >
-              {showAdvanced ? (
-                <ChevronDown size={14} />
-              ) : (
-                <ChevronRight size={14} />
-              )}
-              トークン自動更新（オプション）
+              Tachyon IDでサインイン
             </button>
 
-            {showAdvanced && (
-              <div className="mt-3 space-y-3 pl-1 border-l-2 border-indigo-200 dark:border-indigo-800 ml-1">
-                <div className="pl-3">
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                    リフレッシュトークン
-                  </label>
-                  <input
-                    type="password"
-                    value={refreshToken}
-                    onChange={(e) => setRefreshToken(e.target.value)}
-                    placeholder="省略時はトークン期限切れで再ログイン"
-                    className={inputClass}
-                  />
+            {!showManual && (
+              <button
+                type="button"
+                onClick={() => setShowManual(true)}
+                className="w-full mt-3 text-xs text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors duration-150"
+              >
+                トークンを手動入力
+              </button>
+            )}
+
+            {showManual && (
+              <div className="relative my-5">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-300 dark:border-slate-700" />
                 </div>
-                <div className="pl-3">
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                    クライアントID
-                  </label>
-                  <input
-                    type="text"
-                    value={clientId}
-                    onChange={(e) => setClientId(e.target.value)}
-                    className={inputClass}
-                  />
-                </div>
-                <div className="pl-3">
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                    クライアントシークレット
-                  </label>
-                  <input
-                    type="password"
-                    value={clientSecret}
-                    onChange={(e) => setClientSecret(e.target.value)}
-                    className={inputClass}
-                  />
+                <div className="relative flex justify-center text-xs">
+                  <span className="bg-gray-50 dark:bg-slate-950 px-2 text-gray-400 dark:text-slate-500">
+                    または手動でトークン入力
+                  </span>
                 </div>
               </div>
             )}
           </div>
+        )}
 
-          {error && (
-            <div className="px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-xs text-red-700 dark:text-red-400">
-              {error}
+        {!isExchangingToken && (!hasOAuth2 || showManual) && (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                API URL
+              </label>
+              <input
+                type="url"
+                value={apiBaseUrl}
+                onChange={(e) => setApiBaseUrl(e.target.value)}
+                className={inputClass}
+                required
+              />
             </div>
-          )}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                テナントID
+              </label>
+              <input
+                type="text"
+                value={tenantId}
+                onChange={(e) => setTenantId(e.target.value)}
+                placeholder="tn_xxxx"
+                className={inputClass}
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                アクセストークン
+              </label>
+              <input
+                type="password"
+                value={accessToken}
+                onChange={(e) => setAccessToken(e.target.value)}
+                className={inputClass}
+                required
+              />
+            </div>
 
-          <button
-            type="submit"
-            disabled={isLoading || !apiBaseUrl || !tenantId || !accessToken}
-            className="w-full py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 dark:hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150"
-          >
-            {isLoading ? "接続中..." : "ログイン"}
-          </button>
-        </form>
+            {/* Collapsible advanced section for token refresh */}
+            <div>
+              <button
+                type="button"
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                className="flex items-center gap-1 text-xs text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300 transition-colors duration-150"
+              >
+                {showAdvanced ? (
+                  <ChevronDown size={14} />
+                ) : (
+                  <ChevronRight size={14} />
+                )}
+                トークン自動更新（オプション）
+              </button>
+
+              {showAdvanced && (
+                <div className="mt-3 space-y-3 pl-1 border-l-2 border-indigo-200 dark:border-indigo-800 ml-1">
+                  <div className="pl-3">
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                      リフレッシュトークン
+                    </label>
+                    <input
+                      type="password"
+                      value={refreshToken}
+                      onChange={(e) => setRefreshToken(e.target.value)}
+                      placeholder="省略時はトークン期限切れで再ログイン"
+                      className={inputClass}
+                    />
+                  </div>
+                  <div className="pl-3">
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                      クライアントID
+                    </label>
+                    <input
+                      type="text"
+                      value={clientId}
+                      onChange={(e) => setClientId(e.target.value)}
+                      className={inputClass}
+                    />
+                  </div>
+                  <div className="pl-3">
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                      クライアントシークレット
+                    </label>
+                    <input
+                      type="password"
+                      value={clientSecret}
+                      onChange={(e) => setClientSecret(e.target.value)}
+                      className={inputClass}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {error && (
+              <div className="px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-xs text-red-700 dark:text-red-400">
+                {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={isLoading || !apiBaseUrl || !tenantId || !accessToken}
+              className="w-full py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 dark:hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150"
+            >
+              {isLoading ? "接続中..." : "ログイン"}
+            </button>
+          </form>
+        )}
       </div>
     </div>
   );
