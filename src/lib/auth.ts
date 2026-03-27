@@ -14,12 +14,43 @@ export type AuthState = {
   clientSecret?: string;
 };
 
+function isValidStoredAuth(value: unknown): value is AuthState {
+  if (!value || typeof value !== "object") return false;
+
+  const auth = value as Partial<AuthState>;
+  return (
+    typeof auth.accessToken === "string" &&
+    auth.accessToken.length > 0 &&
+    typeof auth.tenantId === "string" &&
+    auth.tenantId.length > 0 &&
+    typeof auth.apiBaseUrl === "string" &&
+    auth.apiBaseUrl.length > 0
+  );
+}
+
 export function loadAuth(): AuthState | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    return JSON.parse(raw) as AuthState;
+
+    const parsed = JSON.parse(raw) as unknown;
+    if (!isValidStoredAuth(parsed)) {
+      clearAuth();
+      return null;
+    }
+
+    const expiresAt = parsed.expiresAt ?? getTokenExpiresAt(parsed.accessToken) ?? undefined;
+    if (expiresAt && expiresAt <= Date.now() && !parsed.refreshToken) {
+      clearAuth();
+      return null;
+    }
+
+    return {
+      ...parsed,
+      expiresAt,
+    };
   } catch {
+    clearAuth();
     return null;
   }
 }

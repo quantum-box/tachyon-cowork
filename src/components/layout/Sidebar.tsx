@@ -9,10 +9,10 @@ import {
   Pin,
   PinOff,
 } from "lucide-react";
-import type { ChatRoom } from "../../lib/types";
+import type { SessionSummary } from "../../lib/types";
 
 type Props = {
-  chatRooms: ChatRoom[];
+  chatRooms: SessionSummary[];
   activeSessionId: string | null;
   pinnedRooms: string[];
   onNewChat: () => void;
@@ -179,7 +179,7 @@ function ChatRoomItem({
   onDelete,
   onTogglePin,
 }: {
-  room: ChatRoom;
+  room: SessionSummary;
   isActive: boolean;
   isPinned: boolean;
   onSelect: () => void;
@@ -223,8 +223,8 @@ function ChatRoomItem({
   );
 }
 
-function groupByDate(rooms: ChatRoom[]): Record<string, ChatRoom[]> {
-  const groups: Record<string, ChatRoom[]> = {};
+function groupByDate(rooms: SessionSummary[]): Record<string, SessionSummary[]> {
+  const groups: Record<string, SessionSummary[]> = {};
   const now = new Date();
   const today = now.toDateString();
   const yesterday = new Date(now.getTime() - 86400000).toDateString();

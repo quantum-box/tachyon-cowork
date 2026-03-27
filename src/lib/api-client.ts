@@ -2,10 +2,74 @@ import type {
   AgentChunk,
   AgentExecuteRequest,
   AuthConfig,
-  ChatRoom,
   ModelInfo,
+  SessionSummary,
 } from "./types";
 import type { TokenManager } from "./token-manager";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function normalizeSession(value: unknown): SessionSummary | null {
+  if (!isRecord(value)) return null;
+
+  const id = typeof value.id === "string" ? value.id : null;
+  if (!id) return null;
+
+  const name =
+    typeof value.name === "string"
+      ? value.name
+      : typeof value.title === "string"
+        ? value.title
+        : "";
+
+  const createdAt =
+    typeof value.created_at === "string"
+      ? value.created_at
+      : typeof value.createdAt === "string"
+        ? value.createdAt
+        : new Date().toISOString();
+
+  return { id, name, created_at: createdAt };
+}
+
+function normalizeSessionsResponse(value: unknown): SessionSummary[] {
+  const candidates = [
+    value,
+    isRecord(value) ? value.sessions : undefined,
+    isRecord(value) ? value.items : undefined,
+    isRecord(value) ? value.data : undefined,
+  ];
+
+  for (const candidate of candidates) {
+    if (!Array.isArray(candidate)) continue;
+
+    return candidate
+      .map((item) => normalizeSession(item))
+      .filter((item): item is SessionSummary => item !== null);
+  }
+
+  return [];
+}
+
+function normalizeMessagesResponse(value: unknown): AgentChunk[] {
+  const candidates = [
+    value,
+    isRecord(value) ? value.messages : undefined,
+    isRecord(value) ? value.chunks : undefined,
+    isRecord(value) ? value.items : undefined,
+    isRecord(value) ? value.data : undefined,
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      return candidate as AgentChunk[];
+    }
+  }
+
+  return [];
+}
 
 export class AgentChatClient {
   private config: AuthConfig;
@@ -90,44 +154,49 @@ export class AgentChatClient {
     return (await response.json()) as T;
   }
 
-  // ── Chatroom API ──────────────────────────────────────────────────
+  // ── Session API ───────────────────────────────────────────────────
 
-  async createChatRoom(
+  async createSession(
     title?: string,
-  ): Promise<{ chatroom: { id: string; name: string } }> {
-    return this.request("/v1/llms/chatrooms", {
+  ): Promise<{ session: { id: string; name: string } }> {
+    const data = await this.request<unknown>("/llms/sessions", {
       method: "POST",
       body: JSON.stringify({ ...(title && { name: title }) }),
     });
+    const session =
+      normalizeSession(isRecord(data) ? data.session : data) ??
+      normalizeSession(isRecord(data) ? data.data : null);
+    if (!session) {
+      throw new Error("Unexpected session create response");
+    }
+    return { session: { id: session.id, name: session.name } };
   }
 
-  async getChatrooms(): Promise<ChatRoom[]> {
-    const data = await this.request<{ chatrooms: ChatRoom[] }>(
-      "/v1/llms/chatrooms",
-    );
-    return data.chatrooms;
+  async getSessions(): Promise<SessionSummary[]> {
+    const data = await this.request<unknown>("/llms/sessions");
+    return normalizeSessionsResponse(data);
   }
 
-  async updateChatRoom(
+  async updateSession(
     id: string,
     payload: { name?: string },
-  ): Promise<ChatRoom> {
-    const data = await this.request<{ chatroom: ChatRoom }>(
-      `/v1/llms/chatrooms/${id}`,
+  ): Promise<SessionSummary> {
+    const data = await this.request<{ session: SessionSummary }>(
+      `/llms/sessions/${id}`,
       { method: "PATCH", body: JSON.stringify(payload) },
     );
-    return data.chatroom;
+    return data.session;
   }
 
-  async deleteChatroom(id: string): Promise<void> {
-    const url = this.buildUrl(`/v1/llms/chatrooms/${id}`);
+  async deleteSession(id: string): Promise<void> {
+    const url = this.buildUrl(`/llms/sessions/${id}`);
     const headers = await this.getFreshHeaders();
     const response = await fetch(url, {
       method: "DELETE",
       headers,
     });
     if (!response.ok) {
-      throw new Error(`Failed to delete chatroom: ${response.status}`);
+      throw new Error(`Failed to delete session: ${response.status}`);
     }
   }
 
@@ -137,9 +206,7 @@ export class AgentChatClient {
     chatRoomId: string,
     args: AgentExecuteRequest,
   ): Promise<Response> {
-    const url = this.buildUrl(
-      `/v1/llms/sessions/${chatRoomId}/agent/execute`,
-    );
+    const url = this.buildUrl(`/llms/sessions/${chatRoomId}/agent/execute`);
     const headers = await this.getFreshHeaders();
     const response = await fetch(url, {
       method: "POST",
@@ -157,15 +224,28 @@ export class AgentChatClient {
   }
 
   async getMessages(chatRoomId: string): Promise<AgentChunk[]> {
-    const data = await this.request<{ messages: AgentChunk[] }>(
-      `/v1/llms/sessions/${chatRoomId}/agent/messages`,
-    );
-    return data.messages;
+    try {
+      const data = await this.request<unknown>(
+        `/llms/sessions/${chatRoomId}/agent/messages`,
+      );
+      return normalizeMessagesResponse(data);
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message.includes("404")
+      ) {
+        const fallback = await this.request<unknown>(
+          `/llms/sessions/${chatRoomId}/messages`,
+        );
+        return normalizeMessagesResponse(fallback);
+      }
+      throw error;
+    }
   }
 
   async getModels(): Promise<ModelInfo[]> {
     const data = await this.request<{ models: ModelInfo[] }>(
-      "/v1/llms/models?supported_feature=agent&require_agent_product=true",
+      "/llms/models?supported_feature=agent&require_agent_product=true",
     );
     return data.models;
   }
