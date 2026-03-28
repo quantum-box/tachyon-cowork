@@ -4,8 +4,8 @@ import type {
   AgentChunk,
   AgentExecuteRequest,
   Artifact,
-  ChatRoom,
   InlineAttachment,
+  SessionSummary,
 } from "../lib/types";
 import { chunkToArtifact } from "./useArtifact";
 
@@ -35,7 +35,7 @@ export function useAgentChat(
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [input, setInput] = useState("");
-  const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
+  const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [pinnedRooms, setPinnedRooms] = useState<string[]>(loadPinnedRooms);
   const [selectedModel, setSelectedModel] = useState<string>(
     () => localStorage.getItem(MODEL_KEY) ?? "anthropic/claude-sonnet-4-5",
@@ -52,30 +52,45 @@ export function useAgentChat(
       return;
     }
     let cancelled = false;
+    setError(null);
     client
       .getMessages(sessionId)
       .then((messages) => {
-        if (!cancelled) setChunks(messages);
+        if (!cancelled) {
+          setChunks(messages);
+        }
       })
-      .catch(console.error);
+      .catch((e) => {
+        if (!cancelled) {
+          setChunks([]);
+          setError(e instanceof Error ? e : new Error(String(e)));
+        }
+        console.error("Failed to fetch session messages:", e);
+      });
     return () => {
       cancelled = true;
     };
   }, [sessionId, client]);
 
-  const fetchChatRooms = useCallback(async () => {
+  const fetchSessions = useCallback(async () => {
     if (!client) return;
     try {
-      const rooms = await client.getChatrooms();
-      setChatRooms(rooms);
+      const items = await client.getSessions();
+      setSessions(items);
+      setSessionId((prev) => {
+        if (prev && items.some((item) => item.id === prev)) {
+          return prev;
+        }
+        return items[0]?.id ?? null;
+      });
     } catch (e) {
-      console.error("Failed to fetch chatrooms:", e);
+      console.error("Failed to fetch sessions:", e);
     }
   }, [client]);
 
   useEffect(() => {
-    fetchChatRooms();
-  }, [fetchChatRooms]);
+    fetchSessions();
+  }, [fetchSessions]);
 
   const startTask = useCallback(
     async (task: string, newRoomTitle?: string, attachments?: InlineAttachment[]) => {
@@ -86,15 +101,15 @@ export function useAgentChat(
       let currentSessionId = sessionId;
       if (!currentSessionId) {
         try {
-          const room = await client.createChatRoom(
+          const session = await client.createSession(
             newRoomTitle || task.slice(0, 50),
           );
-          currentSessionId = room.chatroom.id;
+          currentSessionId = session.session.id;
           setSessionId(currentSessionId);
-          setChatRooms((prev) => [
+          setSessions((prev) => [
             {
-              id: room.chatroom.id,
-              name: room.chatroom.name,
+              id: session.session.id,
+              name: session.session.name,
               created_at: new Date().toISOString(),
             },
             ...prev,
@@ -243,11 +258,11 @@ export function useAgentChat(
     async (id: string) => {
       if (!client) return;
       try {
-        await client.deleteChatroom(id);
-        setChatRooms((prev) => prev.filter((r) => r.id !== id));
+        await client.deleteSession(id);
+        setSessions((prev) => prev.filter((r) => r.id !== id));
         if (sessionId === id) newChat();
       } catch (e) {
-        console.error("Failed to delete chatroom:", e);
+        console.error("Failed to delete session:", e);
       }
     },
     [client, sessionId, newChat],
@@ -279,7 +294,8 @@ export function useAgentChat(
     setInput,
     selectedModel,
     setSelectedModel,
-    chatRooms,
+    chatRooms: sessions,
+    sessions,
     pinnedRooms,
     togglePin,
     handleSubmit,
@@ -287,6 +303,6 @@ export function useAgentChat(
     newChat,
     selectSession,
     deleteRoom,
-    fetchChatRooms,
+    fetchSessions,
   };
 }

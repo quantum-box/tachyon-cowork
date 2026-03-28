@@ -1,4 +1,4 @@
-import { getTokenExpiresAt, isTokenExpired } from "./jwt";
+import { getTokenExpiresAt } from "./jwt";
 
 const STORAGE_KEY = "tachyon-cowork-auth";
 
@@ -14,27 +14,43 @@ export type AuthState = {
   clientSecret?: string;
 };
 
+function isValidStoredAuth(value: unknown): value is AuthState {
+  if (!value || typeof value !== "object") return false;
+
+  const auth = value as Partial<AuthState>;
+  return (
+    typeof auth.accessToken === "string" &&
+    auth.accessToken.length > 0 &&
+    typeof auth.tenantId === "string" &&
+    auth.tenantId.length > 0 &&
+    typeof auth.apiBaseUrl === "string" &&
+    auth.apiBaseUrl.length > 0
+  );
+}
+
 export function loadAuth(): AuthState | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    const state = JSON.parse(raw) as AuthState;
 
-    // Validate required fields — incomplete auth must not bypass login
-    if (!state.accessToken || !state.apiBaseUrl || !state.tenantId) {
-      localStorage.removeItem(STORAGE_KEY);
+    const parsed = JSON.parse(raw) as unknown;
+    if (!isValidStoredAuth(parsed)) {
+      clearAuth();
       return null;
     }
 
-    // If the access token is expired and there's no refresh token,
-    // clear stale auth so the login screen is shown.
-    if (isTokenExpired(state.accessToken) && !state.refreshToken) {
-      localStorage.removeItem(STORAGE_KEY);
+    const expiresAt = parsed.expiresAt ?? getTokenExpiresAt(parsed.accessToken) ?? undefined;
+    if (expiresAt && expiresAt <= Date.now() && !parsed.refreshToken) {
+      clearAuth();
       return null;
     }
 
-    return state;
+    return {
+      ...parsed,
+      expiresAt,
+    };
   } catch {
+    clearAuth();
     return null;
   }
 }

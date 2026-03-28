@@ -92,8 +92,8 @@ export type ModelInfo = {
   max_output_tokens?: number | null;
 };
 
-/** A chat room */
-export type ChatRoom = {
+/** A session summary */
+export type SessionSummary = {
   id: string;
   name: string;
   created_at: string;
