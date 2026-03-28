@@ -20,6 +20,7 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 1420,
       strictPort: isTauri,
+      allowedHosts: true,
       ...(apiProxyTarget
         ? {
             proxy: {

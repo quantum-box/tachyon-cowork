@@ -14,6 +14,8 @@ import { isTauri } from "../../lib/tauri-bridge";
 
 type Props = {
   onLogin: (auth: AuthState) => void;
+  oauthError?: string | null;
+  isExchangingToken?: boolean;
 };
 
 type TenantOption = {
@@ -125,7 +127,7 @@ async function fetchCognitoUserInfo(
   return response.json();
 }
 
-export function LoginScreen({ onLogin }: Props) {
+export function LoginScreen({ onLogin, oauthError, isExchangingToken }: Props) {
   const defaultTenantId = import.meta.env.VITE_DEFAULT_TENANT_ID || "";
   const cognitoDomain = import.meta.env.VITE_COGNITO_DOMAIN || "";
   const cognitoClientId = import.meta.env.VITE_COGNITO_CLIENT_ID || "";
@@ -374,6 +376,7 @@ export function LoginScreen({ onLogin }: Props) {
       "w-full px-3 py-2.5 text-sm rounded-xl border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100 outline-none focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 dark:focus:ring-indigo-400/20 placeholder:text-gray-400 dark:placeholder:text-slate-500 transition-colors duration-150",
     [],
   );
+  const isBusy = isLoading || Boolean(isExchangingToken);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-slate-950 p-4 transition-colors duration-150">
@@ -395,18 +398,24 @@ export function LoginScreen({ onLogin }: Props) {
             Tachyon Cowork
           </h1>
           <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
-            AIアシスタントにログイン
+            AIアシスタントにサインイン
           </p>
         </div>
 
         <div className="space-y-4">
+          {oauthError && (
+            <div className="px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-xs text-red-700 dark:text-red-400">
+              サインインエラー: {oauthError}
+            </div>
+          )}
+
           <button
             type="button"
             onClick={handleBrowserLogin}
-            disabled={isLoading || !hostedLoginReady}
+            disabled={isBusy || !hostedLoginReady}
             className="w-full py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 dark:hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150"
           >
-            {isLoading ? "ログイン処理中..." : "ブラウザでログイン"}
+            {isBusy ? "ログイン処理中..." : "ブラウザでログイン"}
           </button>
 
           <p className="text-xs text-center text-gray-500 dark:text-slate-400 leading-5">
@@ -432,7 +441,7 @@ export function LoginScreen({ onLogin }: Props) {
               <button
                 type="button"
                 onClick={() => void handleOAuthCallbackUrl(callbackUrlInput)}
-                disabled={isLoading || !callbackUrlInput.trim()}
+                disabled={isBusy || !callbackUrlInput.trim()}
                 className="w-full py-2.5 rounded-xl bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150"
               >
                 callback URL で続行
@@ -525,7 +534,7 @@ export function LoginScreen({ onLogin }: Props) {
                 <button
                   type="button"
                   onClick={handleTenantLogin}
-                  disabled={isLoading || !tenantId || !accessToken}
+                  disabled={isBusy || !tenantId || !accessToken}
                   className="w-full py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 dark:hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150"
                 >
                   続行
@@ -533,10 +542,10 @@ export function LoginScreen({ onLogin }: Props) {
               ) : (
                 <button
                   type="submit"
-                  disabled={isLoading || !apiBaseUrl || !accessToken}
+                  disabled={isBusy || !apiBaseUrl || !accessToken}
                   className="w-full py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 dark:hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150"
                 >
-                  {isLoading ? "接続中..." : "手動ログイン"}
+                  {isBusy ? "接続中..." : "手動ログイン"}
                 </button>
               )}
             </form>
