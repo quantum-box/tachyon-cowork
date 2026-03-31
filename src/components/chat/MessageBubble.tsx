@@ -2,14 +2,12 @@ import { useState, useCallback, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
-  Bot,
   User,
   ChevronDown,
   ChevronRight,
   Wrench,
   CheckCircle,
   Loader2,
-  Coins,
   Code,
   FileDown,
   X,
@@ -60,7 +58,7 @@ export function MessageBubble({ chunk, onOpenArtifact, searchQuery }: Props) {
     case "tool_result":
       return <ToolResultMessage chunk={chunk} />;
     case "usage":
-      return <UsageMessage chunk={chunk} />;
+      return null;
     case "tool_job_started":
       return (
         <div className="flex justify-start mb-2">
@@ -223,11 +221,8 @@ function AssistantMessage({
   );
 
   return (
-    <div className="flex justify-start mb-4 gap-2">
-      <div className="shrink-0 w-8 h-8 rounded-full bg-gray-100 dark:bg-slate-800 flex items-center justify-center">
-        <Bot size={16} className="text-gray-600 dark:text-gray-400" />
-      </div>
-      <div className="max-w-[75%] rounded-2xl rounded-bl-sm px-4 py-3 bg-gray-100 dark:bg-slate-800 text-sm leading-relaxed prose prose-sm max-w-none prose-p:my-1 prose-pre:bg-transparent prose-pre:p-0 prose-code:text-indigo-600 dark:prose-code:text-indigo-400 prose-code:before:content-[''] prose-code:after:content-[''] text-gray-900 dark:text-gray-100 prose-headings:text-gray-900 dark:prose-headings:text-gray-100 prose-strong:text-gray-900 dark:prose-strong:text-gray-100 prose-a:text-indigo-600 dark:prose-a:text-indigo-400">
+    <div className="mb-6">
+      <div className="max-w-3xl text-sm leading-relaxed prose prose-sm max-w-none prose-p:my-1 prose-pre:bg-transparent prose-pre:p-0 prose-code:text-indigo-600 dark:prose-code:text-indigo-400 prose-code:before:content-[''] prose-code:after:content-[''] text-gray-900 dark:text-gray-100 prose-headings:text-gray-900 dark:prose-headings:text-gray-100 prose-strong:text-gray-900 dark:prose-strong:text-gray-100 prose-a:text-indigo-600 dark:prose-a:text-indigo-400">
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           components={{
@@ -274,6 +269,7 @@ function AssistantMessage({
             {codeBlocks.map((block, i) => (
               <button
                 key={i}
+                type="button"
                 onClick={() => handleOpenCodeBlock(block, i)}
                 className="flex items-center gap-1.5 rounded-lg border border-indigo-200 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/30 px-2.5 py-1 text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"
               >
@@ -378,20 +374,6 @@ function ToolResultMessage({ chunk }: { chunk: AgentChunk }) {
           <pre className="mt-1 px-3 py-2 rounded-lg bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-xs text-gray-800 dark:text-gray-200 overflow-x-auto max-h-48 overflow-y-auto">
             {text}
           </pre>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function UsageMessage({ chunk }: { chunk: AgentChunk }) {
-  return (
-    <div className="flex justify-center mb-3">
-      <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-[10px] text-gray-400 dark:text-slate-500">
-        <Coins size={10} />
-        {chunk.total_tokens?.toLocaleString()} tokens
-        {chunk.total_cost != null && (
-          <span className="ml-1">${chunk.total_cost.toFixed(4)}</span>
         )}
       </div>
     </div>
