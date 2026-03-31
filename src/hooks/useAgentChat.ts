@@ -12,6 +12,109 @@ import { chunkToArtifact } from "./useArtifact";
 const MODEL_KEY = "tachyon-cowork-model";
 const PINNED_KEY = "tachyon-cowork-pinned";
 
+function mergeChunkText(
+  currentValue: string | undefined,
+  nextValue: string | undefined,
+): string | undefined {
+  if (!nextValue) return currentValue;
+  if (!currentValue) return nextValue;
+  if (nextValue.startsWith(currentValue)) return nextValue;
+  if (currentValue.endsWith(nextValue)) return currentValue;
+  return `${currentValue}${nextValue}`;
+}
+
+function mergeChunk(existing: AgentChunk, incoming: AgentChunk): AgentChunk {
+  return {
+    ...existing,
+    ...incoming,
+    text: mergeChunkText(existing.text, incoming.text),
+    content: mergeChunkText(existing.content, incoming.content),
+    thinking: mergeChunkText(existing.thinking, incoming.thinking),
+    tool_arguments: mergeChunkText(
+      existing.tool_arguments,
+      incoming.tool_arguments,
+    ),
+    tool_result: mergeChunkText(existing.tool_result, incoming.tool_result),
+    result: mergeChunkText(existing.result, incoming.result),
+  };
+}
+
+function getChunkSourceId(chunk: AgentChunk): string {
+  return chunk.id || chunk.tool_id || chunk.created_at || "unknown";
+}
+
+function getChunkStreamKey(chunk: AgentChunk): string {
+  switch (chunk.type) {
+    case "assistant":
+    case "say":
+    case "attempt_completion":
+    case "completion":
+      return "assistant";
+    case "thinking":
+      return "thinking";
+    case "tool_call":
+    case "tool_call_args":
+    case "tool_call_pending":
+      return `tool-call:${chunk.tool_id || chunk.tool_name || getChunkSourceId(chunk)}`;
+    case "tool_result":
+      return `tool-result:${chunk.tool_id || chunk.tool_name || getChunkSourceId(chunk)}`;
+    case "artifact":
+      return `artifact:${chunk.artifact_id || chunk.filename || getChunkSourceId(chunk)}`;
+    case "usage":
+      return "usage";
+    default:
+      return `${chunk.type}:${getChunkSourceId(chunk)}`;
+  }
+}
+
+function withStreamScopedId(
+  incoming: AgentChunk,
+  mergeableKeys: Map<string, string>,
+  streamInstanceId: string,
+): AgentChunk {
+  const mergeKey = getChunkStreamKey(incoming);
+  const existingId = mergeableKeys.get(mergeKey);
+  if (existingId) {
+    return { ...incoming, id: existingId };
+  }
+
+  const sourceId = getChunkSourceId(incoming) || `chunk-${mergeableKeys.size}`;
+  const scopedId = `${sourceId}::${streamInstanceId}::${mergeableKeys.size}`;
+  mergeableKeys.set(mergeKey, scopedId);
+  return { ...incoming, id: scopedId };
+}
+
+function upsertChunk(prev: AgentChunk[], incoming: AgentChunk): AgentChunk[] {
+  const existingIndex = prev.findIndex((chunk) => chunk.id === incoming.id);
+  if (existingIndex === -1) {
+    return [...prev, incoming];
+  }
+
+  const next = [...prev];
+  next[existingIndex] = mergeChunk(prev[existingIndex], incoming);
+  return next;
+}
+
+function extractSseEvents(buffer: string): {
+  events: string[];
+  rest: string;
+} {
+  const parts = buffer.split(/\r?\n\r?\n/);
+  const rest = parts.pop() ?? "";
+  return { events: parts, rest };
+}
+
+function parseSseEvent(eventBlock: string): string | null {
+  const data = eventBlock
+    .split(/\r?\n/)
+    .filter((line) => line.startsWith("data:"))
+    .map((line) => line.slice(5).trimStart())
+    .join("\n")
+    .trim();
+
+  return data || null;
+}
+
 function loadPinnedRooms(): string[] {
   try {
     const raw = localStorage.getItem(PINNED_KEY);
@@ -124,6 +227,9 @@ export function useAgentChat(
       if (abortRef.current) abortRef.current.abort();
       const ac = new AbortController();
       abortRef.current = ac;
+      const streamInstanceId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const mergeableStreamKeys = new Map<string, string>();
+      let receivedStreamChunk = false;
 
       try {
         const args: AgentExecuteRequest = {
@@ -145,12 +251,11 @@ export function useAgentChat(
           if (done) break;
 
           buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() ?? "";
+          const { events, rest } = extractSseEvents(buffer);
+          buffer = rest;
 
-          for (const line of lines) {
-            if (!line.startsWith("data: ")) continue;
-            const data = line.slice(6).trim();
+          for (const eventBlock of events) {
+            const data = parseSseEvent(eventBlock);
             if (!data || data === "[DONE]") continue;
             try {
               const parsed = JSON.parse(data);
@@ -161,14 +266,37 @@ export function useAgentChat(
                 setError(new Error(msg));
                 continue;
               }
-              const chunk = parsed as AgentChunk;
-              setChunks((prev) => [...prev, chunk]);
+              const chunk = withStreamScopedId(
+                parsed as AgentChunk,
+                mergeableStreamKeys,
+                streamInstanceId,
+              );
+              receivedStreamChunk = true;
+              setChunks((prev) => upsertChunk(prev, chunk));
               if (chunk.type === "artifact" && onArtifact) {
                 onArtifact(chunkToArtifact(chunk));
               }
             } catch {
               // skip malformed JSON
             }
+          }
+        }
+
+        const finalData = parseSseEvent(buffer);
+        if (finalData && finalData !== "[DONE]") {
+          try {
+            const chunk = withStreamScopedId(
+              JSON.parse(finalData) as AgentChunk,
+              mergeableStreamKeys,
+              streamInstanceId,
+            );
+            receivedStreamChunk = true;
+            setChunks((prev) => upsertChunk(prev, chunk));
+            if (chunk.type === "artifact" && onArtifact) {
+              onArtifact(chunkToArtifact(chunk));
+            }
+          } catch {
+            // ignore trailing partial event
           }
         }
       } catch (e) {
@@ -181,8 +309,12 @@ export function useAgentChat(
 
         if (currentSessionId) {
           try {
-            const msgs = await client.getMessages(currentSessionId);
-            if (msgs.length > 0) setChunks(msgs);
+            if (!receivedStreamChunk) {
+              const msgs = await client.getMessages(currentSessionId);
+              if (msgs.length > 0) {
+                setChunks(msgs);
+              }
+            }
           } catch {
             /* ignore */
           }
