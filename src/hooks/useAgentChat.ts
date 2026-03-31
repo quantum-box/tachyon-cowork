@@ -4,13 +4,80 @@ import type {
   AgentChunk,
   AgentExecuteRequest,
   Artifact,
+  ClientToolDefinition,
   InlineAttachment,
   SessionSummary,
+  ToolCall,
 } from "../lib/types";
+import { executeClientTool, isTauri } from "../lib/tauri-bridge";
 import { chunkToArtifact } from "./useArtifact";
 
 const MODEL_KEY = "tachyon-cowork-model";
 const PINNED_KEY = "tachyon-cowork-pinned";
+
+const CLIENT_TOOLS: ClientToolDefinition[] = [
+  {
+    name: "local_list_directory",
+    description:
+      "List files and subdirectories in a local directory on this device. Use this to inspect what exists inside a folder before reading or processing files.",
+    parameters: {
+      type: "object",
+      properties: {
+        path: {
+          type: "string",
+          description: "Absolute path of the local directory to inspect.",
+        },
+      },
+      required: ["path"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "local_search_files",
+    description:
+      "Search for files inside a local directory on this device by filename and optional extension filters.",
+    parameters: {
+      type: "object",
+      properties: {
+        directory: {
+          type: "string",
+          description: "Absolute path of the local directory to search inside.",
+        },
+        pattern: {
+          type: "string",
+          description: "Case-insensitive substring to match against filenames.",
+        },
+        extensions: {
+          type: "array",
+          items: { type: "string" },
+          description: "Optional file extensions to include, without dots if possible.",
+        },
+        max_results: {
+          type: "integer",
+          description: "Maximum number of matches to return.",
+        },
+      },
+      required: ["directory"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "local_get_file_info",
+    description:
+      "Get metadata for a local file or directory on this device, including size, timestamps, type, and extension.",
+    parameters: {
+      type: "object",
+      properties: {
+        path: {
+          type: "string",
+          description: "Absolute path of the local file or directory.",
+        },
+      },
+      required: ["path"],
+      additionalProperties: false,
+    },
+  },
+];
 
 function mergeChunkText(
   currentValue: string | undefined,
@@ -43,13 +110,46 @@ function getChunkSourceId(chunk: AgentChunk): string {
   return chunk.id || chunk.tool_id || chunk.created_at || "unknown";
 }
 
-function getChunkStreamKey(chunk: AgentChunk): string {
+type ChunkGroup = "assistant" | "thinking" | "tool" | "artifact" | "usage" | "other";
+
+function getChunkGroup(chunk: AgentChunk): ChunkGroup {
   switch (chunk.type) {
     case "assistant":
     case "say":
     case "attempt_completion":
     case "completion":
       return "assistant";
+    case "thinking":
+      return "thinking";
+    case "tool_call":
+    case "tool_call_args":
+    case "tool_call_pending":
+    case "tool_result":
+      return "tool";
+    case "artifact":
+      return "artifact";
+    case "usage":
+      return "usage";
+    default:
+      return "other";
+  }
+}
+
+type StreamScopeState = {
+  assistantSegment: number;
+  lastGroup: ChunkGroup | null;
+};
+
+function getChunkStreamKey(
+  chunk: AgentChunk,
+  streamState?: StreamScopeState,
+): string {
+  switch (chunk.type) {
+    case "assistant":
+    case "say":
+    case "attempt_completion":
+    case "completion":
+      return `${chunk.type}:${getChunkSourceId(chunk)}:${streamState?.assistantSegment ?? 0}`;
     case "thinking":
       return "thinking";
     case "tool_call":
@@ -71,9 +171,17 @@ function withStreamScopedId(
   incoming: AgentChunk,
   mergeableKeys: Map<string, string>,
   streamInstanceId: string,
+  streamState: StreamScopeState,
 ): AgentChunk {
-  const mergeKey = getChunkStreamKey(incoming);
+  const group = getChunkGroup(incoming);
+  if (group === "assistant" && streamState.lastGroup !== "assistant") {
+    streamState.assistantSegment += 1;
+  }
+
+  const mergeKey = getChunkStreamKey(incoming, streamState);
   const existingId = mergeableKeys.get(mergeKey);
+  streamState.lastGroup = group;
+
   if (existingId) {
     return { ...incoming, id: existingId };
   }
@@ -95,6 +203,79 @@ function upsertChunk(prev: AgentChunk[], incoming: AgentChunk): AgentChunk[] {
   return next;
 }
 
+function resolvePendingToolCall(
+  prev: AgentChunk[],
+  toolId: string,
+): AgentChunk[] {
+  return prev.map((chunk) => {
+    if (chunk.type !== "tool_call_pending" || chunk.tool_id !== toolId) {
+      return chunk;
+    }
+    return {
+      ...chunk,
+      type: "tool_call",
+      is_finished: true,
+    };
+  });
+}
+
+function isToolCallChunk(chunk: AgentChunk): boolean {
+  return (
+    chunk.type === "tool_call" ||
+    chunk.type === "tool_call_args" ||
+    chunk.type === "tool_call_pending"
+  );
+}
+
+function normalizeLoadedChunks(chunks: AgentChunk[]): AgentChunk[] {
+  const compacted: AgentChunk[] = [];
+
+  for (const chunk of chunks) {
+    const normalized = normalizeIncomingChunk(chunk);
+    const previous = compacted[compacted.length - 1];
+
+    if (
+      previous &&
+      previous.tool_id &&
+      normalized.tool_id &&
+      previous.tool_id === normalized.tool_id &&
+      isToolCallChunk(previous) &&
+      isToolCallChunk(normalized)
+    ) {
+      compacted[compacted.length - 1] = mergeChunk(previous, normalized);
+      continue;
+    }
+
+    compacted.push(normalized);
+  }
+
+  const completedToolIds = new Set(
+    compacted
+      .filter(
+        (chunk) =>
+          !!chunk.tool_id &&
+          (chunk.type === "tool_result" || chunk.type === "tool_call"),
+      )
+      .map((chunk) => chunk.tool_id!),
+  );
+
+  return compacted.map((chunk) => {
+    if (
+      chunk.type === "tool_call_pending" &&
+      chunk.tool_id &&
+      completedToolIds.has(chunk.tool_id)
+    ) {
+      return {
+        ...chunk,
+        type: "tool_call",
+        is_finished: true,
+      };
+    }
+
+    return chunk;
+  });
+}
+
 function extractSseEvents(buffer: string): {
   events: string[];
   rest: string;
@@ -113,6 +294,23 @@ function parseSseEvent(eventBlock: string): string | null {
     .trim();
 
   return data || null;
+}
+
+function stringifyToolPayload(value: unknown): string {
+  if (typeof value === "string") return value;
+  return JSON.stringify(value, null, 2);
+}
+
+function normalizeIncomingChunk(chunk: AgentChunk): AgentChunk {
+  if (chunk.type !== "tool_call_pending" || !chunk.args) {
+    return chunk;
+  }
+
+  return {
+    ...chunk,
+    tool_arguments:
+      chunk.tool_arguments ?? stringifyToolPayload(chunk.args),
+  };
 }
 
 function loadPinnedRooms(): string[] {
@@ -144,6 +342,49 @@ export function useAgentChat(
     () => localStorage.getItem(MODEL_KEY) ?? "anthropic/claude-sonnet-4-5",
   );
   const abortRef = useRef<AbortController | null>(null);
+  const skipNextSessionLoadRef = useRef<string | null>(null);
+
+  const handlePendingToolCall = useCallback(
+    async (
+      currentSessionId: string,
+      chunk: AgentChunk & { args?: Record<string, unknown> },
+    ) => {
+      if (!client || !chunk.tool_id || !chunk.tool_name) return;
+
+      let resultText = "";
+      try {
+        if (!isTauri()) {
+          throw new Error(
+            "client-side local filesystem tools are only available in the Tauri app",
+          );
+        }
+        const toolCall: ToolCall = {
+          name: chunk.tool_name,
+          arguments: chunk.args ?? {},
+        };
+        const outcome = await executeClientTool(toolCall);
+        resultText = stringifyToolPayload(
+          outcome.error
+            ? { ok: false, error: outcome.error, result: outcome.result }
+            : outcome.result,
+        );
+      } catch (error) {
+        resultText = stringifyToolPayload({
+          ok: false,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+
+      if (chunk.fire_and_forget) return;
+      await client.submitToolResult(currentSessionId, {
+        tool_id: chunk.tool_id,
+        result: resultText,
+        is_finished: true,
+      });
+      setChunks((prev) => resolvePendingToolCall(prev, chunk.tool_id!));
+    },
+    [client],
+  );
 
   useEffect(() => {
     localStorage.setItem(MODEL_KEY, selectedModel);
@@ -155,6 +396,10 @@ export function useAgentChat(
       setIsLoading(false);
       return;
     }
+    if (skipNextSessionLoadRef.current === sessionId) {
+      skipNextSessionLoadRef.current = null;
+      return;
+    }
     let cancelled = false;
     setIsLoading(true);
     setError(null);
@@ -162,7 +407,7 @@ export function useAgentChat(
       .getMessages(sessionId)
       .then((messages) => {
         if (!cancelled) {
-          setChunks(messages);
+          setChunks(normalizeLoadedChunks(messages));
           setIsLoading(false);
         }
       })
@@ -212,6 +457,7 @@ export function useAgentChat(
             newRoomTitle || task.slice(0, 50),
           );
           currentSessionId = session.session.id;
+          skipNextSessionLoadRef.current = currentSessionId;
           setSessionId(currentSessionId);
           setSessions((prev) => [
             {
@@ -233,6 +479,10 @@ export function useAgentChat(
       abortRef.current = ac;
       const streamInstanceId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const mergeableStreamKeys = new Map<string, string>();
+      const streamScopeState: StreamScopeState = {
+        assistantSegment: 0,
+        lastGroup: null,
+      };
       let receivedStreamChunk = false;
 
       try {
@@ -240,6 +490,7 @@ export function useAgentChat(
           task,
           model: selectedModel,
           max_requests: 10,
+          client_tools: CLIENT_TOOLS,
           ...(attachments && attachments.length > 0 && { attachments }),
         };
         const response = await client.executeAgent(currentSessionId, args);
@@ -270,13 +521,21 @@ export function useAgentChat(
                 setError(new Error(msg));
                 continue;
               }
+              const normalized = normalizeIncomingChunk(parsed as AgentChunk);
               const chunk = withStreamScopedId(
-                parsed as AgentChunk,
+                normalized,
                 mergeableStreamKeys,
                 streamInstanceId,
+                streamScopeState,
               );
               receivedStreamChunk = true;
               setChunks((prev) => upsertChunk(prev, chunk));
+              if (chunk.type === "tool_call_pending" && currentSessionId) {
+                await handlePendingToolCall(
+                  currentSessionId,
+                  parsed as AgentChunk & { args?: Record<string, unknown> },
+                );
+              }
               if (chunk.type === "artifact" && onArtifact) {
                 onArtifact(chunkToArtifact(chunk));
               }
@@ -289,13 +548,25 @@ export function useAgentChat(
         const finalData = parseSseEvent(buffer);
         if (finalData && finalData !== "[DONE]") {
           try {
-            const chunk = withStreamScopedId(
+            const normalized = normalizeIncomingChunk(
               JSON.parse(finalData) as AgentChunk,
+            );
+            const chunk = withStreamScopedId(
+              normalized,
               mergeableStreamKeys,
               streamInstanceId,
+              streamScopeState,
             );
             receivedStreamChunk = true;
             setChunks((prev) => upsertChunk(prev, chunk));
+            if (chunk.type === "tool_call_pending" && currentSessionId) {
+              await handlePendingToolCall(
+                currentSessionId,
+                JSON.parse(finalData) as AgentChunk & {
+                  args?: Record<string, unknown>;
+                },
+              );
+            }
             if (chunk.type === "artifact" && onArtifact) {
               onArtifact(chunkToArtifact(chunk));
             }
@@ -316,7 +587,7 @@ export function useAgentChat(
             if (!receivedStreamChunk) {
               const msgs = await client.getMessages(currentSessionId);
               if (msgs.length > 0) {
-                setChunks(msgs);
+                setChunks(normalizeLoadedChunks(msgs));
               }
             }
           } catch {
@@ -325,7 +596,7 @@ export function useAgentChat(
         }
       }
     },
-    [sessionId, client, selectedModel, onArtifact],
+    [sessionId, client, selectedModel, onArtifact, handlePendingToolCall],
   );
 
   const sendMessage = useCallback(
@@ -430,7 +701,6 @@ export function useAgentChat(
     setInput,
     selectedModel,
     setSelectedModel,
-    chatRooms: sessions,
     sessions,
     pinnedRooms,
     togglePin,

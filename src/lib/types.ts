@@ -31,6 +31,8 @@ export type AgentChunk = {
   tool_arguments?: string;
   tool_result?: string;
   tool_id?: string;
+  args?: Record<string, unknown>;
+  fire_and_forget?: boolean;
   content?: string;
   result?: string;
   is_finished?: boolean;
@@ -68,6 +70,7 @@ export type AgentExecuteRequest = {
   model?: string;
   max_requests?: number;
   tool_access?: ToolAccess;
+  client_tools?: ClientToolDefinition[];
   attachments?: InlineAttachment[];
 };
 
@@ -193,4 +196,11 @@ export type ToolResult = {
   tool_id: string;
   result: unknown;
   error?: string;
+};
+
+export type ClientToolDefinition = {
+  name: string;
+  description: string;
+  parameters?: Record<string, unknown>;
+  fire_and_forget?: boolean;
 };

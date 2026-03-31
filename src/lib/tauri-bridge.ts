@@ -2,6 +2,10 @@
  * Platform abstraction for Tauri / Web file operations.
  */
 
+import { invoke } from "@tauri-apps/api/core";
+
+import type { ToolCall, ToolResult } from "./types";
+
 /** Detect whether we are running inside a Tauri webview. */
 export function isTauri(): boolean {
   return typeof window !== "undefined" && "__TAURI__" in window;
@@ -14,6 +18,14 @@ export async function readLocalFile(path: string): Promise<Uint8Array> {
   }
   const { readFile } = await import("@tauri-apps/plugin-fs");
   return readFile(path);
+}
+
+/** Execute a client-side tool via the Tauri backend. Throws on web. */
+export async function executeClientTool(toolCall: ToolCall): Promise<ToolResult> {
+  if (!isTauri()) {
+    throw new Error("client-side tools are only available in Tauri");
+  }
+  return invoke<ToolResult>("execute_tool", { toolCall });
 }
 
 export type SaveFileOptions = {

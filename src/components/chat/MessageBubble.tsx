@@ -326,7 +326,7 @@ function ThinkingMessage({
 
 function ToolCallMessage({ chunk }: { chunk: AgentChunk }) {
   const [expanded, setExpanded] = useState(false);
-  const isPending = chunk.type === "tool_call_pending";
+  const isPending = chunk.type === "tool_call_pending" && !chunk.is_finished;
 
   return (
     <div className="flex justify-start mb-2 gap-2">

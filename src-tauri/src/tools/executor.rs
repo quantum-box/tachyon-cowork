@@ -60,6 +60,86 @@ pub async fn execute_tool(tool_call: ToolCall) -> Result<ToolResult, String> {
                 }),
             }
         }
+        "local_list_directory" => {
+            let path = tool_call
+                .arguments
+                .get("path")
+                .and_then(|v| v.as_str())
+                .ok_or("Missing 'path' argument")?
+                .to_string();
+            match commands::file_manage::list_directory(path).await {
+                Ok(entries) => Ok(ToolResult {
+                    tool_id,
+                    result: serde_json::to_value(entries).unwrap_or_default(),
+                    error: None,
+                }),
+                Err(e) => Ok(ToolResult {
+                    tool_id,
+                    result: serde_json::Value::Null,
+                    error: Some(e),
+                }),
+            }
+        }
+        "local_search_files" => {
+            let directory = tool_call
+                .arguments
+                .get("directory")
+                .and_then(|v| v.as_str())
+                .ok_or("Missing 'directory' argument")?
+                .to_string();
+            let pattern = tool_call
+                .arguments
+                .get("pattern")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+            let extensions = tool_call.arguments.get("extensions").and_then(|v| {
+                v.as_array().map(|items| {
+                    items
+                        .iter()
+                        .filter_map(|item| item.as_str().map(|s| s.to_string()))
+                        .collect::<Vec<_>>()
+                })
+            });
+            let max_results = tool_call
+                .arguments
+                .get("max_results")
+                .and_then(|v| v.as_u64())
+                .map(|n| n as usize);
+            match commands::file_manage::search_files(directory, pattern, extensions, max_results)
+                .await
+            {
+                Ok(entries) => Ok(ToolResult {
+                    tool_id,
+                    result: serde_json::to_value(entries).unwrap_or_default(),
+                    error: None,
+                }),
+                Err(e) => Ok(ToolResult {
+                    tool_id,
+                    result: serde_json::Value::Null,
+                    error: Some(e),
+                }),
+            }
+        }
+        "local_get_file_info" => {
+            let path = tool_call
+                .arguments
+                .get("path")
+                .and_then(|v| v.as_str())
+                .ok_or("Missing 'path' argument")?
+                .to_string();
+            match commands::file_manage::get_file_info(path).await {
+                Ok(info) => Ok(ToolResult {
+                    tool_id,
+                    result: serde_json::to_value(info).unwrap_or_default(),
+                    error: None,
+                }),
+                Err(e) => Ok(ToolResult {
+                    tool_id,
+                    result: serde_json::Value::Null,
+                    error: Some(e),
+                }),
+            }
+        }
         _ => Err(format!("Unknown tool: {}", tool_call.name)),
     }
 }

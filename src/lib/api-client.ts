@@ -14,7 +14,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function normalizeSession(value: unknown): SessionSummary | null {
   if (!isRecord(value)) return null;
 
-  const id = typeof value.id === "string" ? value.id : null;
+  const id =
+    typeof value.id === "string"
+      ? value.id
+      : typeof value.session_id === "string"
+        ? value.session_id
+        : null;
   if (!id) return null;
 
   const name =
@@ -32,6 +37,24 @@ function normalizeSession(value: unknown): SessionSummary | null {
         : new Date().toISOString();
 
   return { id, name, created_at: createdAt };
+}
+
+function normalizeSingleSessionResponse(value: unknown): SessionSummary | null {
+  const candidates = [
+    value,
+    isRecord(value) ? value.session : undefined,
+    isRecord(value) ? value.room : undefined,
+    isRecord(value) ? value.data : undefined,
+    isRecord(value) && isRecord(value.data) ? value.data.session : undefined,
+    isRecord(value) && isRecord(value.data) ? value.data.room : undefined,
+  ];
+
+  for (const candidate of candidates) {
+    const session = normalizeSession(candidate);
+    if (session) return session;
+  }
+
+  return null;
 }
 
 function normalizeSessionsResponse(value: unknown): SessionSummary[] {
@@ -169,9 +192,7 @@ export class AgentChatClient {
       method: "POST",
       body: JSON.stringify({ ...(title && { name: title }) }),
     });
-    const session =
-      normalizeSession(isRecord(data) ? data.session : data) ??
-      normalizeSession(isRecord(data) ? data.data : null);
+    const session = normalizeSingleSessionResponse(data);
     if (!session) {
       throw new Error("Unexpected session create response");
     }
@@ -209,10 +230,10 @@ export class AgentChatClient {
   // ── Agent API ──────────────────────────────────────────────────────
 
   async executeAgent(
-    chatRoomId: string,
+    sessionId: string,
     args: AgentExecuteRequest,
   ): Promise<Response> {
-    const url = this.buildUrl(`/llms/sessions/${chatRoomId}/agent/execute`);
+    const url = this.buildUrl(`/llms/sessions/${sessionId}/agent/execute`);
     const headers = await this.getFreshHeaders();
     const response = await fetch(url, {
       method: "POST",
@@ -229,10 +250,31 @@ export class AgentChatClient {
     return response;
   }
 
-  async getMessages(chatRoomId: string): Promise<AgentChunk[]> {
+  async submitToolResult(
+    sessionId: string,
+    payload: { tool_id: string; result: string; is_finished: boolean },
+  ): Promise<void> {
+    const headers = await this.getFreshHeaders();
+    const response = await fetch(
+      this.buildUrl(`/llms/sessions/${sessionId}/agent/tool-result`),
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload),
+      },
+    );
+    if (response.ok) return;
+
+    const body = await response.text().catch(() => "");
+    throw new Error(
+      `Tool result submit failed: ${response.status}${body ? ` - ${body}` : ""}`,
+    );
+  }
+
+  async getMessages(sessionId: string): Promise<AgentChunk[]> {
     try {
       const data = await this.request<unknown>(
-        `/llms/sessions/${chatRoomId}/agent/messages`,
+        `/llms/sessions/${sessionId}/agent/messages`,
       );
       return normalizeMessagesResponse(data);
     } catch (error) {
@@ -241,7 +283,7 @@ export class AgentChatClient {
         error.message.includes("404")
       ) {
         const fallback = await this.request<unknown>(
-          `/llms/sessions/${chatRoomId}/messages`,
+          `/llms/sessions/${sessionId}/messages`,
         );
         return normalizeMessagesResponse(fallback);
       }

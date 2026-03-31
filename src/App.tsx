@@ -213,7 +213,7 @@ export default function App() {
       {/* Sidebar: 260px fixed */}
       <div className="w-[260px] shrink-0">
         <Sidebar
-          chatRooms={chat.chatRooms}
+          sessions={chat.sessions}
           activeSessionId={chat.sessionId}
           pinnedRooms={chat.pinnedRooms}
           onNewChat={chat.newChat}

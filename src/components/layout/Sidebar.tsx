@@ -12,7 +12,7 @@ import {
 import type { SessionSummary } from "../../lib/types";
 
 type Props = {
-  chatRooms: SessionSummary[];
+  sessions: SessionSummary[];
   activeSessionId: string | null;
   pinnedRooms: string[];
   onNewChat: () => void;
@@ -26,7 +26,7 @@ type Props = {
 };
 
 export function Sidebar({
-  chatRooms,
+  sessions,
   activeSessionId,
   pinnedRooms,
   onNewChat,
@@ -41,10 +41,10 @@ export function Sidebar({
   const [search, setSearch] = useState("");
 
   const filtered = search
-    ? chatRooms.filter((r) =>
+    ? sessions.filter((r) =>
         r.name.toLowerCase().includes(search.toLowerCase()),
       )
-    : chatRooms;
+    : sessions;
 
   // Separate pinned rooms from the rest
   const pinned = filtered.filter((r) => pinnedRooms.includes(r.id));
