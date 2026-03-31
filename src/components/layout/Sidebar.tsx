@@ -187,19 +187,23 @@ function ChatRoomItem({
   onTogglePin: () => void;
 }) {
   return (
-    <button
-      onClick={onSelect}
+    <div
       className={`group w-full text-left px-4 py-2 flex items-center gap-2 transition-colors duration-150 ${
         isActive
           ? "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300"
           : "hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-700 dark:text-gray-300"
       }`}
     >
-      <span className="flex-1 text-xs truncate">
+      <button
+        type="button"
+        onClick={onSelect}
+        className="min-w-0 flex-1 text-left text-xs truncate"
+      >
         {room.name || "新しいチャット"}
-      </span>
+      </button>
       <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all duration-150">
         <button
+          type="button"
           onClick={(e) => {
             e.stopPropagation();
             onTogglePin();
@@ -210,6 +214,7 @@ function ChatRoomItem({
           {isPinned ? <PinOff size={12} /> : <Pin size={12} />}
         </button>
         <button
+          type="button"
           onClick={(e) => {
             e.stopPropagation();
             onDelete();
@@ -219,7 +224,7 @@ function ChatRoomItem({
           <Trash2 size={12} />
         </button>
       </div>
-    </button>
+    </div>
   );
 }
 

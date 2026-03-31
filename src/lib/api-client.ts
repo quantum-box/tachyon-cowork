@@ -129,7 +129,7 @@ export class AgentChatClient {
 
     // On 401, try one refresh + retry
     if (response.status === 401 && this.tokenManager) {
-      const freshToken = await this.tokenManager.ensureFreshToken();
+      const freshToken = await this.tokenManager.forceRefreshToken();
       this.config = { ...this.config, accessToken: freshToken };
       const retryHeaders = this.getHeaders();
       const retryResponse = await fetch(url, {
@@ -137,6 +137,9 @@ export class AgentChatClient {
         headers: { ...retryHeaders, ...options?.headers },
       });
       if (!retryResponse.ok) {
+        if (retryResponse.status === 401) {
+          this.tokenManager.handleUnauthorizedError();
+        }
         const body = await retryResponse.text().catch(() => "");
         throw new Error(
           `Request failed: ${retryResponse.status} ${retryResponse.statusText}${body ? ` - ${body}` : ""}`,
@@ -146,6 +149,9 @@ export class AgentChatClient {
     }
 
     if (!response.ok) {
+      if (response.status === 401 && this.tokenManager) {
+        this.tokenManager.handleUnauthorizedError();
+      }
       const body = await response.text().catch(() => "");
       throw new Error(
         `Request failed: ${response.status} ${response.statusText}${body ? ` - ${body}` : ""}`,

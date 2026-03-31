@@ -66,6 +66,16 @@ export class TokenManager {
     return this.auth.accessToken;
   }
 
+  /** Force a refresh attempt even if the token does not appear near expiry. */
+  async forceRefreshToken(): Promise<string> {
+    if (!this.auth.refreshToken) {
+      return this.auth.accessToken;
+    }
+
+    const newAuth = await this.refresh(true);
+    return newAuth.accessToken;
+  }
+
   /** Get current auth state. */
   getAuth(): AuthState {
     return this.auth;
@@ -77,6 +87,11 @@ export class TokenManager {
       clearTimeout(this.timerId);
       this.timerId = null;
     }
+  }
+
+  /** Clear auth when the API reports the current session is no longer valid. */
+  handleUnauthorizedError(): void {
+    this.callbacks.onAuthError();
   }
 
   // ── Internal ──────────────────────────────────────────────────────
@@ -103,13 +118,13 @@ export class TokenManager {
   /**
    * Perform the actual token refresh. Deduplicates concurrent calls.
    */
-  private async refresh(): Promise<AuthState> {
+  private async refresh(force = false): Promise<AuthState> {
     // Deduplicate: if a refresh is already in flight, reuse it
     if (this.refreshPromise) return this.refreshPromise;
 
     // Rate-limit retries
     const now = Date.now();
-    if (now - this.lastRefreshAttempt < MIN_RETRY_INTERVAL_MS) {
+    if (!force && now - this.lastRefreshAttempt < MIN_RETRY_INTERVAL_MS) {
       return this.auth;
     }
     this.lastRefreshAttempt = now;

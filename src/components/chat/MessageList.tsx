@@ -11,6 +11,10 @@ type Props = {
   onSendMessage?: (message: string) => void;
 };
 
+function getChunkKey(chunk: AgentChunk, index: number): string {
+  return [chunk.type, chunk.id, chunk.created_at, index].join(":");
+}
+
 export function MessageList({ chunks, isLoading, onOpenArtifact, searchQuery, onSendMessage }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -29,7 +33,11 @@ export function MessageList({ chunks, isLoading, onOpenArtifact, searchQuery, on
           <EmptyState onSendMessage={onSendMessage} />
         )}
         {chunks.map((chunk, index) => (
-          <div key={chunk.id} data-chunk-index={index} className="animate-fade-in">
+          <div
+            key={getChunkKey(chunk, index)}
+            data-chunk-index={index}
+            className="animate-fade-in"
+          >
             <MessageBubble
               chunk={chunk}
               onOpenArtifact={onOpenArtifact}
@@ -115,6 +123,7 @@ function EmptyState({ onSendMessage }: { onSendMessage?: (message: string) => vo
         {FEATURE_CARDS.map((card) => (
           <button
             key={card.title}
+            type="button"
             onClick={() => onSendMessage?.(card.prompt)}
             className="flex items-start gap-3 p-4 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800/50 text-left hover:border-indigo-300 dark:hover:border-indigo-700 hover:bg-indigo-50/50 dark:hover:bg-indigo-900/20 transition-all duration-150 group"
           >
