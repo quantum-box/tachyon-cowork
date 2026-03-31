@@ -1,0 +1,4 @@
+interface:
+  display_name: "Tauri WebDriver macOS"
+  short_description: "Automate macOS Tauri apps through tauri-webdriver-automation"
+  default_prompt: "Use tauri-webdriver-automation to launch and drive a macOS Tauri app with WebDriver."
