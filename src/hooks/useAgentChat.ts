@@ -152,21 +152,25 @@ export function useAgentChat(
   useEffect(() => {
     if (!sessionId || !client) {
       setChunks([]);
+      setIsLoading(false);
       return;
     }
     let cancelled = false;
+    setIsLoading(true);
     setError(null);
     client
       .getMessages(sessionId)
       .then((messages) => {
         if (!cancelled) {
           setChunks(messages);
+          setIsLoading(false);
         }
       })
       .catch((e) => {
         if (!cancelled) {
           setChunks([]);
           setError(e instanceof Error ? e : new Error(String(e)));
+          setIsLoading(false);
         }
         console.error("Failed to fetch session messages:", e);
       });

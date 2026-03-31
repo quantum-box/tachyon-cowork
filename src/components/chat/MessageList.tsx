@@ -17,6 +17,7 @@ function getChunkKey(chunk: AgentChunk, index: number): string {
 
 export function MessageList({ chunks, isLoading, onOpenArtifact, searchQuery, onSendMessage }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const showInitialLoading = isLoading && chunks.length === 0;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -29,6 +30,7 @@ export function MessageList({ chunks, isLoading, onOpenArtifact, searchQuery, on
       aria-live="polite"
     >
       <div className="max-w-3xl mx-auto">
+        {showInitialLoading && <LoadingState />}
         {chunks.length === 0 && !isLoading && (
           <EmptyState onSendMessage={onSendMessage} />
         )}
@@ -55,6 +57,17 @@ export function MessageList({ chunks, isLoading, onOpenArtifact, searchQuery, on
           </div>
         )}
         <div ref={bottomRef} />
+      </div>
+    </div>
+  );
+}
+
+function LoadingState() {
+  return (
+    <div className="flex min-h-[320px] items-center justify-center">
+      <div className="flex items-center gap-2 rounded-full bg-gray-100 px-4 py-2 text-sm text-gray-500 dark:bg-slate-800 dark:text-slate-400">
+        <Loader2 size={14} className="animate-spin" />
+        読み込み中...
       </div>
     </div>
   );
