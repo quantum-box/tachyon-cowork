@@ -1,0 +1,68 @@
+name: Deploy to Tachyon Compute (Cloud Run)
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to deploy'
+        required: false
+        default: 'main'
+
+jobs:
+  trigger-build:
+    name: Trigger Build on Tachyon Compute
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger build
+        id: build
+        run: |
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -X POST "${{ secrets.TACHYON_API_URL }}/v1/compute/apps/${{ secrets.TACHYON_COMPUTE_APP_ID }}/builds" \
+            -H "Content-Type: application/json" \
+            -H "x-operator-id: ${{ secrets.TACHYON_TENANT_ID }}" \
+            -H "Authorization: Bearer ${{ secrets.TACHYON_API_KEY }}" \
+            -d "{\"source_branch\": \"${{ github.event.inputs.branch || 'main' }}\"}")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          if [ "$HTTP_CODE" -ge 400 ]; then
+            echo "::error::Build trigger failed (HTTP $HTTP_CODE): $BODY"
+            exit 1
+          fi
+
+          BUILD_ID=$(echo "$BODY" | jq -r '.id')
+          echo "build_id=$BUILD_ID" >> "$GITHUB_OUTPUT"
+          echo "Build triggered: $BUILD_ID"
+
+      - name: Poll build status
+        run: |
+          BUILD_ID="${{ steps.build.outputs.build_id }}"
+          echo "Waiting for build $BUILD_ID..."
+
+          for i in $(seq 1 60); do
+            RESPONSE=$(curl -s \
+              "${{ secrets.TACHYON_API_URL }}/v1/compute/builds/$BUILD_ID" \
+              -H "x-operator-id: ${{ secrets.TACHYON_TENANT_ID }}" \
+              -H "Authorization: Bearer ${{ secrets.TACHYON_API_KEY }}")
+
+            STATUS=$(echo "$RESPONSE" | jq -r '.status')
+            echo "[$i/60] Build status: $STATUS"
+
+            case "$STATUS" in
+              success)
+                echo "Build succeeded!"
+                exit 0
+                ;;
+              failure)
+                ERROR=$(echo "$RESPONSE" | jq -r '.error_message // "unknown error"')
+                echo "::error::Build failed: $ERROR"
+                exit 1
+                ;;
+            esac
+
+            sleep 15
+          done
+
+          echo "::error::Build timed out after 15 minutes"
+          exit 1
