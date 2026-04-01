@@ -17,6 +17,33 @@ const PINNED_KEY = "tachyon-cowork-pinned";
 
 const CLIENT_TOOLS: ClientToolDefinition[] = [
   {
+    name: "canvas",
+    description:
+      "Open a canvas to display and edit a document with live preview. Use this when creating HTML pages, React components, or any visual content the user wants to see rendered.",
+    parameters: {
+      type: "object",
+      properties: {
+        title: {
+          type: "string",
+          description: "Document title.",
+        },
+        content: {
+          type: "string",
+          description:
+            "Full document content. For HTML: a complete HTML document. For JSX: a React component with a default export.",
+        },
+        content_type: {
+          type: "string",
+          enum: ["html", "jsx"],
+          description:
+            "Content type: 'html' for HTML documents, 'jsx' for React JSX components.",
+        },
+      },
+      required: ["title", "content", "content_type"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "local_list_directory",
     description:
       "List files and subdirectories in a local directory on this device. Use this to inspect what exists inside a folder before reading or processing files.",
@@ -327,9 +354,16 @@ function savePinnedRooms(ids: string[]): void {
   localStorage.setItem(PINNED_KEY, JSON.stringify(ids));
 }
 
+export type CanvasToolCallArgs = {
+  title: string;
+  content: string;
+  content_type: "html" | "jsx";
+};
+
 export function useAgentChat(
   client: AgentChatClient | null,
   onArtifact?: (artifact: Artifact) => void,
+  onCanvasToolCall?: (args: CanvasToolCallArgs) => void,
 ) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [chunks, setChunks] = useState<AgentChunk[]>([]);
@@ -352,27 +386,47 @@ export function useAgentChat(
       if (!client || !chunk.tool_id || !chunk.tool_name) return;
 
       let resultText = "";
-      try {
-        if (!isTauri()) {
-          throw new Error(
-            "client-side local filesystem tools are only available in the Tauri app",
-          );
+
+      // Handle canvas tool call on the client side (no Tauri needed)
+      if (chunk.tool_name === "canvas") {
+        try {
+          const args = chunk.args as unknown as CanvasToolCallArgs;
+          if (onCanvasToolCall) {
+            onCanvasToolCall(args);
+          }
+          resultText = stringifyToolPayload({
+            ok: true,
+            message: `Canvas opened: ${args.title}`,
+          });
+        } catch (error) {
+          resultText = stringifyToolPayload({
+            ok: false,
+            error: error instanceof Error ? error.message : String(error),
+          });
         }
-        const toolCall: ToolCall = {
-          name: chunk.tool_name,
-          arguments: chunk.args ?? {},
-        };
-        const outcome = await executeClientTool(toolCall);
-        resultText = stringifyToolPayload(
-          outcome.error
-            ? { ok: false, error: outcome.error, result: outcome.result }
-            : outcome.result,
-        );
-      } catch (error) {
-        resultText = stringifyToolPayload({
-          ok: false,
-          error: error instanceof Error ? error.message : String(error),
-        });
+      } else {
+        try {
+          if (!isTauri()) {
+            throw new Error(
+              "client-side local filesystem tools are only available in the Tauri app",
+            );
+          }
+          const toolCall: ToolCall = {
+            name: chunk.tool_name,
+            arguments: chunk.args ?? {},
+          };
+          const outcome = await executeClientTool(toolCall);
+          resultText = stringifyToolPayload(
+            outcome.error
+              ? { ok: false, error: outcome.error, result: outcome.result }
+              : outcome.result,
+          );
+        } catch (error) {
+          resultText = stringifyToolPayload({
+            ok: false,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
       }
 
       if (chunk.fire_and_forget) return;
@@ -383,7 +437,7 @@ export function useAgentChat(
       });
       setChunks((prev) => resolvePendingToolCall(prev, chunk.tool_id!));
     },
-    [client],
+    [client, onCanvasToolCall],
   );
 
   useEffect(() => {

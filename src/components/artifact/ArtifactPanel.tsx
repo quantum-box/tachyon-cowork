@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { X, Download, Copy, Check, ChevronLeft, ChevronRight, History } from "lucide-react";
+import { X, Download, Copy, Check, ChevronLeft, ChevronRight, History, Maximize2 } from "lucide-react";
 import { useState } from "react";
 import type { Artifact } from "../../lib/types";
 import { CodeBlock } from "./CodeBlock";
@@ -14,6 +14,7 @@ type ArtifactPanelProps = {
   onClose: () => void;
   onDownload: (artifact: Artifact) => void;
   onSwitchVersion?: (version: number) => void;
+  onOpenCanvas?: (title: string, content: string, contentType: "html" | "jsx") => void;
 };
 
 function CsvTable({ content }: { content: string }) {
@@ -204,12 +205,17 @@ function VersionSelector({
   );
 }
 
+function canOpenInCanvas(artifact: Artifact): boolean {
+  return artifact.type === "html" || artifact.type === "jsx";
+}
+
 export function ArtifactPanel({
   artifact,
   isOpen,
   onClose,
   onDownload,
   onSwitchVersion,
+  onOpenCanvas,
 }: ArtifactPanelProps) {
   const [copied, setCopied] = useState(false);
 
@@ -241,6 +247,22 @@ export function ArtifactPanel({
                 </span>
               )}
             </div>
+            {artifact && canOpenInCanvas(artifact) && onOpenCanvas && (
+              <button
+                onClick={() =>
+                  onOpenCanvas(
+                    artifact.title,
+                    artifact.content,
+                    artifact.type as "html" | "jsx",
+                  )
+                }
+                className="rounded-lg p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+                aria-label="キャンバスで開く"
+                title="キャンバスで開く"
+              >
+                <Maximize2 size={16} className="text-gray-500 dark:text-slate-400" />
+              </button>
+            )}
             <button
               onClick={onClose}
               className="rounded-lg p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"

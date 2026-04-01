@@ -34,7 +34,8 @@
     "react-router-dom": "^7.1.0",
     "rehype-highlight": "^7.0.2",
     "rehype-raw": "^7.0.0",
-    "remark-gfm": "^4.0.0"
+    "remark-gfm": "^4.0.0",
+    "sucrase": "^3.35.1"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

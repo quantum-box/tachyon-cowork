@@ -24,6 +24,7 @@ function inferArtifactType(
       return "pptx";
     if (contentType === "text/csv") return "csv";
     if (contentType === "text/html") return "html";
+    if (contentType === "text/jsx") return "jsx";
     if (contentType === "text/markdown") return "markdown";
   }
   if (filename) {
@@ -43,6 +44,8 @@ function inferArtifactType(
       csv: "csv",
       html: "html",
       htm: "html",
+      jsx: "jsx",
+      tsx: "jsx",
       md: "markdown",
       mmd: "mermaid",
     };
@@ -62,6 +65,7 @@ function extensionForType(type: Artifact["type"]): string {
     mermaid: "mmd",
     csv: "csv",
     html: "html",
+    jsx: "jsx",
   };
   return map[type];
 }
@@ -82,12 +86,25 @@ export function chunkToArtifact(chunk: AgentChunk): Artifact {
   };
 }
 
+export type CanvasState = {
+  isOpen: boolean;
+  title: string;
+  content: string;
+  contentType: "html" | "jsx";
+};
+
 export function useArtifact() {
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(
     null,
   );
   const [isPanelOpen, setIsPanelOpen] = useState(false);
+  const [canvas, setCanvas] = useState<CanvasState>({
+    isOpen: false,
+    title: "",
+    content: "",
+    contentType: "html",
+  });
 
   const addArtifact = useCallback((artifact: Artifact) => {
     // Ensure versioning fields are set
@@ -141,6 +158,22 @@ export function useArtifact() {
     setIsPanelOpen(false);
   }, []);
 
+  const openCanvas = useCallback(
+    (title: string, content: string, contentType: "html" | "jsx") => {
+      setCanvas({ isOpen: true, title, content, contentType });
+      setIsPanelOpen(false);
+    },
+    [],
+  );
+
+  const closeCanvas = useCallback(() => {
+    setCanvas((prev) => ({ ...prev, isOpen: false }));
+  }, []);
+
+  const updateCanvasContent = useCallback((content: string) => {
+    setCanvas((prev) => ({ ...prev, content }));
+  }, []);
+
   /** Switch to a specific version of the selected artifact */
   const switchVersion = useCallback((version: number) => {
     setSelectedArtifact((prev) => {
@@ -187,5 +220,9 @@ export function useArtifact() {
     closePanel,
     downloadArtifact,
     switchVersion,
+    canvas,
+    openCanvas,
+    closeCanvas,
+    updateCanvasContent,
   };
 }

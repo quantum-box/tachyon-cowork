@@ -17,6 +17,7 @@ import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { Sidebar } from "./components/layout/Sidebar";
 import { ChatPanel } from "./components/chat/ChatPanel";
 import { ArtifactPanel } from "./components/artifact/ArtifactPanel";
+import { CanvasView } from "./components/canvas/CanvasView";
 import { LoginScreen } from "./components/layout/LoginScreen";
 import { ToolsPanel } from "./components/layout/ToolsPanel";
 import { SettingsPanel } from "./components/layout/SettingsPanel";
@@ -28,6 +29,7 @@ export default function App() {
   const [showTools, setShowTools] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const { theme, setTheme } = useTheme();
 
@@ -145,7 +147,14 @@ export default function App() {
     [artifactState],
   );
 
-  const chat = useAgentChat(client, handleArtifactFromSSE);
+  const handleCanvasToolCall = useCallback(
+    (args: { title: string; content: string; content_type: "html" | "jsx" }) => {
+      artifactState.openCanvas(args.title, args.content, args.content_type);
+    },
+    [artifactState],
+  );
+
+  const chat = useAgentChat(client, handleArtifactFromSSE, handleCanvasToolCall);
 
   const handleLogout = useCallback(() => {
     tokenManagerRef.current?.dispose();
@@ -210,8 +219,8 @@ export default function App() {
 
   return (
     <div className="flex h-screen bg-white dark:bg-slate-950 transition-colors duration-150">
-      {/* Sidebar: 260px fixed */}
-      <div className="w-[260px] shrink-0">
+      {/* Sidebar */}
+      <div className={`shrink-0 ${sidebarCollapsed ? "w-12" : "w-[260px]"} transition-all duration-200`}>
         <Sidebar
           sessions={chat.sessions}
           activeSessionId={chat.sessionId}
@@ -224,6 +233,8 @@ export default function App() {
           onToggleTools={handleToggleTools}
           showTools={showTools}
           onOpenSettings={() => setSettingsOpen(true)}
+          isCollapsed={sidebarCollapsed}
+          onToggleCollapse={() => setSidebarCollapsed((prev) => !prev)}
         />
       </div>
 
@@ -247,14 +258,24 @@ export default function App() {
         )}
       </div>
 
-      {/* Artifact panel (right side) */}
-      <ArtifactPanel
-        artifact={artifactState.selectedArtifact}
-        isOpen={artifactState.isPanelOpen}
-        onClose={artifactState.closePanel}
-        onDownload={artifactState.downloadArtifact}
-        onSwitchVersion={artifactState.switchVersion}
-      />
+      {/* Canvas panel (right side) - takes priority over artifact panel */}
+      {artifactState.canvas.isOpen ? (
+        <CanvasView
+          title={artifactState.canvas.title}
+          content={artifactState.canvas.content}
+          contentType={artifactState.canvas.contentType}
+          onClose={artifactState.closeCanvas}
+        />
+      ) : (
+        <ArtifactPanel
+          artifact={artifactState.selectedArtifact}
+          isOpen={artifactState.isPanelOpen}
+          onClose={artifactState.closePanel}
+          onDownload={artifactState.downloadArtifact}
+          onSwitchVersion={artifactState.switchVersion}
+          onOpenCanvas={artifactState.openCanvas}
+        />
+      )}
 
       {/* Settings panel */}
       <SettingsPanel

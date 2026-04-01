@@ -141,7 +141,8 @@ export type Artifact = {
     | "markdown"
     | "mermaid"
     | "csv"
-    | "html";
+    | "html"
+    | "jsx";
   title: string;
   content: string;
   language?: string;

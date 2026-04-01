@@ -8,6 +8,8 @@ import {
   FolderOpen,
   Pin,
   PinOff,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 import type { SessionSummary } from "../../lib/types";
 
@@ -23,6 +25,8 @@ type Props = {
   onToggleTools: () => void;
   showTools: boolean;
   onOpenSettings: () => void;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 };
 
 export function Sidebar({
@@ -37,6 +41,8 @@ export function Sidebar({
   onToggleTools,
   showTools,
   onOpenSettings,
+  isCollapsed = false,
+  onToggleCollapse,
 }: Props) {
   const [search, setSearch] = useState("");
 
@@ -53,6 +59,35 @@ export function Sidebar({
   // Group unpinned by date
   const grouped = groupByDate(unpinned);
 
+  if (isCollapsed) {
+    return (
+      <div className="flex flex-col items-center h-full bg-gray-50 dark:bg-slate-900 border-r border-gray-200 dark:border-slate-700 py-3 gap-2 w-12">
+        <button
+          onClick={onToggleCollapse}
+          className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-800 text-gray-500 dark:text-slate-400 transition-colors"
+          title="サイドバーを開く"
+        >
+          <PanelLeftOpen size={18} />
+        </button>
+        <button
+          onClick={onNewChat}
+          className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-800 text-gray-600 dark:text-gray-400 transition-colors"
+          title="新しいチャット"
+        >
+          <MessageSquarePlus size={18} />
+        </button>
+        <div className="flex-1" />
+        <button
+          onClick={onOpenSettings}
+          className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-800 text-gray-500 dark:text-slate-400 transition-colors"
+          title="設定"
+        >
+          <Settings size={16} />
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full bg-gray-50 dark:bg-slate-900 border-r border-gray-200 dark:border-slate-700 transition-colors duration-150">
       {/* Header */}
@@ -61,13 +96,24 @@ export function Sidebar({
           <h1 className="text-sm font-semibold text-gray-800 dark:text-gray-200 tracking-tight">
             Tachyon Cowork
           </h1>
-          <button
-            onClick={onNewChat}
-            className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-800 text-gray-600 dark:text-gray-400 transition-colors duration-150"
-            title="新しいチャット"
-          >
-            <MessageSquarePlus size={18} />
-          </button>
+          <div className="flex items-center gap-0.5">
+            {onToggleCollapse && (
+              <button
+                onClick={onToggleCollapse}
+                className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-800 text-gray-500 dark:text-slate-400 transition-colors duration-150"
+                title="サイドバーを閉じる"
+              >
+                <PanelLeftClose size={18} />
+              </button>
+            )}
+            <button
+              onClick={onNewChat}
+              className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-800 text-gray-600 dark:text-gray-400 transition-colors duration-150"
+              title="新しいチャット"
+            >
+              <MessageSquarePlus size={18} />
+            </button>
+          </div>
         </div>
 
         {/* Search */}
