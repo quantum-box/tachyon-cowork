@@ -291,6 +291,20 @@ export class AgentChatClient {
     }
   }
 
+  async deleteMessage(sessionId: string, messageId: string): Promise<void> {
+    const url = this.buildUrl(
+      `/llms/sessions/${sessionId}/agent/messages/${messageId}`,
+    );
+    const headers = await this.getFreshHeaders();
+    const response = await fetch(url, { method: "DELETE", headers });
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      throw new Error(
+        `Failed to delete message: ${response.status}${body ? ` - ${body}` : ""}`,
+      );
+    }
+  }
+
   async getModels(): Promise<ModelInfo[]> {
     const data = await this.request<{ models: ModelInfo[] }>(
       "/llms/models?supported_feature=agent&require_agent_product=true",

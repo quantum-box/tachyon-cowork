@@ -15,6 +15,7 @@ type Props = {
   onClearFiles: () => void;
   toInlineAttachments: () => InlineAttachment[];
   onOpenArtifact: (artifact: Artifact) => void;
+  onOpenCanvas?: (title: string, content: string, contentType: "html" | "jsx") => void;
   isSearchOpen: boolean;
   onSearchClose: () => void;
 };
@@ -28,6 +29,7 @@ export function ChatPanel({
   onClearFiles,
   toInlineAttachments,
   onOpenArtifact,
+  onOpenCanvas,
   isSearchOpen,
   onSearchClose,
 }: Props) {
@@ -69,8 +71,11 @@ export function ChatPanel({
           chunks={chat.chunks}
           isLoading={chat.isLoading}
           onOpenArtifact={onOpenArtifact}
+          onOpenCanvas={onOpenCanvas}
           searchQuery={searchQuery}
           onSendMessage={chat.sendMessage}
+          onRetry={chat.retry}
+          onDeleteMessage={chat.deleteMessage}
         />
 
         <ChatInput
