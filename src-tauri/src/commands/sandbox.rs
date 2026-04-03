@@ -1,6 +1,8 @@
 use crate::sandbox::executor;
 
-pub use executor::{ExecuteCodeRequest, ExecuteCodeResult, GenerateFileRequest, GenerateFileResult};
+pub use executor::{
+    ExecuteCodeRequest, ExecuteCodeResult, GenerateFileRequest, GenerateFileResult,
+};
 
 #[tauri::command]
 pub async fn execute_code(request: ExecuteCodeRequest) -> Result<ExecuteCodeResult, String> {

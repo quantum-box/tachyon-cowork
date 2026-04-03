@@ -32,9 +32,7 @@ pub async fn read_pdf(path: String) -> Result<PdfData, String> {
     let mut pages = Vec::new();
 
     for page_num in 1..=page_count as u32 {
-        let text = doc
-            .extract_text(&[page_num])
-            .unwrap_or_default();
+        let text = doc.extract_text(&[page_num]).unwrap_or_default();
         pages.push(PdfPageData {
             page_number: page_num as usize,
             text,
@@ -46,23 +44,6 @@ pub async fn read_pdf(path: String) -> Result<PdfData, String> {
         pages,
         metadata,
     })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn test_read_pdf() {
-        let result = read_pdf("/tmp/tachyon-test/test.pdf".to_string()).await;
-        assert!(result.is_ok(), "Failed to read PDF: {:?}", result.err());
-        let data = result.unwrap();
-        assert_eq!(data.page_count, 2);
-        assert!(!data.pages[0].text.is_empty(), "Page 1 should have text");
-        println!("PDF page_count: {}", data.page_count);
-        println!("Page 1 text: {:?}", &data.pages[0].text[..50.min(data.pages[0].text.len())]);
-        println!("Page 2 text: {:?}", &data.pages[1].text[..50.min(data.pages[1].text.len())]);
-    }
 }
 
 fn extract_metadata(doc: &Document) -> PdfMetadata {
@@ -89,5 +70,28 @@ fn extract_metadata(doc: &Document) -> PdfMetadata {
         author: get_info(b"Author"),
         subject: get_info(b"Subject"),
         creator: get_info(b"Creator"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_read_pdf() {
+        let result = read_pdf("/tmp/tachyon-test/test.pdf".to_string()).await;
+        assert!(result.is_ok(), "Failed to read PDF: {:?}", result.err());
+        let data = result.unwrap();
+        assert_eq!(data.page_count, 2);
+        assert!(!data.pages[0].text.is_empty(), "Page 1 should have text");
+        println!("PDF page_count: {}", data.page_count);
+        println!(
+            "Page 1 text: {:?}",
+            &data.pages[0].text[..50.min(data.pages[0].text.len())]
+        );
+        println!(
+            "Page 2 text: {:?}",
+            &data.pages[1].text[..50.min(data.pages[1].text.len())]
+        );
     }
 }

@@ -29,11 +29,7 @@ impl SandboxManager {
     }
 
     /// Create a sandbox for code execution
-    pub async fn create_code_sandbox(
-        &self,
-        name: &str,
-        language: &str,
-    ) -> Result<Sandbox, String> {
+    pub async fn create_code_sandbox(&self, name: &str, language: &str) -> Result<Sandbox, String> {
         let image = Self::image_for_language(language);
         Self::create_sandbox_with_image(name, image).await
     }

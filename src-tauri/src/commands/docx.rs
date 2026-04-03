@@ -54,31 +54,6 @@ pub async fn read_docx(path: String) -> Result<DocxData, String> {
     })
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn test_read_docx() {
-        let result = read_docx("/tmp/tachyon-test/test.docx".to_string()).await;
-        assert!(result.is_ok(), "Failed to read DOCX: {:?}", result.err());
-        let data = result.unwrap();
-        assert!(!data.paragraphs.is_empty(), "Should have paragraphs");
-        assert!(!data.tables.is_empty(), "Should have tables");
-        println!("Paragraphs count: {}", data.paragraphs.len());
-        for (i, p) in data.paragraphs.iter().enumerate() {
-            println!("  P{}: style={:?} text={:?}", i, p.style, &p.text[..50.min(p.text.len())]);
-        }
-        println!("Tables count: {}", data.tables.len());
-        for (i, t) in data.tables.iter().enumerate() {
-            println!("  T{}: {} rows", i, t.rows.len());
-            for row in &t.rows {
-                println!("    {:?}", row);
-            }
-        }
-    }
-}
-
 fn read_zip_entry(
     archive: &mut zip::ZipArchive<std::fs::File>,
     name: &str,
@@ -240,5 +215,35 @@ fn parse_core_xml(xml: &str) -> DocxMetadata {
         title,
         author,
         description,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_read_docx() {
+        let result = read_docx("/tmp/tachyon-test/test.docx".to_string()).await;
+        assert!(result.is_ok(), "Failed to read DOCX: {:?}", result.err());
+        let data = result.unwrap();
+        assert!(!data.paragraphs.is_empty(), "Should have paragraphs");
+        assert!(!data.tables.is_empty(), "Should have tables");
+        println!("Paragraphs count: {}", data.paragraphs.len());
+        for (i, p) in data.paragraphs.iter().enumerate() {
+            println!(
+                "  P{}: style={:?} text={:?}",
+                i,
+                p.style,
+                &p.text[..50.min(p.text.len())]
+            );
+        }
+        println!("Tables count: {}", data.tables.len());
+        for (i, t) in data.tables.iter().enumerate() {
+            println!("  T{}: {} rows", i, t.rows.len());
+            for row in &t.rows {
+                println!("    {:?}", row);
+            }
+        }
     }
 }
