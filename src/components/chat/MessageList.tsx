@@ -33,6 +33,7 @@ export function MessageList({ chunks, isLoading, onOpenArtifact, searchQuery, on
             <MessageBubble
               chunk={chunk}
               onOpenArtifact={onOpenArtifact}
+              onOptionSelect={onSendMessage}
               searchQuery={searchQuery}
             />
           </div>

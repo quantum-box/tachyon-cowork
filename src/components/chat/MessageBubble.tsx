@@ -23,10 +23,11 @@ import { MermaidDiagram } from "../artifact/MermaidDiagram";
 type Props = {
   chunk: AgentChunk;
   onOpenArtifact?: (artifact: Artifact) => void;
+  onOptionSelect?: (option: string) => void;
   searchQuery?: string;
 };
 
-export function MessageBubble({ chunk, onOpenArtifact, searchQuery }: Props) {
+export function MessageBubble({ chunk, onOpenArtifact, onOptionSelect, searchQuery }: Props) {
   switch (chunk.type) {
     case "user":
       return (
@@ -80,12 +81,14 @@ export function MessageBubble({ chunk, onOpenArtifact, searchQuery }: Props) {
             {chunk.options && (
               <div className="flex flex-wrap gap-2">
                 {chunk.options.map((opt) => (
-                  <span
+                  <button
                     key={opt}
-                    className="px-2 py-1 text-xs rounded-lg bg-yellow-100 dark:bg-yellow-800/40 text-yellow-800 dark:text-yellow-300"
+                    type="button"
+                    onClick={() => onOptionSelect?.(opt)}
+                    className="px-2 py-1 text-xs rounded-lg bg-yellow-100 dark:bg-yellow-800/40 text-yellow-800 dark:text-yellow-300 hover:bg-yellow-200 dark:hover:bg-yellow-700/50 transition-colors cursor-pointer"
                   >
                     {opt}
-                  </span>
+                  </button>
                 ))}
               </div>
             )}
