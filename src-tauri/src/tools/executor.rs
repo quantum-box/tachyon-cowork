@@ -140,6 +140,86 @@ pub async fn execute_tool(tool_call: ToolCall) -> Result<ToolResult, String> {
                 }),
             }
         }
+        "pdf_read" => {
+            let path = tool_call
+                .arguments
+                .get("path")
+                .and_then(|v| v.as_str())
+                .ok_or("Missing 'path' argument")?
+                .to_string();
+            match commands::pdf::read_pdf(path).await {
+                Ok(data) => Ok(ToolResult {
+                    tool_id,
+                    result: serde_json::to_value(data).unwrap_or_default(),
+                    error: None,
+                }),
+                Err(e) => Ok(ToolResult {
+                    tool_id,
+                    result: serde_json::Value::Null,
+                    error: Some(e),
+                }),
+            }
+        }
+        "docx_read" => {
+            let path = tool_call
+                .arguments
+                .get("path")
+                .and_then(|v| v.as_str())
+                .ok_or("Missing 'path' argument")?
+                .to_string();
+            match commands::docx::read_docx(path).await {
+                Ok(data) => Ok(ToolResult {
+                    tool_id,
+                    result: serde_json::to_value(data).unwrap_or_default(),
+                    error: None,
+                }),
+                Err(e) => Ok(ToolResult {
+                    tool_id,
+                    result: serde_json::Value::Null,
+                    error: Some(e),
+                }),
+            }
+        }
+        "execute_code" => {
+            let request: crate::sandbox::executor::ExecuteCodeRequest =
+                serde_json::from_value(tool_call.arguments.clone()).map_err(|e| e.to_string())?;
+            match crate::sandbox::executor::run_code(&request).await {
+                Ok(result) => Ok(ToolResult {
+                    tool_id,
+                    result: serde_json::to_value(result).unwrap_or_default(),
+                    error: None,
+                }),
+                Err(e) => Ok(ToolResult {
+                    tool_id,
+                    result: serde_json::Value::Null,
+                    error: Some(e),
+                }),
+            }
+        }
+        "generate_file" => {
+            let request: crate::sandbox::executor::GenerateFileRequest =
+                serde_json::from_value(tool_call.arguments.clone()).map_err(|e| e.to_string())?;
+            match crate::sandbox::executor::generate_file(&request).await {
+                Ok(result) => {
+                    let b64 = base64::engine::general_purpose::STANDARD.encode(&result.file_bytes);
+                    Ok(ToolResult {
+                        tool_id,
+                        result: serde_json::json!({
+                            "base64": b64,
+                            "file_name": result.file_name,
+                            "size": result.file_bytes.len(),
+                            "saved_path": result.saved_path,
+                        }),
+                        error: None,
+                    })
+                }
+                Err(e) => Ok(ToolResult {
+                    tool_id,
+                    result: serde_json::Value::Null,
+                    error: Some(e),
+                }),
+            }
+        }
         _ => Err(format!("Unknown tool: {}", tool_call.name)),
     }
 }

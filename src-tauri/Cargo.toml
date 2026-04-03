@@ -35,5 +35,7 @@ blake3 = "1"
 mime_guess = "2"
 chrono = { version = "0.4", features = ["serde"] }
 trash = "5"
+lopdf = "0.34"
+microsandbox = "0.3"
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-deep-link = "2.0.0"
