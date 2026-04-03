@@ -142,7 +142,8 @@ export type Artifact = {
     | "mermaid"
     | "csv"
     | "html"
-    | "jsx";
+    | "jsx"
+    | "docx";
   title: string;
   content: string;
   language?: string;
@@ -197,6 +198,66 @@ export type ToolResult = {
   tool_id: string;
   result: unknown;
   error?: string;
+};
+
+// PDF types
+export type PdfData = {
+  page_count: number;
+  pages: PdfPageData[];
+  metadata: PdfMetadata;
+};
+export type PdfPageData = {
+  page_number: number;
+  text: string;
+};
+export type PdfMetadata = {
+  title?: string;
+  author?: string;
+  subject?: string;
+  creator?: string;
+};
+
+// DOCX types
+export type DocxData = {
+  paragraphs: DocxParagraph[];
+  tables: DocxTable[];
+  metadata: DocxMetadataInfo;
+};
+export type DocxParagraph = {
+  text: string;
+  style?: string;
+};
+export type DocxTable = {
+  rows: string[][];
+};
+export type DocxMetadataInfo = {
+  title?: string;
+  author?: string;
+  description?: string;
+};
+
+// Sandbox execution types
+export type ExecuteCodeRequest = {
+  language: string;
+  code: string;
+  timeout_secs?: number;
+};
+export type ExecuteCodeResult = {
+  stdout: string;
+  stderr: string;
+  exit_code: number;
+  timed_out: boolean;
+  duration_ms: number;
+};
+export type GenerateFileRequest = {
+  file_type: string;
+  data: Record<string, unknown>;
+  output_path?: string;
+};
+export type GenerateFileResult = {
+  file_bytes: number[];
+  file_name: string;
+  saved_path?: string;
 };
 
 export type ClientToolDefinition = {

@@ -7,6 +7,9 @@ import type { Artifact } from "../../lib/types";
 import { CodeBlock } from "./CodeBlock";
 import { MermaidDiagram } from "./MermaidDiagram";
 import { HtmlPreview } from "./HtmlPreview";
+import { PdfPreview } from "./PdfPreview";
+import { DocxPreview } from "./DocxPreview";
+import { CodeRunner } from "./CodeRunner";
 
 type ArtifactPanelProps = {
   artifact: Artifact | null;
@@ -133,12 +136,17 @@ function ArtifactContent({ artifact }: { artifact: Artifact }) {
   switch (artifact.type) {
     case "code":
       return (
-        <CodeBlock
-          code={artifact.content}
-          language={artifact.language}
-          showDownload
-          filename={artifact.title}
-        />
+        <div>
+          <CodeBlock
+            code={artifact.content}
+            language={artifact.language}
+            showDownload
+            filename={artifact.title}
+          />
+          {artifact.language && (
+            <CodeRunner code={artifact.content} language={artifact.language} />
+          )}
+        </div>
       );
     case "markdown":
       return <MarkdownContent content={artifact.content} />;
@@ -158,6 +166,20 @@ function ArtifactContent({ artifact }: { artifact: Artifact }) {
       );
     case "html":
       return <HtmlPreview content={artifact.content} title={artifact.title} />;
+    case "pdf":
+      return (
+        <PdfPreview
+          data={artifact.content ? JSON.parse(artifact.content) : null}
+          title={artifact.title}
+        />
+      );
+    case "docx":
+      return (
+        <DocxPreview
+          data={artifact.content ? JSON.parse(artifact.content) : null}
+          title={artifact.title}
+        />
+      );
     default:
       return (
         <div className="flex flex-col items-center justify-center gap-3 py-12 text-gray-400 dark:text-slate-500">

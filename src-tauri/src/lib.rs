@@ -1,4 +1,5 @@
 mod commands;
+mod sandbox;
 mod tools;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -40,6 +41,10 @@ pub fn run() {
             commands::file_organize::get_disk_usage,
             commands::system::get_system_info,
             commands::system::show_in_folder,
+            commands::pdf::read_pdf,
+            commands::docx::read_docx,
+            commands::sandbox::execute_code,
+            commands::sandbox::generate_file,
         ]);
 
     #[cfg(debug_assertions)]
