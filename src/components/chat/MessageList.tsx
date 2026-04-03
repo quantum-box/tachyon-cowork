@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
-import { Loader2, BarChart3, FileText, Code, Search } from "lucide-react";
+import { useEffect, useMemo, useRef } from "react";
+import { Loader2, BarChart3, FileText, Code, Search, RefreshCw, Trash2 } from "lucide-react";
 import type { AgentChunk, Artifact } from "../../lib/types";
 import { MessageBubble } from "./MessageBubble";
 
@@ -7,17 +7,49 @@ type Props = {
   chunks: AgentChunk[];
   isLoading?: boolean;
   onOpenArtifact?: (artifact: Artifact) => void;
+  onOpenCanvas?: (title: string, content: string, contentType: "html" | "jsx") => void;
   searchQuery?: string;
   onSendMessage?: (message: string) => void;
+  onRetry?: () => void;
+  onDeleteMessage?: (chunkId: string) => void;
 };
 
 function getChunkKey(chunk: AgentChunk, index: number): string {
   return [chunk.type, chunk.id, chunk.created_at, index].join(":");
 }
 
-export function MessageList({ chunks, isLoading, onOpenArtifact, searchQuery, onSendMessage }: Props) {
+export function MessageList({ chunks, isLoading, onOpenArtifact, onOpenCanvas, searchQuery, onSendMessage, onRetry, onDeleteMessage }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const showInitialLoading = isLoading && chunks.length === 0;
+
+  // Merge tool_call_args into the corresponding tool_call for display
+  const displayChunks = useMemo(() => {
+    const argsById = new Map<string, AgentChunk>();
+    for (const c of chunks) {
+      if (c.type === "tool_call_args" && c.tool_id) {
+        argsById.set(c.tool_id, c);
+      }
+    }
+    if (argsById.size === 0) return chunks;
+
+    const result: AgentChunk[] = [];
+    for (const c of chunks) {
+      // Skip tool_call_args that will be folded into their tool_call
+      if (c.type === "tool_call_args" && c.tool_id && chunks.some(
+        (tc) => tc.type === "tool_call" && tc.tool_id === c.tool_id,
+      )) {
+        continue;
+      }
+      // Merge args into tool_call
+      if (c.type === "tool_call" && c.tool_id && argsById.has(c.tool_id)) {
+        const argsChunk = argsById.get(c.tool_id)!;
+        result.push({ ...c, args: argsChunk.args, tool_arguments: argsChunk.tool_arguments ?? c.tool_arguments });
+      } else {
+        result.push(c);
+      }
+    }
+    return result;
+  }, [chunks]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -34,20 +66,41 @@ export function MessageList({ chunks, isLoading, onOpenArtifact, searchQuery, on
         {chunks.length === 0 && !isLoading && (
           <EmptyState onSendMessage={onSendMessage} />
         )}
-        {chunks.map((chunk, index) => (
-          <div
-            key={getChunkKey(chunk, index)}
-            data-chunk-index={index}
-            className="animate-fade-in"
-          >
-            <MessageBubble
-              chunk={chunk}
-              onOpenArtifact={onOpenArtifact}
-              onOptionSelect={onSendMessage}
-              searchQuery={searchQuery}
-            />
-          </div>
-        ))}
+        {displayChunks.map((chunk, index) => {
+          const isDeletable = onDeleteMessage && (
+            chunk.type === "user" ||
+            chunk.type === "say" ||
+            chunk.type === "assistant" ||
+            chunk.type === "attempt_completion" ||
+            chunk.type === "tool_call" ||
+            chunk.type === "tool_call_args" ||
+            chunk.type === "tool_result"
+          );
+          return (
+            <div
+              key={getChunkKey(chunk, index)}
+              data-chunk-index={index}
+              className="animate-fade-in group/msg relative"
+            >
+              <MessageBubble
+                chunk={chunk}
+                onOpenArtifact={onOpenArtifact}
+                onOptionSelect={onSendMessage}
+                onOpenCanvas={onOpenCanvas}
+                searchQuery={searchQuery}
+              />
+              {isDeletable && (
+                <button
+                  onClick={() => onDeleteMessage(chunk.id)}
+                  className="absolute top-1 right-1 p-1 rounded opacity-0 group-hover/msg:opacity-100 text-gray-300 dark:text-slate-600 hover:text-red-400 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
+                  title="メッセージを削除"
+                >
+                  <Trash2 size={14} />
+                </button>
+              )}
+            </div>
+          );
+        })}
         {isLoading && chunks.length > 0 && (
           <div className="flex justify-start mb-2 gap-2 animate-fade-in">
             <div className="w-8" />
@@ -55,6 +108,18 @@ export function MessageList({ chunks, isLoading, onOpenArtifact, searchQuery, on
               <Loader2 size={12} className="animate-spin" />
               AIが応答中...
             </div>
+          </div>
+        )}
+        {!isLoading && displayChunks.length > 0 && onRetry && (
+          <div className="flex justify-start mb-2 gap-2">
+            <div className="w-8" />
+            <button
+              onClick={onRetry}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+            >
+              <RefreshCw size={12} />
+              再生成
+            </button>
           </div>
         )}
         <div ref={bottomRef} />
