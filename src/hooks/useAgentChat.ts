@@ -104,6 +104,89 @@ const CLIENT_TOOLS: ClientToolDefinition[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: "execute_code",
+    description:
+      "Execute code in a sandboxed microVM environment. Supports Python, JavaScript (Node.js), and Shell. The code runs in complete isolation with no network access. Use this when the user asks to run, execute, or test code.",
+    parameters: {
+      type: "object",
+      properties: {
+        language: {
+          type: "string",
+          enum: ["python", "javascript", "shell"],
+          description: "Programming language to execute.",
+        },
+        code: {
+          type: "string",
+          description: "Source code to execute.",
+        },
+        timeout_secs: {
+          type: "integer",
+          description: "Execution timeout in seconds (default: 30, max: 300).",
+        },
+      },
+      required: ["language", "code"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "generate_file",
+    description:
+      "Generate a document file (PDF, DOCX, or PPTX) using Python libraries in a sandboxed environment. The data object specifies the document content structure.",
+    parameters: {
+      type: "object",
+      properties: {
+        file_type: {
+          type: "string",
+          enum: ["pdf", "docx", "pptx"],
+          description: "Type of file to generate.",
+        },
+        data: {
+          type: "object",
+          description:
+            "Document content. Common fields: title (string), content (string), sections (array of {heading, body}). For PPTX: slides (array of {title, content, bullets}). For DOCX: tables (array of {headers, rows}).",
+        },
+        output_path: {
+          type: "string",
+          description: "Optional absolute path to save the generated file on the local device.",
+        },
+      },
+      required: ["file_type", "data"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "pdf_read",
+    description:
+      "Read and extract text content from a PDF file on this device. Returns page-by-page text and metadata (title, author).",
+    parameters: {
+      type: "object",
+      properties: {
+        path: {
+          type: "string",
+          description: "Absolute path of the PDF file to read.",
+        },
+      },
+      required: ["path"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "docx_read",
+    description:
+      "Read and extract content from a Word document (.docx) on this device. Returns paragraphs with styles, tables, and metadata.",
+    parameters: {
+      type: "object",
+      properties: {
+        path: {
+          type: "string",
+          description: "Absolute path of the DOCX file to read.",
+        },
+      },
+      required: ["path"],
+      additionalProperties: false,
+    },
+  },
 ];
 
 function mergeChunkText(
@@ -691,6 +774,40 @@ export function useAgentChat(
     [input, isLoading, sendMessage],
   );
 
+  const deleteMessage = useCallback(
+    (chunkId: string) => {
+      setChunks((prev) => prev.filter((c) => c.id !== chunkId));
+      if (client && sessionId) {
+        client.deleteMessage(sessionId, chunkId).catch((e) => {
+          console.error("Failed to delete message from server:", e);
+        });
+      }
+    },
+    [client, sessionId],
+  );
+
+  const retry = useCallback(async () => {
+    if (isLoading) return;
+
+    // Find the last user message
+    let lastUserIndex = -1;
+    for (let i = chunks.length - 1; i >= 0; i--) {
+      if (chunks[i].type === "user") {
+        lastUserIndex = i;
+        break;
+      }
+    }
+    if (lastUserIndex === -1) return;
+
+    const lastUserChunk = chunks[lastUserIndex];
+    const userText = lastUserChunk.text || "";
+
+    // Remove all chunks after the last user message
+    setChunks((prev) => prev.slice(0, lastUserIndex + 1));
+
+    await startTask(userText);
+  }, [isLoading, chunks, startTask]);
+
   const newChat = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
@@ -760,6 +877,8 @@ export function useAgentChat(
     togglePin,
     handleSubmit,
     sendMessage,
+    retry,
+    deleteMessage,
     newChat,
     selectSession,
     deleteRoom,
