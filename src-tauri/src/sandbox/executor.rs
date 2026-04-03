@@ -117,7 +117,7 @@ pub async fn generate_file(request: &GenerateFileRequest) -> Result<GenerateFile
     let sandbox_name = format!("tachyon-gen-{}", uuid_simple());
     let sb = SandboxManager::create_file_sandbox(&sandbox_name).await?;
 
-    let start = Instant::now();
+    let _start = Instant::now();
 
     // Write the data as JSON for the Python script to consume
     let data_json = serde_json::to_string(&request.data).map_err(|e| e.to_string())?;
@@ -159,13 +159,10 @@ pub async fn generate_file(request: &GenerateFileRequest) -> Result<GenerateFile
 
     // Execute the generation script
     let timeout = Duration::from_secs(120);
-    let exec_result = tokio::time::timeout(
-        timeout,
-        sb.shell("python3 /tmp/generate.py"),
-    )
-    .await
-    .map_err(|_| "File generation timed out".to_string())?
-    .map_err(|e| format!("Generation failed: {}", e))?;
+    let exec_result = tokio::time::timeout(timeout, sb.shell("python3 /tmp/generate.py"))
+        .await
+        .map_err(|_| "File generation timed out".to_string())?
+        .map_err(|e| format!("Generation failed: {}", e))?;
 
     if exec_result.status().code != 0 {
         let stderr = exec_result.stderr().unwrap_or_default();
@@ -396,6 +393,14 @@ fn truncate_output(s: &str, max_bytes: usize) -> String {
     }
 }
 
+fn uuid_simple() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let ts = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default();
+    format!("{:x}{:x}", ts.as_secs(), ts.subsec_nanos())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -473,7 +478,10 @@ mod tests {
         }
         assert!(result.is_ok(), "Generate PDF failed: {:?}", result.err());
         let r = result.unwrap();
-        assert!(!r.file_bytes.is_empty(), "Generated PDF should not be empty");
+        assert!(
+            !r.file_bytes.is_empty(),
+            "Generated PDF should not be empty"
+        );
         assert_eq!(r.file_name, "output.pdf");
         // Check saved file exists
         assert!(std::path::Path::new("/tmp/tachyon-test/generated.pdf").exists());
@@ -498,9 +506,17 @@ mod tests {
         }
         assert!(result.is_ok(), "JS execute failed: {:?}", result.err());
         let r = result.unwrap();
-        assert_eq!(r.exit_code, 0, "JS exit code should be 0, stderr: {}", r.stderr);
+        assert_eq!(
+            r.exit_code, 0,
+            "JS exit code should be 0, stderr: {}",
+            r.stderr
+        );
         assert!(r.stdout.contains("hello from node"), "stdout: {}", r.stdout);
-        assert!(r.stdout.contains("3"), "stdout should contain 3: {}", r.stdout);
+        assert!(
+            r.stdout.contains("3"),
+            "stdout should contain 3: {}",
+            r.stdout
+        );
     }
 
     #[tokio::test]
@@ -523,12 +539,4 @@ mod tests {
         let r = result.unwrap();
         assert!(r.stdout.contains("hello_shell"));
     }
-}
-
-fn uuid_simple() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let ts = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default();
-    format!("{:x}{:x}", ts.as_secs(), ts.subsec_nanos())
 }
