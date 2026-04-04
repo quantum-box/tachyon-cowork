@@ -406,6 +406,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+    #[ignore] // Requires microsandbox (msb) runtime
     async fn test_execute_python() {
         use microsandbox::Sandbox;
 
@@ -455,6 +456,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires microsandbox (msb) runtime
     async fn test_generate_pdf() {
         let request = GenerateFileRequest {
             file_type: "pdf".to_string(),
@@ -488,6 +490,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires microsandbox (msb) runtime
     async fn test_execute_javascript() {
         let request = ExecuteCodeRequest {
             language: "javascript".to_string(),
@@ -520,6 +523,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires microsandbox (msb) runtime
     async fn test_execute_shell() {
         let request = ExecuteCodeRequest {
             language: "shell".to_string(),
