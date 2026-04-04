@@ -12,6 +12,7 @@ import {
   FileDown,
   X,
   ZoomIn,
+  PanelRightOpen,
 } from "lucide-react";
 import type { AgentChunk, Artifact } from "../../lib/types";
 import { chunkToArtifact } from "../../hooks/useArtifact";
@@ -22,10 +23,11 @@ type Props = {
   chunk: AgentChunk;
   onOpenArtifact?: (artifact: Artifact) => void;
   onOptionSelect?: (option: string) => void;
+  onOpenCanvas?: (title: string, content: string, contentType: "html" | "jsx") => void;
   searchQuery?: string;
 };
 
-export function MessageBubble({ chunk, onOpenArtifact, onOptionSelect, searchQuery }: Props) {
+export function MessageBubble({ chunk, onOpenArtifact, onOptionSelect, onOpenCanvas, searchQuery }: Props) {
   switch (chunk.type) {
     case "user":
       return (
@@ -55,7 +57,7 @@ export function MessageBubble({ chunk, onOpenArtifact, onOptionSelect, searchQue
     case "tool_call":
     case "tool_call_args":
     case "tool_call_pending":
-      return <ToolCallMessage chunk={chunk} />;
+      return <ToolCallMessage chunk={chunk} onOpenCanvas={onOpenCanvas} />;
     case "tool_result":
       return <ToolResultMessage chunk={chunk} />;
     case "usage":
@@ -327,26 +329,48 @@ function ThinkingMessage({
   );
 }
 
-function ToolCallMessage({ chunk }: { chunk: AgentChunk }) {
+function ToolCallMessage({ chunk, onOpenCanvas }: { chunk: AgentChunk; onOpenCanvas?: (title: string, content: string, contentType: "html" | "jsx") => void }) {
   const [expanded, setExpanded] = useState(false);
   const isPending = chunk.type === "tool_call_pending" && !chunk.is_finished;
+  const isCanvas = chunk.tool_name === "canvas";
+
+  const handleOpenCanvas = useCallback(() => {
+    if (!onOpenCanvas || !chunk.args) return;
+    const args = chunk.args as { title?: string; content?: string; content_type?: "html" | "jsx" };
+    onOpenCanvas(
+      args.title || "Canvas",
+      args.content || "",
+      args.content_type || "html",
+    );
+  }, [onOpenCanvas, chunk.args]);
 
   return (
     <div className="flex justify-start mb-2 gap-2">
       <div className="w-8" />
       <div className="max-w-[75%]">
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors"
-        >
-          {isPending ? (
-            <Loader2 size={12} className="animate-spin" />
-          ) : (
-            <Wrench size={12} />
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors"
+          >
+            {isPending ? (
+              <Loader2 size={12} className="animate-spin" />
+            ) : (
+              <Wrench size={12} />
+            )}
+            {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+            {chunk.tool_name || "tool_call"}
+          </button>
+          {isCanvas && !isPending && onOpenCanvas && chunk.args && (
+            <button
+              onClick={handleOpenCanvas}
+              className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-700 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"
+            >
+              <PanelRightOpen size={12} />
+              Canvasを開く
+            </button>
           )}
-          {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-          {chunk.tool_name || "tool_call"}
-        </button>
+        </div>
         {expanded && chunk.tool_arguments && (
           <pre className="mt-1 px-3 py-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800 text-xs text-gray-800 dark:text-gray-200 overflow-x-auto max-h-48 overflow-y-auto">
             {chunk.tool_arguments}
