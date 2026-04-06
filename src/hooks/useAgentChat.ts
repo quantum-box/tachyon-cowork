@@ -217,6 +217,93 @@ const CLIENT_TOOLS: ClientToolDefinition[] = [
       additionalProperties: false,
     },
   },
+  // ── Host filesystem tools (runs on host OS, restricted to home dir) ──
+  {
+    name: "host_read_file",
+    description:
+      "Read a file from the host filesystem. Only files within the user's home directory are accessible. Returns text content or base64-encoded binary. Use this for reading config files, scripts, data files, etc.",
+    parameters: {
+      type: "object",
+      properties: {
+        path: {
+          type: "string",
+          description: "Absolute path of the file to read (must be within home directory).",
+        },
+      },
+      required: ["path"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "host_write_file",
+    description:
+      "Write content to a file on the host filesystem. Only paths within the user's home directory are allowed. Use this for saving config files, scripts, data files, etc.",
+    parameters: {
+      type: "object",
+      properties: {
+        path: {
+          type: "string",
+          description: "Absolute path to write the file (must be within home directory).",
+        },
+        content: {
+          type: "string",
+          description: "File content as text, or base64-encoded string if is_base64 is true.",
+        },
+        is_base64: {
+          type: "boolean",
+          description: "If true, content is base64-encoded binary data.",
+        },
+      },
+      required: ["path", "content"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "host_list_dir",
+    description:
+      "List the contents of a directory on the host filesystem. Only directories within the user's home directory are accessible.",
+    parameters: {
+      type: "object",
+      properties: {
+        path: {
+          type: "string",
+          description: "Absolute path of the directory to list (must be within home directory).",
+        },
+        show_hidden: {
+          type: "boolean",
+          description: "If true, include hidden files (starting with '.').",
+        },
+      },
+      required: ["path"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "host_execute_command",
+    description:
+      "Execute a safe, allow-listed command on the host OS. Only specific commands are permitted: ls, stat, file, du, wc, find, which, cat, head, tail, grep, sort, uniq, diff, tar, zip, unzip, date, echo, pwd, basename, dirname, realpath. All path arguments must be within the home directory.",
+    parameters: {
+      type: "object",
+      properties: {
+        command: {
+          type: "string",
+          description: "Command name from the allow-list.",
+        },
+        args: {
+          type: "array",
+          items: { type: "string" },
+          description: "Command arguments.",
+        },
+        working_dir: {
+          type: "string",
+          description:
+            "Working directory for the command (must be within home directory, defaults to home).",
+        },
+      },
+      required: ["command"],
+      additionalProperties: false,
+    },
+  },
 ];
 
 function mergeChunkText(
