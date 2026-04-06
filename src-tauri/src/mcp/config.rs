@@ -34,6 +34,10 @@ pub struct McpServerConfig {
 pub struct McpConfig {
     #[serde(default)]
     pub servers: Vec<McpServerConfig>,
+    /// Built-in app enable/disable state (app_id -> enabled).
+    /// Apps not listed are enabled by default.
+    #[serde(default)]
+    pub builtin_apps: HashMap<String, bool>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -54,4 +58,7 @@ pub struct McpServerStatus {
     pub connected: bool,
     pub tool_count: usize,
     pub error: Option<String>,
+    pub builtin: bool,
+    /// Description (for built-in apps)
+    pub description: Option<String>,
 }

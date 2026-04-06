@@ -7341,6 +7341,7 @@ dependencies = [
  "tauri-plugin-webdriver-automation",
  "tokio",
  "trash",
+ "urlencoding",
  "uuid",
  "walkdir",
  "zip",

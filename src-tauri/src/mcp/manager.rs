@@ -4,6 +4,7 @@ use tauri_plugin_store::StoreExt;
 use tokio::sync::Mutex;
 
 use super::{
+    apps,
     client::McpClientSession,
     config::{McpConfig, McpServerStatus, McpToolInfo},
 };
@@ -121,9 +122,20 @@ impl McpManager {
     }
 
     pub async fn get_all_tools(&self) -> Vec<McpToolInfo> {
-        let sessions = self.sessions.lock().await;
         let mut tools = Vec::new();
 
+        // 1. Collect tools from built-in apps (if enabled)
+        let config = self.config.lock().await;
+        for app in apps::all_apps() {
+            let enabled = config.builtin_apps.get(&app.id).copied().unwrap_or(true); // enabled by default
+            if enabled {
+                tools.extend(app.to_mcp_tools());
+            }
+        }
+        drop(config);
+
+        // 2. Collect tools from external MCP sessions
+        let sessions = self.sessions.lock().await;
         for session in sessions.values() {
             let sanitized_name = sanitize_name(&session.server_name);
             for tool in &session.tools {
@@ -151,9 +163,26 @@ impl McpManager {
         namespaced_name: &str,
         arguments: serde_json::Value,
     ) -> Result<serde_json::Value, String> {
-        let sessions = self.sessions.lock().await;
+        // 1. Check built-in apps first
+        let config = self.config.lock().await;
+        for app in apps::all_apps() {
+            let enabled = config.builtin_apps.get(&app.id).copied().unwrap_or(true);
+            if !enabled {
+                continue;
+            }
+            let prefix = format!("mcp_{}_", app.id);
+            if let Some(tool_name) = namespaced_name.strip_prefix(&prefix) {
+                // Verify the tool exists
+                if app.tools.iter().any(|t| t.name == tool_name) {
+                    drop(config);
+                    return apps::call_tool(&app.id, tool_name, arguments).await;
+                }
+            }
+        }
+        drop(config);
 
-        // Find the session that owns this tool
+        // 2. Check external MCP sessions
+        let sessions = self.sessions.lock().await;
         for session in sessions.values() {
             let sanitized_name = sanitize_name(&session.server_name);
             let prefix = format!("mcp_{}_", sanitized_name);
@@ -177,24 +206,49 @@ impl McpManager {
         let sessions = self.sessions.lock().await;
         let errors = self.errors.lock().await;
 
-        config
-            .servers
-            .iter()
-            .map(|server| {
-                let connected = sessions.contains_key(&server.id);
-                let tool_count = sessions.get(&server.id).map(|s| s.tools.len()).unwrap_or(0);
-                let error = errors.get(&server.id).cloned();
+        let mut statuses = Vec::new();
 
-                McpServerStatus {
-                    id: server.id.clone(),
-                    name: server.name.clone(),
-                    enabled: server.enabled,
-                    connected,
-                    tool_count,
-                    error,
-                }
-            })
-            .collect()
+        // 1. Built-in apps
+        for app in apps::all_apps() {
+            let enabled = config.builtin_apps.get(&app.id).copied().unwrap_or(true);
+            statuses.push(McpServerStatus {
+                id: app.id.clone(),
+                name: app.name.clone(),
+                enabled,
+                connected: enabled, // always "connected" when enabled
+                tool_count: app.tools.len(),
+                error: None,
+                builtin: true,
+                description: Some(app.description.clone()),
+            });
+        }
+
+        // 2. External servers
+        for server in &config.servers {
+            let connected = sessions.contains_key(&server.id);
+            let tool_count = sessions.get(&server.id).map(|s| s.tools.len()).unwrap_or(0);
+            let error = errors.get(&server.id).cloned();
+
+            statuses.push(McpServerStatus {
+                id: server.id.clone(),
+                name: server.name.clone(),
+                enabled: server.enabled,
+                connected,
+                tool_count,
+                error,
+                builtin: false,
+                description: None,
+            });
+        }
+
+        statuses
+    }
+
+    // ── Built-in app management ──────────────────────────────────────
+
+    pub async fn toggle_builtin_app(&self, app_id: &str, enabled: bool) {
+        let mut config = self.config.lock().await;
+        config.builtin_apps.insert(app_id.to_string(), enabled);
     }
 }
 

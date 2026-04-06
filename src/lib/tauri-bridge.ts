@@ -62,6 +62,15 @@ export type McpServerStatus = {
   connected: boolean;
   tool_count: number;
   error?: string;
+  builtin: boolean;
+  description?: string;
+};
+
+export type BuiltinAppInfo = {
+  id: string;
+  name: string;
+  description: string;
+  tools: { name: string; description: string; input_schema: Record<string, unknown> }[];
 };
 
 // ── MCP Bridge Functions ───────────────────────────────────────────
@@ -88,6 +97,14 @@ export async function mcpGetTools(): Promise<McpToolInfo[]> {
 
 export async function mcpGetServerStatuses(): Promise<McpServerStatus[]> {
   return invoke<McpServerStatus[]>("mcp_get_server_statuses");
+}
+
+export async function mcpToggleBuiltinApp(appId: string, enabled: boolean): Promise<void> {
+  return invoke<void>("mcp_toggle_builtin_app", { appId, enabled });
+}
+
+export async function mcpGetBuiltinApps(): Promise<BuiltinAppInfo[]> {
+  return invoke<BuiltinAppInfo[]>("mcp_get_builtin_apps");
 }
 
 export type SaveFileOptions = {
