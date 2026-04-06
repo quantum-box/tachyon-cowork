@@ -182,8 +182,7 @@ impl McpManager {
             .iter()
             .map(|server| {
                 let connected = sessions.contains_key(&server.id);
-                let tool_count =
-                    sessions.get(&server.id).map(|s| s.tools.len()).unwrap_or(0);
+                let tool_count = sessions.get(&server.id).map(|s| s.tools.len()).unwrap_or(0);
                 let error = errors.get(&server.id).cloned();
 
                 McpServerStatus {
