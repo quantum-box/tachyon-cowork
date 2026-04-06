@@ -15,6 +15,32 @@ import { chunkToArtifact } from "./useArtifact";
 const MODEL_KEY = "tachyon-cowork-model";
 const PINNED_KEY = "tachyon-cowork-pinned";
 
+/** Streaming timeout: abort if no data received for this duration (ms) */
+const STREAM_TIMEOUT_MS = 90_000;
+
+/** Max retry attempts for transient errors */
+const MAX_RETRIES = 2;
+
+/** Base delay for exponential backoff (ms) */
+const RETRY_BASE_DELAY_MS = 1_000;
+
+function isRetryableError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const msg = error.message.toLowerCase();
+  // Retry on network errors and 5xx server errors
+  return (
+    msg.includes("failed to fetch") ||
+    msg.includes("network") ||
+    msg.includes("timeout") ||
+    msg.includes("aborted") ||
+    /\b5\d{2}\b/.test(msg)
+  );
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 const CLIENT_TOOLS: ClientToolDefinition[] = [
   {
     name: "canvas",
@@ -377,6 +403,7 @@ export function useAgentChat(
   );
   const abortRef = useRef<AbortController | null>(null);
   const skipNextSessionLoadRef = useRef<string | null>(null);
+  const lastMessageRef = useRef<{ message: string; attachments?: InlineAttachment[] } | null>(null);
 
   const handlePendingToolCall = useCallback(
     async (
@@ -539,43 +566,89 @@ export function useAgentChat(
       };
       let receivedStreamChunk = false;
 
-      try {
-        const args: AgentExecuteRequest = {
-          task,
-          model: selectedModel,
-          max_requests: 10,
-          client_tools: CLIENT_TOOLS,
-          ...(attachments && attachments.length > 0 && { attachments }),
-        };
-        const response = await client.executeAgent(currentSessionId, args);
-        if (!response.body) throw new Error("Response body is null");
+      const executeWithRetry = async (attempt: number): Promise<void> => {
+        try {
+          const args: AgentExecuteRequest = {
+            task,
+            model: selectedModel,
+            max_requests: 10,
+            client_tools: CLIENT_TOOLS,
+            ...(attachments && attachments.length > 0 && { attachments }),
+          };
+          const response = await client.executeAgent(currentSessionId!, args);
+          if (!response.body) throw new Error("Response body is null");
 
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = "";
+          let streamTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
-        while (true) {
-          if (ac.signal.aborted) break;
-          const { done, value } = await reader.read();
-          if (done) break;
+          const resetStreamTimeout = () => {
+            if (streamTimeoutId) clearTimeout(streamTimeoutId);
+            streamTimeoutId = setTimeout(() => {
+              ac.abort();
+              setError(new Error("応答がタイムアウトしました。再試行してください。"));
+            }, STREAM_TIMEOUT_MS);
+          };
 
-          buffer += decoder.decode(value, { stream: true });
-          const { events, rest } = extractSseEvents(buffer);
-          buffer = rest;
+          resetStreamTimeout();
 
-          for (const eventBlock of events) {
-            const data = parseSseEvent(eventBlock);
-            if (!data || data === "[DONE]") continue;
-            try {
-              const parsed = JSON.parse(data);
-              if ("error" in parsed && parsed.error) {
-                const msg =
-                  (parsed.error as { message?: string }).message ??
-                  "Unknown error";
-                setError(new Error(msg));
-                continue;
+          try {
+            while (true) {
+              if (ac.signal.aborted) break;
+              const { done, value } = await reader.read();
+              if (done) break;
+
+              resetStreamTimeout();
+              buffer += decoder.decode(value, { stream: true });
+              const { events, rest } = extractSseEvents(buffer);
+              buffer = rest;
+
+              for (const eventBlock of events) {
+                const data = parseSseEvent(eventBlock);
+                if (!data || data === "[DONE]") continue;
+                try {
+                  const parsed = JSON.parse(data);
+                  if ("error" in parsed && parsed.error) {
+                    const msg =
+                      (parsed.error as { message?: string }).message ??
+                      "Unknown error";
+                    setError(new Error(msg));
+                    continue;
+                  }
+                  const normalized = normalizeIncomingChunk(parsed as AgentChunk);
+                  const chunk = withStreamScopedId(
+                    normalized,
+                    mergeableStreamKeys,
+                    streamInstanceId,
+                    streamScopeState,
+                  );
+                  receivedStreamChunk = true;
+                  setChunks((prev) => upsertChunk(prev, chunk));
+                  if (chunk.type === "tool_call_pending" && currentSessionId) {
+                    await handlePendingToolCall(
+                      currentSessionId,
+                      parsed as AgentChunk & { args?: Record<string, unknown> },
+                    );
+                  }
+                  if (chunk.type === "artifact" && onArtifact) {
+                    onArtifact(chunkToArtifact(chunk));
+                  }
+                } catch {
+                  // skip malformed JSON
+                }
               }
-              const normalized = normalizeIncomingChunk(parsed as AgentChunk);
+            }
+          } finally {
+            if (streamTimeoutId) clearTimeout(streamTimeoutId);
+          }
+
+          const finalData = parseSseEvent(buffer);
+          if (finalData && finalData !== "[DONE]") {
+            try {
+              const normalized = normalizeIncomingChunk(
+                JSON.parse(finalData) as AgentChunk,
+              );
               const chunk = withStreamScopedId(
                 normalized,
                 mergeableStreamKeys,
@@ -587,47 +660,34 @@ export function useAgentChat(
               if (chunk.type === "tool_call_pending" && currentSessionId) {
                 await handlePendingToolCall(
                   currentSessionId,
-                  parsed as AgentChunk & { args?: Record<string, unknown> },
+                  JSON.parse(finalData) as AgentChunk & {
+                    args?: Record<string, unknown>;
+                  },
                 );
               }
               if (chunk.type === "artifact" && onArtifact) {
                 onArtifact(chunkToArtifact(chunk));
               }
             } catch {
-              // skip malformed JSON
+              // ignore trailing partial event
             }
           }
+        } catch (e) {
+          if (e instanceof Error && e.name === "AbortError") throw e;
+          // Retry on transient errors if we haven't received any chunks yet
+          if (!receivedStreamChunk && attempt < MAX_RETRIES && isRetryableError(e)) {
+            const backoff = RETRY_BASE_DELAY_MS * Math.pow(2, attempt);
+            await delay(backoff);
+            if (!ac.signal.aborted) {
+              return executeWithRetry(attempt + 1);
+            }
+          }
+          throw e;
         }
+      };
 
-        const finalData = parseSseEvent(buffer);
-        if (finalData && finalData !== "[DONE]") {
-          try {
-            const normalized = normalizeIncomingChunk(
-              JSON.parse(finalData) as AgentChunk,
-            );
-            const chunk = withStreamScopedId(
-              normalized,
-              mergeableStreamKeys,
-              streamInstanceId,
-              streamScopeState,
-            );
-            receivedStreamChunk = true;
-            setChunks((prev) => upsertChunk(prev, chunk));
-            if (chunk.type === "tool_call_pending" && currentSessionId) {
-              await handlePendingToolCall(
-                currentSessionId,
-                JSON.parse(finalData) as AgentChunk & {
-                  args?: Record<string, unknown>;
-                },
-              );
-            }
-            if (chunk.type === "artifact" && onArtifact) {
-              onArtifact(chunkToArtifact(chunk));
-            }
-          } catch {
-            // ignore trailing partial event
-          }
-        }
+      try {
+        await executeWithRetry(0);
       } catch (e) {
         if (e instanceof Error && e.name !== "AbortError") {
           setError(e);
@@ -673,6 +733,7 @@ export function useAgentChat(
         ...(imageUrls && imageUrls.length > 0 && { imageUrls }),
       };
       setChunks((prev) => [...prev, userChunk]);
+      lastMessageRef.current = { message, attachments };
       // Backend requires a non-empty task; use default for image-only sends
       const taskText = trimmed || "この画像について説明してください";
       await startTask(taskText, undefined, attachments);
@@ -739,6 +800,27 @@ export function useAgentChat(
     });
   }, []);
 
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
+
+  const retryLastMessage = useCallback(async () => {
+    if (!lastMessageRef.current || isLoading) return;
+    setError(null);
+    const { message, attachments } = lastMessageRef.current;
+    await startTask(
+      message.trim() || "この画像について説明してください",
+      undefined,
+      attachments,
+    );
+  }, [isLoading, startTask]);
+
+  const stopGeneration = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setIsLoading(false);
+  }, []);
+
   useEffect(
     () => () => {
       abortRef.current?.abort();
@@ -764,5 +846,8 @@ export function useAgentChat(
     selectSession,
     deleteRoom,
     fetchSessions,
+    clearError,
+    retryLastMessage,
+    stopGeneration,
   };
 }

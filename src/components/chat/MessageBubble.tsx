@@ -1,6 +1,7 @@
 import { useState, useCallback, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
 import {
   User,
   ChevronDown,
@@ -12,6 +13,8 @@ import {
   FileDown,
   X,
   ZoomIn,
+  Copy,
+  Check,
 } from "lucide-react";
 import type { AgentChunk, Artifact } from "../../lib/types";
 import { chunkToArtifact } from "../../hooks/useArtifact";
@@ -205,7 +208,28 @@ function AssistantMessage({
   onOpenArtifact?: (artifact: Artifact) => void;
   searchQuery?: string;
 }) {
+  const [copied, setCopied] = useState(false);
   const codeBlocks = extractCodeBlocks(text);
+
+  const handleCopy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // fallback for non-secure contexts
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }, [text]);
 
   const handleOpenCodeBlock = useCallback(
     (block: CodeBlockInfo, index: number) => {
@@ -224,17 +248,16 @@ function AssistantMessage({
   );
 
   return (
-    <div className="mb-6">
+    <div className="mb-6 group/msg">
       <div className="max-w-3xl text-sm leading-relaxed prose prose-sm max-w-none prose-p:my-1 prose-pre:bg-transparent prose-pre:p-0 prose-code:text-indigo-600 dark:prose-code:text-indigo-400 prose-code:before:content-[''] prose-code:after:content-[''] text-gray-900 dark:text-gray-100 prose-headings:text-gray-900 dark:prose-headings:text-gray-100 prose-strong:text-gray-900 dark:prose-strong:text-gray-100 prose-a:text-indigo-600 dark:prose-a:text-indigo-400">
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
+          rehypePlugins={[rehypeRaw]}
           components={{
             code({ className, children, ...props }) {
               const match = /language-(\w+)/.exec(className || "");
               const codeString = String(children).replace(/\n$/, "");
 
-              // Check if this is a code block (has language class) vs inline code
-              // react-markdown wraps code blocks in <pre><code>
               const isInline = !className;
 
               if (isInline) {
@@ -250,7 +273,6 @@ function AssistantMessage({
 
               const language = match?.[1] || "";
 
-              // Mermaid diagram
               if (language === "mermaid") {
                 return <MermaidDiagram chart={codeString} />;
               }
@@ -258,35 +280,120 @@ function AssistantMessage({
               return <CodeBlock code={codeString} language={language} />;
             },
             pre({ children }) {
-              // Let the code component handle rendering
               return <>{children}</>;
+            },
+            table({ children }) {
+              return (
+                <div className="my-3 overflow-x-auto rounded-lg border border-gray-200 dark:border-slate-700">
+                  <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700 text-xs">
+                    {children}
+                  </table>
+                </div>
+              );
+            },
+            thead({ children }) {
+              return (
+                <thead className="bg-gray-50 dark:bg-slate-800/80">
+                  {children}
+                </thead>
+              );
+            },
+            th({ children }) {
+              return (
+                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                  {children}
+                </th>
+              );
+            },
+            td({ children }) {
+              return (
+                <td className="px-3 py-2 text-gray-700 dark:text-gray-300 border-t border-gray-100 dark:border-slate-800">
+                  {children}
+                </td>
+              );
+            },
+            blockquote({ children }) {
+              return (
+                <blockquote className="my-2 border-l-3 border-indigo-300 dark:border-indigo-600 pl-3 text-gray-600 dark:text-slate-400 italic">
+                  {children}
+                </blockquote>
+              );
+            },
+            a({ href, children }) {
+              return (
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-indigo-600 dark:text-indigo-400 hover:underline"
+                >
+                  {children}
+                </a>
+              );
+            },
+            ul({ children }) {
+              return (
+                <ul className="my-1.5 ml-4 list-disc space-y-0.5 marker:text-gray-400 dark:marker:text-slate-500">
+                  {children}
+                </ul>
+              );
+            },
+            ol({ children }) {
+              return (
+                <ol className="my-1.5 ml-4 list-decimal space-y-0.5 marker:text-gray-400 dark:marker:text-slate-500">
+                  {children}
+                </ol>
+              );
+            },
+            hr() {
+              return (
+                <hr className="my-4 border-gray-200 dark:border-slate-700" />
+              );
             },
           }}
         >
           {text}
         </ReactMarkdown>
 
-        {/* Artifact buttons for code blocks */}
-        {codeBlocks.length > 0 && onOpenArtifact && (
-          <div className="mt-2 flex flex-wrap gap-2 not-prose">
-            {codeBlocks.map((block, i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={() => handleOpenCodeBlock(block, i)}
-                className="flex items-center gap-1.5 rounded-lg border border-indigo-200 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/30 px-2.5 py-1 text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"
-              >
-                <Code size={12} />
-                Artifactで開く
-                {codeBlocks.length > 1 && (
-                  <span className="text-indigo-400 dark:text-indigo-500">
-                    ({block.language})
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-        )}
+        {/* Action buttons row */}
+        <div className="mt-2 flex flex-wrap items-center gap-2 not-prose opacity-0 group-hover/msg:opacity-100 transition-opacity duration-150">
+          {/* Copy button */}
+          <button
+            type="button"
+            onClick={handleCopy}
+            className="flex items-center gap-1 px-2 py-1 rounded-md text-xs text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+          >
+            {copied ? (
+              <>
+                <Check size={12} className="text-emerald-500" />
+                コピー済み
+              </>
+            ) : (
+              <>
+                <Copy size={12} />
+                コピー
+              </>
+            )}
+          </button>
+
+          {/* Artifact buttons for code blocks */}
+          {codeBlocks.map((block, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => handleOpenCodeBlock(block, i)}
+              className="flex items-center gap-1.5 rounded-lg border border-indigo-200 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/30 px-2.5 py-1 text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"
+            >
+              <Code size={12} />
+              Artifactで開く
+              {codeBlocks.length > 1 && (
+                <span className="text-indigo-400 dark:text-indigo-500">
+                  ({block.language})
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );

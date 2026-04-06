@@ -10,6 +10,7 @@ import { SendHorizonal, Paperclip } from "lucide-react";
 import { pickFiles } from "../../lib/tauri-bridge";
 import type { FileAttachment } from "../../lib/types";
 import { FilePreview } from "../file/FilePreview";
+import { PromptTemplates } from "./PromptTemplates";
 
 type ChatInputProps = {
   input: string;
@@ -20,6 +21,7 @@ type ChatInputProps = {
   files: FileAttachment[];
   onFilesAdd: (fileList: FileList) => void;
   onFileRemove: (id: string) => void;
+  showPromptTemplates?: boolean;
 };
 
 export function ChatInput({
@@ -31,6 +33,7 @@ export function ChatInput({
   files,
   onFilesAdd,
   onFileRemove,
+  showPromptTemplates,
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -74,6 +77,22 @@ export function ChatInput({
     }
   }, [onFilesAdd]);
 
+  const handleTemplateSelect = useCallback(
+    (prompt: string) => {
+      onInputChange(prompt);
+      // Focus and place cursor at the end
+      requestAnimationFrame(() => {
+        const el = textareaRef.current;
+        if (el) {
+          el.focus();
+          el.style.height = "auto";
+          el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+        }
+      });
+    },
+    [onInputChange],
+  );
+
   const hasContent = input.trim() || files.length > 0;
 
   return (
@@ -82,6 +101,12 @@ export function ChatInput({
       className="border-t border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-950 p-4 transition-colors duration-150"
     >
       <div className="max-w-3xl mx-auto">
+        {/* Prompt templates */}
+        <PromptTemplates
+          onSelect={handleTemplateSelect}
+          visible={!!showPromptTemplates && !input.trim() && files.length === 0}
+        />
+
         {/* File preview chips */}
         <FilePreview files={files} onRemove={onFileRemove} />
 
