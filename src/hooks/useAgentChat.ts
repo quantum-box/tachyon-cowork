@@ -10,7 +10,12 @@ import type {
   ToolCall,
 } from "../lib/types";
 import { executeClientTool, isTauri } from "../lib/tauri-bridge";
-import { chunkToArtifact, isFileWriteTool, fileWriteToArtifact } from "./useArtifact";
+import {
+  chunkToArtifact,
+  isFileWriteTool,
+  fileWriteToArtifact,
+  workspaceFilesToArtifacts,
+} from "./useArtifact";
 
 const MODEL_KEY = "tachyon-cowork-model";
 const PINNED_KEY = "tachyon-cowork-pinned";
@@ -516,6 +521,22 @@ export function useAgentChat(
               ? { ok: false, error: outcome.error, result: outcome.result }
               : outcome.result,
           );
+
+          // Detect workspace files and create artifacts for download
+          if (onArtifact && outcome.result && typeof outcome.result === "object") {
+            const res = outcome.result as Record<string, unknown>;
+            const wsId = res.workspace_id as string | undefined;
+            const wsFiles = res.workspace_files as
+              | { name: string; path: string; size: number; is_dir: boolean }[]
+              | undefined;
+            if (wsId && wsFiles && wsFiles.length > 0) {
+              const now = new Date().toISOString();
+              const artifacts = workspaceFilesToArtifacts(wsId, wsFiles, now);
+              for (const a of artifacts) {
+                onArtifact(a);
+              }
+            }
+          }
         } catch (error) {
           resultText = stringifyToolPayload({
             ok: false,
@@ -532,7 +553,7 @@ export function useAgentChat(
       });
       setChunks((prev) => resolvePendingToolCall(prev, chunk.tool_id!));
     },
-    [client, onCanvasToolCall],
+    [client, onCanvasToolCall, onArtifact],
   );
 
   useEffect(() => {

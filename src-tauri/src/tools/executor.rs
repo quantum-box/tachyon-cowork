@@ -189,7 +189,15 @@ pub async fn execute_tool(
             match crate::sandbox::executor::run_code(&request).await {
                 Ok(result) => Ok(ToolResult {
                     tool_id,
-                    result: serde_json::to_value(result).unwrap_or_default(),
+                    result: serde_json::json!({
+                        "stdout": result.stdout,
+                        "stderr": result.stderr,
+                        "exit_code": result.exit_code,
+                        "timed_out": result.timed_out,
+                        "duration_ms": result.duration_ms,
+                        "workspace_id": result.workspace_id,
+                        "workspace_files": result.workspace_files,
+                    }),
                     error: None,
                 }),
                 Err(e) => Ok(ToolResult {
@@ -212,6 +220,8 @@ pub async fn execute_tool(
                             "file_name": result.file_name,
                             "size": result.file_bytes.len(),
                             "saved_path": result.saved_path,
+                            "workspace_id": result.workspace_id,
+                            "workspace_files": result.workspace_files,
                         }),
                         error: None,
                     })

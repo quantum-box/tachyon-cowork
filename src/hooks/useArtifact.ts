@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
-import { saveFile } from "../lib/tauri-bridge";
-import type { AgentChunk, Artifact, ArtifactVersion } from "../lib/types";
+import { saveFile, readWorkspaceFile } from "../lib/tauri-bridge";
+import type { AgentChunk, Artifact, ArtifactVersion, WorkspaceFile } from "../lib/types";
 
 /** Infer a language hint for syntax highlighting from a filename */
 function inferLanguage(filename: string): string | undefined {
@@ -163,6 +163,31 @@ export function chunkToArtifact(chunk: AgentChunk): Artifact {
   };
 }
 
+/** Create Artifact entries for files persisted in a sandbox workspace */
+export function workspaceFilesToArtifacts(
+  workspaceId: string,
+  files: WorkspaceFile[],
+  timestamp: string,
+): Artifact[] {
+  return files
+    .filter((f) => !f.is_dir)
+    .map((f) => {
+      const type = inferArtifactType(undefined, f.name);
+      const language = type === "code" ? inferLanguage(f.name) : undefined;
+      return {
+        id: `ws-${workspaceId}-${f.name}`,
+        type,
+        title: f.name,
+        content: "",
+        language,
+        createdAt: timestamp,
+        versions: [{ version: 1, content: "", createdAt: timestamp }],
+        currentVersion: 1,
+        workspace: { workspaceId, filename: f.name },
+      };
+    });
+}
+
 export type CanvasState = {
   isOpen: boolean;
   title: string;
@@ -262,6 +287,19 @@ export function useArtifact() {
   }, []);
 
   const downloadArtifact = useCallback(async (artifact: Artifact) => {
+    // Workspace file: read from sandbox workspace via Tauri command
+    if (artifact.workspace) {
+      try {
+        const bytes = await readWorkspaceFile(
+          artifact.workspace.workspaceId,
+          artifact.workspace.filename,
+        );
+        await saveFile(bytes, artifact.workspace.filename);
+      } catch (e) {
+        console.error("Workspace file download failed:", e);
+      }
+      return;
+    }
     if (artifact.url) {
       try {
         const response = await fetch(artifact.url);

@@ -107,6 +107,18 @@ export async function mcpGetBuiltinApps(): Promise<BuiltinAppInfo[]> {
   return invoke<BuiltinAppInfo[]>("mcp_get_builtin_apps");
 }
 
+/** Read a file from a sandbox workspace. Returns raw bytes. */
+export async function readWorkspaceFile(
+  workspaceId: string,
+  filename: string,
+): Promise<Uint8Array> {
+  if (!isTauri()) {
+    throw new Error("readWorkspaceFile is only available in Tauri");
+  }
+  const bytes = await invoke<number[]>("read_workspace_file", { workspaceId, filename });
+  return new Uint8Array(bytes);
+}
+
 export type SaveFileOptions = {
   defaultPath?: string;
   filters?: { name: string; extensions: string[] }[];

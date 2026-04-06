@@ -154,6 +154,11 @@ export type Artifact = {
   versions?: ArtifactVersion[];
   /** Current version number (1-based) */
   currentVersion?: number;
+  /** Workspace metadata for sandbox-generated files */
+  workspace?: {
+    workspaceId: string;
+    filename: string;
+  };
 };
 
 // Excel types
@@ -249,6 +254,8 @@ export type ExecuteCodeResult = {
   exit_code: number;
   timed_out: boolean;
   duration_ms: number;
+  workspace_id: string;
+  workspace_files: WorkspaceFile[];
 };
 export type GenerateFileRequest = {
   file_type: string;
@@ -259,6 +266,14 @@ export type GenerateFileResult = {
   file_bytes: number[];
   file_name: string;
   saved_path?: string;
+  workspace_id: string;
+  workspace_files: WorkspaceFile[];
+};
+export type WorkspaceFile = {
+  name: string;
+  path: string;
+  size: number;
+  is_dir: boolean;
 };
 
 export type ClientToolDefinition = {
