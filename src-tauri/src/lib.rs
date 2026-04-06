@@ -27,8 +27,7 @@ pub fn run() {
             {
                 use tauri::Manager;
                 let project_manager = app.state::<project::ProjectManager>();
-                if let Err(e) = tauri::async_runtime::block_on(project_manager.load(&app.handle()))
-                {
+                if let Err(e) = tauri::async_runtime::block_on(project_manager.load(app.handle())) {
                     eprintln!("Project startup error: {}", e);
                 }
             }

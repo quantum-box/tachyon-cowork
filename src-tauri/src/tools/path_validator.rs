@@ -74,11 +74,6 @@ pub fn validate_read_path(raw: &str) -> Result<PathBuf, String> {
     Ok(path)
 }
 
-/// Validate a path for write operations (parent must exist).
-pub fn validate_write_path(raw: &str) -> Result<PathBuf, String> {
-    validate_path(raw)
-}
-
 /// Resolve a project-scoped path.
 ///
 /// Relative paths are resolved from the project root.
