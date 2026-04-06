@@ -1,7 +1,6 @@
 use rmcp::{
-    model::{CallToolRequestParam, ClientInfo, Implementation},
+    model::{CallToolRequestParams, Implementation},
     service::RunningService,
-    transport::streamable_http_client::StreamableHttpClientTransport,
     RoleClient,
 };
 use std::collections::HashMap;
@@ -11,19 +10,14 @@ use super::config::McpTransportConfig;
 pub struct McpClientSession {
     pub server_id: String,
     pub server_name: String,
-    client: RunningService<RoleClient>,
+    client: RunningService<RoleClient, ()>,
     pub tools: Vec<rmcp::model::Tool>,
 }
 
-fn client_info() -> ClientInfo {
-    ClientInfo {
-        protocol_version: Default::default(),
-        capabilities: Default::default(),
-        client_info: Implementation {
-            name: "tachyon-cowork".into(),
-            version: "0.1.0".into(),
-        },
-    }
+fn client_info() -> rmcp::model::ClientInfo {
+    let mut info = rmcp::model::ClientInfo::default();
+    info.client_info = Implementation::new("tachyon-cowork", "0.1.0");
+    info
 }
 
 impl McpClientSession {
@@ -55,7 +49,7 @@ impl McpClientSession {
             cmd.env(k, v);
         }
 
-        let transport = rmcp::transport::TokioChildProcess::new(&mut cmd)
+        let transport = rmcp::transport::TokioChildProcess::new(cmd)
             .map_err(|e| format!("Failed to spawn MCP server '{}': {}", server_name, e))?;
 
         let client = rmcp::serve_client(client_info(), transport)
@@ -63,6 +57,7 @@ impl McpClientSession {
             .map_err(|e| format!("Failed to initialize MCP server '{}': {}", server_name, e))?;
 
         let tools_result = client
+            .peer()
             .list_tools(None)
             .await
             .map_err(|e| format!("Failed to list tools from '{}': {}", server_name, e))?;
@@ -80,17 +75,20 @@ impl McpClientSession {
         server_name: String,
         url: &str,
     ) -> Result<Self, String> {
-        let transport = StreamableHttpClientTransport::builder(
-            url.parse()
-                .map_err(|e| format!("Invalid URL for '{}': {}", server_name, e))?,
-        )
-        .build();
+        use rmcp::transport::streamable_http_client::{
+            StreamableHttpClientTransport, StreamableHttpClientTransportConfig,
+        };
+
+        let config = StreamableHttpClientTransportConfig::with_uri(url);
+        let http_client = reqwest::Client::new();
+        let transport = StreamableHttpClientTransport::with_client(http_client, config);
 
         let client = rmcp::serve_client(client_info(), transport)
             .await
             .map_err(|e| format!("Failed to initialize MCP server '{}': {}", server_name, e))?;
 
         let tools_result = client
+            .peer()
             .list_tools(None)
             .await
             .map_err(|e| format!("Failed to list tools from '{}': {}", server_name, e))?;
@@ -108,16 +106,18 @@ impl McpClientSession {
         name: &str,
         arguments: serde_json::Value,
     ) -> Result<serde_json::Value, String> {
-        let params = CallToolRequestParam {
-            name: name.into(),
-            arguments: match arguments {
-                serde_json::Value::Object(map) => Some(map),
-                _ => None,
-            },
+        let args_map = match arguments {
+            serde_json::Value::Object(map) => Some(map),
+            _ => None,
         };
+        let mut params = CallToolRequestParams::new(name.to_string());
+        if let Some(map) = args_map {
+            params = params.with_arguments(map);
+        }
 
         let result = self
             .client
+            .peer()
             .call_tool(params)
             .await
             .map_err(|e| format!("Tool call failed on '{}': {}", self.server_name, e))?;
@@ -134,8 +134,9 @@ impl McpClientSession {
                     serde_json::json!({"type": "image", "data": img.data, "mime_type": img.mime_type})
                 }
                 rmcp::model::RawContent::Resource(res) => {
-                    serde_json::json!({"type": "resource", "uri": res.resource.uri, "text": res.resource.text})
+                    serde_json::json!({"type": "resource", "resource": serde_json::to_value(&res.resource).unwrap_or_default()})
                 }
+                _ => serde_json::json!({"type": "unknown"}),
             })
             .collect();
 
