@@ -2,6 +2,7 @@ import { useState } from "react";
 import { AlertCircle, RefreshCw, X, Square } from "lucide-react";
 import type { useAgentChat } from "../../hooks/useAgentChat";
 import type { Artifact, FileAttachment, InlineAttachment } from "../../lib/types";
+import type { SendKeyMode } from "../../hooks/useSendKey";
 import { FileDropZone } from "../file/FileDropZone";
 import { MessageList } from "./MessageList";
 import { ChatInput } from "./ChatInput";
@@ -19,6 +20,7 @@ type Props = {
   onOpenCanvas?: (title: string, content: string, contentType: "html" | "jsx") => void;
   isSearchOpen: boolean;
   onSearchClose: () => void;
+  sendKey?: SendKeyMode;
 };
 
 export function ChatPanel({
@@ -33,6 +35,7 @@ export function ChatPanel({
   onOpenCanvas,
   isSearchOpen,
   onSearchClose,
+  sendKey,
 }: Props) {
   const [searchQuery] = useState("");
 
@@ -119,6 +122,7 @@ export function ChatPanel({
           onFilesAdd={onFilesAdd}
           onFileRemove={onFileRemove}
           showPromptTemplates={chat.chunks.length === 0}
+          sendKey={sendKey}
         />
       </div>
     </FileDropZone>

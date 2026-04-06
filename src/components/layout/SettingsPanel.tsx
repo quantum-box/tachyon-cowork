@@ -1,6 +1,7 @@
 import { X, Keyboard, Palette, Bot, Info, LogOut, Puzzle } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { McpSettingsSection } from "./McpSettingsSection";
+import type { SendKeyMode } from "../../hooks/useSendKey";
 
 type Theme = "light" | "dark" | "system";
 
@@ -15,6 +16,8 @@ type Props = {
   apiBaseUrl?: string;
   tenantId?: string;
   onMcpConfigChanged?: () => void;
+  sendKey: SendKeyMode;
+  onSendKeyChange: (mode: SendKeyMode) => void;
 };
 
 const MODELS = [
@@ -26,13 +29,21 @@ const MODELS = [
   { id: "google/gemini-2.0-flash", label: "Gemini 2.0 Flash" },
 ];
 
-const SHORTCUTS = [
-  { key: "Ctrl + N", description: "新しいチャット" },
-  { key: "Ctrl + F", description: "チャット内検索" },
-  { key: "Escape", description: "パネルを閉じる" },
-  { key: "Enter", description: "メッセージ送信" },
-  { key: "Shift + Enter", description: "改行" },
-];
+function getShortcuts(sendKey: SendKeyMode) {
+  return [
+    { key: "Ctrl + N", description: "新しいチャット" },
+    { key: "Ctrl + F", description: "チャット内検索" },
+    { key: "Escape", description: "パネルを閉じる" },
+    {
+      key: sendKey === "cmd-enter" ? "⌘/Ctrl + Enter" : "Enter",
+      description: "メッセージ送信",
+    },
+    {
+      key: sendKey === "cmd-enter" ? "Enter" : "Shift + Enter",
+      description: "改行",
+    },
+  ];
+}
 
 export function SettingsPanel({
   isOpen,
@@ -45,8 +56,12 @@ export function SettingsPanel({
   apiBaseUrl,
   tenantId,
   onMcpConfigChanged,
+  sendKey,
+  onSendKeyChange,
 }: Props) {
   if (!isOpen) return null;
+
+  const shortcuts = getShortcuts(sendKey);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -98,6 +113,38 @@ export function SettingsPanel({
             </select>
           </section>
 
+          {/* Send Key Mode */}
+          <section>
+            <div className="flex items-center gap-2 mb-3">
+              <Keyboard size={14} className="text-gray-500 dark:text-slate-400" />
+              <h3 className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                メッセージ送信キー
+              </h3>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => onSendKeyChange("enter")}
+                className={`flex-1 px-3 py-2 rounded-lg text-sm border transition-colors ${
+                  sendKey === "enter"
+                    ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300"
+                    : "border-gray-200 dark:border-slate-600 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-800"
+                }`}
+              >
+                Enter
+              </button>
+              <button
+                onClick={() => onSendKeyChange("cmd-enter")}
+                className={`flex-1 px-3 py-2 rounded-lg text-sm border transition-colors ${
+                  sendKey === "cmd-enter"
+                    ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300"
+                    : "border-gray-200 dark:border-slate-600 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-800"
+                }`}
+              >
+                ⌘/Ctrl + Enter
+              </button>
+            </div>
+          </section>
+
           {/* Keyboard Shortcuts */}
           <section>
             <div className="flex items-center gap-2 mb-3">
@@ -107,8 +154,8 @@ export function SettingsPanel({
               </h3>
             </div>
             <div className="space-y-2">
-              {SHORTCUTS.map((s) => (
-                <div key={s.key} className="flex items-center justify-between text-sm">
+              {shortcuts.map((s) => (
+                <div key={s.description} className="flex items-center justify-between text-sm">
                   <span className="text-gray-600 dark:text-gray-400">{s.description}</span>
                   <kbd className="px-2 py-0.5 rounded bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 text-xs font-mono border border-gray-200 dark:border-slate-600">
                     {s.key}
