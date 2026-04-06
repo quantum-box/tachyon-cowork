@@ -21,6 +21,8 @@ type Props = {
   isSearchOpen: boolean;
   onSearchClose: () => void;
   sendKey?: SendKeyMode;
+  isOffline?: boolean;
+  onOpenTools?: () => void;
 };
 
 export function ChatPanel({
@@ -36,11 +38,15 @@ export function ChatPanel({
   isSearchOpen,
   onSearchClose,
   sendKey,
+  isOffline = false,
+  onOpenTools,
 }: Props) {
   const [searchQuery] = useState("");
+  const hasNetworkIssue = isOffline || chat.error?.kind === "network";
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isOffline) return;
     if (!chat.input.trim() && files.length === 0) return;
     const attachments = files.length > 0 ? toInlineAttachments() : undefined;
     const msg = chat.input.trim();
@@ -58,7 +64,50 @@ export function ChatPanel({
         )}
 
         {/* Error banner with retry/dismiss */}
-        {chat.error && (
+        {hasNetworkIssue && (
+          <div className="mx-4 mt-3 px-4 py-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2">
+            <AlertCircle size={14} className="shrink-0" />
+            <div className="flex-1 space-y-1">
+              <div className="font-medium">
+                {isOffline
+                  ? "オフラインです。チャット送信は停止しています。"
+                  : (chat.error?.message ?? "Agent API に接続できません。")}
+              </div>
+              <div className="text-[11px] text-amber-700 dark:text-amber-400">
+                オフラインでも `ファイル検索` `整理` `重複検出` `容量分析` は利用できます。
+              </div>
+            </div>
+            {onOpenTools && (
+              <button
+                type="button"
+                onClick={onOpenTools}
+                className="shrink-0 flex items-center gap-1 px-2 py-1 rounded-md bg-amber-100 dark:bg-amber-800/30 hover:bg-amber-200 dark:hover:bg-amber-800/50 text-amber-800 dark:text-amber-200 transition-colors"
+              >
+                ファイルツール
+              </button>
+            )}
+            {!isOffline && (
+              <button
+                type="button"
+                onClick={chat.retryLastMessage}
+                className="shrink-0 flex items-center gap-1 px-2 py-1 rounded-md bg-amber-100 dark:bg-amber-800/30 hover:bg-amber-200 dark:hover:bg-amber-800/50 text-amber-800 dark:text-amber-200 transition-colors"
+              >
+                <RefreshCw size={12} />
+                再試行
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={chat.clearError}
+              className="shrink-0 p-1 rounded-md hover:bg-amber-200 dark:hover:bg-amber-800/50 transition-colors"
+              aria-label="閉じる"
+            >
+              <X size={12} />
+            </button>
+          </div>
+        )}
+
+        {chat.error && chat.error.kind !== "network" && (
           <div className="mx-4 mt-3 px-4 py-2.5 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-xs text-red-700 dark:text-red-400 flex items-center gap-2">
             <AlertCircle size={14} className="shrink-0" />
             <span className="flex-1">{chat.error.message}</span>
@@ -123,6 +172,12 @@ export function ChatPanel({
           onFileRemove={onFileRemove}
           showPromptTemplates={chat.chunks.length === 0}
           sendKey={sendKey}
+          isDisabled={isOffline}
+          placeholder={
+            isOffline
+              ? "オフライン中のためチャット送信はできません"
+              : undefined
+          }
         />
       </div>
     </FileDropZone>

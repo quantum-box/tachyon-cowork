@@ -11,11 +11,9 @@ pub struct SystemInfo {
 
 #[tauri::command]
 pub async fn get_system_info() -> Result<SystemInfo, String> {
-    let home = std::env::var("HOME")
-        .or_else(|_| std::env::var("USERPROFILE"))
-        .ok();
-    let desktop = home.as_ref().map(|h| format!("{}/Desktop", h));
-    let downloads = home.as_ref().map(|h| format!("{}/Downloads", h));
+    let home = dirs::home_dir().map(|path| path.to_string_lossy().to_string());
+    let desktop = dirs::desktop_dir().map(|path| path.to_string_lossy().to_string());
+    let downloads = dirs::download_dir().map(|path| path.to_string_lossy().to_string());
 
     Ok(SystemInfo {
         os: std::env::consts::OS.to_string(),
@@ -28,28 +26,30 @@ pub async fn get_system_info() -> Result<SystemInfo, String> {
 
 #[tauri::command]
 pub async fn show_in_folder(path: String) -> Result<(), String> {
+    let canonical =
+        std::fs::canonicalize(&path).unwrap_or_else(|_| std::path::PathBuf::from(&path));
+
     #[cfg(target_os = "macos")]
     {
         std::process::Command::new("open")
             .arg("-R")
-            .arg(&path)
+            .arg(&canonical)
             .spawn()
             .map_err(|e| e.to_string())?;
     }
     #[cfg(target_os = "windows")]
     {
         std::process::Command::new("explorer")
-            .arg("/select,")
-            .arg(&path)
+            .arg(format!("/select,{}", canonical.display()))
             .spawn()
             .map_err(|e| e.to_string())?;
     }
     #[cfg(target_os = "linux")]
     {
-        let dir = std::path::Path::new(&path)
+        let dir = canonical
             .parent()
             .map(|p| p.to_string_lossy().to_string())
-            .unwrap_or(path);
+            .unwrap_or_else(|| canonical.to_string_lossy().to_string());
         std::process::Command::new("xdg-open")
             .arg(&dir)
             .spawn()

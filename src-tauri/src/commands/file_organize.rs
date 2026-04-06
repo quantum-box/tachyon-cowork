@@ -14,6 +14,7 @@ pub struct OrganizePlan {
     pub strategy: String,
     pub source_dir: String,
     pub operations: Vec<FileOperation>,
+    pub conflicts: Vec<OrganizeConflict>,
     pub summary: OrganizeSummary,
 }
 
@@ -22,6 +23,15 @@ pub struct OrganizeSummary {
     pub total_files: usize,
     pub categories: HashMap<String, usize>,
     pub dirs_to_create: usize,
+    pub movable_files: usize,
+    pub conflicts: usize,
+}
+
+#[derive(Serialize)]
+pub struct OrganizeConflict {
+    pub source: String,
+    pub destination: String,
+    pub reason: String,
 }
 
 #[tauri::command]
@@ -35,6 +45,8 @@ pub async fn organize_files(directory: String, strategy: String) -> Result<Organ
     let mut categories: HashMap<String, usize> = HashMap::new();
     let mut dirs_to_create = std::collections::HashSet::new();
     let mut total_files = 0usize;
+    let mut movable_files = 0usize;
+    let mut conflicts = Vec::new();
 
     for entry in std::fs::read_dir(dir).map_err(|e| e.to_string())? {
         let entry = entry.map_err(|e| e.to_string())?;
@@ -88,6 +100,16 @@ pub async fn organize_files(directory: String, strategy: String) -> Result<Organ
 
         let file_name = path.file_name().unwrap().to_string_lossy().to_string();
         let dest_file = dest_dir.join(&file_name);
+        if dest_file.exists() {
+            conflicts.push(OrganizeConflict {
+                source: path.to_string_lossy().to_string(),
+                destination: dest_file.to_string_lossy().to_string(),
+                reason: "destination_exists".to_string(),
+            });
+            total_files += 1;
+            continue;
+        }
+
         operations.push(FileOperation {
             source: path.to_string_lossy().to_string(),
             destination: dest_file.to_string_lossy().to_string(),
@@ -96,16 +118,20 @@ pub async fn organize_files(directory: String, strategy: String) -> Result<Organ
 
         *categories.entry(category).or_insert(0) += 1;
         total_files += 1;
+        movable_files += 1;
     }
 
     Ok(OrganizePlan {
         strategy,
         source_dir: directory,
         operations,
+        conflicts,
         summary: OrganizeSummary {
             total_files,
             categories,
             dirs_to_create: dirs_to_create.len(),
+            movable_files,
+            conflicts: total_files.saturating_sub(movable_files),
         },
     })
 }

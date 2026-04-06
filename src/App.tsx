@@ -28,13 +28,27 @@ export default function App() {
   const [auth, setAuth] = useState<AuthState | null>(loadAuth);
   const [oauthError, setOauthError] = useState<string | null>(null);
   const [isExchangingToken, setIsExchangingToken] = useState(false);
+  const [offlineMode, setOfflineMode] = useState(false);
   const [showTools, setShowTools] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [isOnline, setIsOnline] = useState(() =>
+    typeof navigator === "undefined" ? true : navigator.onLine,
+  );
 
   const { theme, setTheme } = useTheme();
   const { sendKey, setSendKey } = useSendKey();
+
+  useEffect(() => {
+    const syncNetworkState = () => setIsOnline(navigator.onLine);
+    window.addEventListener("online", syncNetworkState);
+    window.addEventListener("offline", syncNetworkState);
+    return () => {
+      window.removeEventListener("online", syncNetworkState);
+      window.removeEventListener("offline", syncNetworkState);
+    };
+  }, []);
 
   // ── OAuth2 Callback Handler ──────────────────────────────────────
   useEffect(() => {
@@ -170,6 +184,7 @@ export default function App() {
   const handleLogin = useCallback((newAuth: AuthState) => {
     saveAuth(newAuth);
     setAuth(newAuth);
+    setOfflineMode(false);
   }, []);
 
   const handleOpenArtifact = useCallback(
@@ -215,11 +230,26 @@ export default function App() {
   );
 
   if (!auth) {
+    if (offlineMode) {
+      return (
+        <div className="h-screen bg-white dark:bg-slate-950 transition-colors duration-150">
+          <ToolsPanel
+            onBack={() => setOfflineMode(false)}
+            backLabel="サインインへ戻る"
+            title="ローカルファイルツール"
+            description="オフラインでも使える機能だけを表示しています"
+          />
+        </div>
+      );
+    }
+
     return (
       <LoginScreen
         onLogin={handleLogin}
         oauthError={oauthError}
         isExchangingToken={isExchangingToken}
+        isOffline={!isOnline}
+        onEnterOfflineMode={() => setOfflineMode(true)}
       />
     );
   }
@@ -271,6 +301,8 @@ export default function App() {
             isSearchOpen={searchOpen}
             onSearchClose={() => setSearchOpen(false)}
             sendKey={sendKey}
+            isOffline={!isOnline}
+            onOpenTools={() => setShowTools(true)}
           />
         )}
       </div>

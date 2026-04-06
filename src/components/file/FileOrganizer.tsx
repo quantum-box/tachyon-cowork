@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   XCircle,
   FolderPlus,
+  AlertTriangle,
 } from "lucide-react";
 
 type FileOperation = {
@@ -20,10 +21,17 @@ type OrganizePlan = {
   strategy: string;
   source_dir: string;
   operations: FileOperation[];
+  conflicts: {
+    source: string;
+    destination: string;
+    reason: string;
+  }[];
   summary: {
     total_files: number;
     categories: Record<string, number>;
     dirs_to_create: number;
+    movable_files: number;
+    conflicts: number;
   };
 };
 
@@ -53,6 +61,7 @@ export function FileOrganizer() {
   const [results, setResults] = useState<OperationResult[] | null>(null);
   const [isPlanning, setIsPlanning] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleBrowse = useCallback(async () => {
     const selected = await open({ directory: true, multiple: false });
@@ -60,6 +69,7 @@ export function FileOrganizer() {
       setDirectory(selected);
       setPlan(null);
       setResults(null);
+      setError(null);
     }
   }, []);
 
@@ -68,6 +78,7 @@ export function FileOrganizer() {
     setIsPlanning(true);
     setPlan(null);
     setResults(null);
+    setError(null);
     try {
       const p = await invoke<OrganizePlan>("organize_files", {
         directory,
@@ -76,6 +87,7 @@ export function FileOrganizer() {
       setPlan(p);
     } catch (err) {
       console.error("Plan error:", err);
+      setError(err instanceof Error ? err.message : "整理プランの作成に失敗しました");
     } finally {
       setIsPlanning(false);
     }
@@ -84,6 +96,7 @@ export function FileOrganizer() {
   const handleExecute = useCallback(async () => {
     if (!plan) return;
     setIsExecuting(true);
+    setError(null);
     try {
       const res = await invoke<OperationResult[]>("execute_organize_plan", {
         operations: plan.operations,
@@ -91,6 +104,7 @@ export function FileOrganizer() {
       setResults(res);
     } catch (err) {
       console.error("Execute error:", err);
+      setError(err instanceof Error ? err.message : "整理の実行に失敗しました");
     } finally {
       setIsExecuting(false);
     }
@@ -99,6 +113,7 @@ export function FileOrganizer() {
   const handleCancel = useCallback(() => {
     setPlan(null);
     setResults(null);
+    setError(null);
   }, []);
 
   const successCount = results?.filter((r) => r.success).length ?? 0;
@@ -177,6 +192,12 @@ export function FileOrganizer() {
 
       {/* Plan display */}
       <div className="flex-1 overflow-y-auto">
+        {error && (
+          <div className="mx-4 mt-4 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 px-3 py-2 text-xs text-red-700 dark:text-red-300">
+            {error}
+          </div>
+        )}
+
         {plan && !results && (
           <div className="p-4 space-y-3">
             {/* Summary */}
@@ -185,7 +206,8 @@ export function FileOrganizer() {
                 整理プラン
               </div>
               <div className="text-xs text-blue-700 dark:text-blue-300">
-                {plan.summary.total_files}ファイルを
+                {plan.summary.total_files}ファイルのうち
+                {plan.summary.movable_files}件を
                 {Object.keys(plan.summary.categories).length}
                 カテゴリに分類します
               </div>
@@ -202,6 +224,28 @@ export function FileOrganizer() {
                 )}
               </div>
             </div>
+
+            {plan.summary.conflicts > 0 && (
+              <div className="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-3">
+                <div className="flex items-center gap-2 text-sm font-medium text-amber-800 dark:text-amber-200">
+                  <AlertTriangle size={14} />
+                  同名ファイルの衝突が {plan.summary.conflicts} 件あります
+                </div>
+                <div className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+                  既存ファイルを上書きしないよう、衝突したファイルは実行対象から外しています。
+                </div>
+                <div className="mt-2 space-y-1">
+                  {plan.conflicts.slice(0, 5).map((conflict) => (
+                    <div
+                      key={`${conflict.source}->${conflict.destination}`}
+                      className="rounded bg-amber-100/70 dark:bg-amber-900/30 px-2 py-1 text-[11px] text-amber-900 dark:text-amber-200"
+                    >
+                      {conflict.source.split(/[/\\]/).pop()} → {conflict.destination.split(/[/\\]/).pop()}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Operation list */}
             <div className="space-y-1">
@@ -236,7 +280,7 @@ export function FileOrganizer() {
             <div className="flex gap-2">
               <button
                 onClick={handleExecute}
-                disabled={isExecuting}
+                disabled={isExecuting || plan.summary.movable_files === 0}
                 className="flex-1 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 transition-colors"
               >
                 {isExecuting ? (

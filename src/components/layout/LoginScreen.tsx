@@ -16,6 +16,8 @@ type Props = {
   onLogin: (auth: AuthState) => void;
   oauthError?: string | null;
   isExchangingToken?: boolean;
+  isOffline?: boolean;
+  onEnterOfflineMode?: () => void;
 };
 
 type TenantOption = {
@@ -127,7 +129,13 @@ async function fetchCognitoUserInfo(
   return response.json();
 }
 
-export function LoginScreen({ onLogin, oauthError, isExchangingToken }: Props) {
+export function LoginScreen({
+  onLogin,
+  oauthError,
+  isExchangingToken,
+  isOffline = false,
+  onEnterOfflineMode,
+}: Props) {
   const defaultTenantId = import.meta.env.VITE_DEFAULT_TENANT_ID || "";
   const cognitoDomain = import.meta.env.VITE_COGNITO_DOMAIN || "";
   const cognitoClientId = import.meta.env.VITE_COGNITO_CLIENT_ID || "";
@@ -403,6 +411,12 @@ export function LoginScreen({ onLogin, oauthError, isExchangingToken }: Props) {
         </div>
 
         <div className="space-y-4">
+          {isOffline && (
+            <div className="px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-300">
+              ネットワークに接続されていません。チャットは使えませんが、ローカルのファイルツールは利用できます。
+            </div>
+          )}
+
           {oauthError && (
             <div className="px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-xs text-red-700 dark:text-red-400">
               サインインエラー: {oauthError}
@@ -421,6 +435,16 @@ export function LoginScreen({ onLogin, oauthError, isExchangingToken }: Props) {
           <p className="text-xs text-center text-gray-500 dark:text-slate-400 leading-5">
             ブラウザで認証したあと、自動でアプリに戻ります。
           </p>
+
+          {onEnterOfflineMode && (
+            <button
+              type="button"
+              onClick={onEnterOfflineMode}
+              className="w-full py-2.5 rounded-xl border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors duration-150"
+            >
+              ローカルツールだけ使う
+            </button>
+          )}
 
           {isDevTauri && (
             <div className="space-y-2 rounded-xl border border-dashed border-amber-300 dark:border-amber-700 bg-amber-50/70 dark:bg-amber-900/10 p-3">
