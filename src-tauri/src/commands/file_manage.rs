@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::fs;
 use walkdir::WalkDir;
 
@@ -47,13 +48,39 @@ pub async fn search_files(
     pattern: Option<String>,
     extensions: Option<Vec<String>>,
     max_results: Option<usize>,
+    recursive: Option<bool>,
+    include_hidden: Option<bool>,
 ) -> Result<Vec<FileInfo>, String> {
-    let max = max_results.unwrap_or(200);
+    let max = max_results.unwrap_or(500).min(5_000);
+    let recursive = recursive.unwrap_or(true);
+    let include_hidden = include_hidden.unwrap_or(false);
+    let lowered_pattern = pattern
+        .as_ref()
+        .map(|value| value.trim().to_lowercase())
+        .filter(|value| !value.is_empty());
+    let extension_filter = extensions.map(|items| {
+        items
+            .into_iter()
+            .map(|item| item.trim().trim_start_matches('.').to_lowercase())
+            .filter(|item| !item.is_empty())
+            .collect::<HashSet<_>>()
+    });
     let mut results = Vec::new();
 
     for entry in WalkDir::new(&directory)
-        .max_depth(10)
+        .min_depth(1)
+        .max_depth(if recursive { usize::MAX } else { 1 })
         .into_iter()
+        .filter_entry(|entry| {
+            if include_hidden {
+                return true;
+            }
+            entry
+                .file_name()
+                .to_str()
+                .map(|name| !name.starts_with('.'))
+                .unwrap_or(true)
+        })
         .filter_map(|e| e.ok())
     {
         if results.len() >= max {
@@ -69,17 +96,19 @@ pub async fn search_files(
             .map(|n| n.to_string_lossy().to_string())
             .unwrap_or_default();
 
-        if let Some(ref pat) = pattern {
-            if !name.to_lowercase().contains(&pat.to_lowercase()) {
+        let path_text = path.to_string_lossy().to_lowercase();
+
+        if let Some(ref pat) = lowered_pattern {
+            if !name.to_lowercase().contains(pat) && !path_text.contains(pat) {
                 continue;
             }
         }
-        if let Some(ref exts) = extensions {
+        if let Some(ref exts) = extension_filter {
             let ext = path
                 .extension()
                 .map(|e| e.to_string_lossy().to_lowercase())
                 .unwrap_or_default();
-            if !exts.iter().any(|e| e.to_lowercase() == ext) {
+            if !exts.contains(&ext) {
                 continue;
             }
         }

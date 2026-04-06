@@ -79,11 +79,16 @@ function toChatError(error: unknown): ChatErrorState {
   if (isNetworkErrorMessage(message)) {
     return {
       kind: "network",
-      message: "Agent API に接続できません。ネットワークを確認するか、ローカルのファイルツールを利用してください。",
+      message:
+        "Agent API に接続できません。ネットワークを確認するか、ローカルのファイルツールを利用してください。",
     };
   }
 
-  if (normalized.includes("401") || normalized.includes("403") || normalized.includes("unauthorized")) {
+  if (
+    normalized.includes("401") ||
+    normalized.includes("403") ||
+    normalized.includes("unauthorized")
+  ) {
     return {
       kind: "auth",
       message: "認証が無効です。再ログインしてから再試行してください。",
@@ -172,6 +177,14 @@ const CLIENT_TOOLS: ClientToolDefinition[] = [
         max_results: {
           type: "integer",
           description: "Maximum number of matches to return.",
+        },
+        recursive: {
+          type: "boolean",
+          description: "Whether to include subdirectories in the search.",
+        },
+        include_hidden: {
+          type: "boolean",
+          description: "Whether to include hidden files and folders.",
         },
       },
       required: ["directory"],
@@ -626,13 +639,17 @@ export function useAgentChat(
   );
   const abortRef = useRef<AbortController | null>(null);
   const skipNextSessionLoadRef = useRef<string | null>(null);
-  const lastMessageRef = useRef<{ message: string; attachments?: InlineAttachment[] } | null>(null);
+  const lastMessageRef = useRef<{
+    message: string;
+    task: string;
+    attachments?: InlineAttachment[];
+  } | null>(null);
 
   const handlePendingToolCall = useCallback(
     async (currentSessionId: string, chunk: AgentChunk & { args?: Record<string, unknown> }) => {
       if (!client || !chunk.tool_id || !chunk.tool_name) return;
 
-      let resultText = "";
+      let resultText: string;
 
       // Handle canvas tool call on the client side (no Tauri needed)
       if (chunk.tool_name === "canvas") {
@@ -806,7 +823,9 @@ export function useAgentChat(
       const trackToolCall = (chunk: AgentChunk) => {
         if (!chunk.tool_id) return;
         if (
-          (chunk.type === "tool_call" || chunk.type === "tool_call_args" || chunk.type === "tool_call_pending") &&
+          (chunk.type === "tool_call" ||
+            chunk.type === "tool_call_args" ||
+            chunk.type === "tool_call_pending") &&
           chunk.tool_name
         ) {
           const existing = toolCallMeta.get(chunk.tool_id);
@@ -821,10 +840,7 @@ export function useAgentChat(
                 mergeChunkText(existing.toolArguments, chunk.tool_arguments) || "";
             }
           }
-        } else if (
-          (chunk.type === "tool_call_args") &&
-          chunk.tool_arguments
-        ) {
+        } else if (chunk.type === "tool_call_args" && chunk.tool_arguments) {
           const existing = toolCallMeta.get(chunk.tool_id);
           if (existing) {
             existing.toolArguments =
@@ -869,7 +885,8 @@ export function useAgentChat(
               ac.abort();
               setError({
                 kind: "network",
-                message: "Agent API の応答がタイムアウトしました。接続を確認して再試行してください。",
+                message:
+                  "Agent API の応答がタイムアウトしました。接続を確認して再試行してください。",
               });
             }, STREAM_TIMEOUT_MS);
           };
@@ -997,7 +1014,7 @@ export function useAgentChat(
   );
 
   const sendMessage = useCallback(
-    async (message: string, attachments?: InlineAttachment[]) => {
+    async (message: string, attachments?: InlineAttachment[], taskOverride?: string) => {
       const trimmed = message.trim();
       const hasAttachments = attachments && attachments.length > 0;
       if ((!trimmed && !hasAttachments) || isLoading) return;
@@ -1016,9 +1033,9 @@ export function useAgentChat(
         ...(imageUrls && imageUrls.length > 0 && { imageUrls }),
       };
       setChunks((prev) => [...prev, userChunk]);
-      lastMessageRef.current = { message, attachments };
+      const taskText = (taskOverride ?? trimmed) || "この画像について説明してください";
+      lastMessageRef.current = { message, task: taskText, attachments };
       // Backend requires a non-empty task; use default for image-only sends
-      const taskText = trimmed || "この画像について説明してください";
       await startTask(taskText, undefined, attachments);
     },
     [isLoading, startTask],
@@ -1122,8 +1139,8 @@ export function useAgentChat(
   const retryLastMessage = useCallback(async () => {
     if (!lastMessageRef.current || isLoading) return;
     setError(null);
-    const { message, attachments } = lastMessageRef.current;
-    await startTask(message.trim() || "この画像について説明してください", undefined, attachments);
+    const { task, attachments } = lastMessageRef.current;
+    await startTask(task, undefined, attachments);
   }, [isLoading, startTask]);
 
   const stopGeneration = useCallback(() => {

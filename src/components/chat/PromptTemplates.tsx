@@ -1,13 +1,5 @@
 import { useState } from "react";
-import {
-  Lightbulb,
-  Mail,
-  Languages,
-  FileText,
-  Code,
-  ChevronDown,
-  ChevronUp,
-} from "lucide-react";
+import { Lightbulb, Mail, Languages, FileText, Code, ChevronDown, ChevronUp } from "lucide-react";
 
 export type PromptTemplate = {
   icon: typeof Lightbulb;
@@ -19,6 +11,27 @@ export type PromptTemplate = {
 const TEMPLATES: PromptTemplate[] = [
   {
     icon: FileText,
+    label: "日報作成",
+    prompt:
+      "以下の作業ログから、そのまま提出できる日報を日本語で作成してください。\n出力形式:\n- 本日の実績\n- 完了した作業\n- 課題/懸念\n- 明日の予定\n- 関係者への共有事項\n\n作業ログ:\n",
+    category: "業務",
+  },
+  {
+    icon: FileText,
+    label: "議事録整形",
+    prompt:
+      "以下の会議メモを実務で使える議事録に整形してください。\n出力形式:\n- 会議名\n- 日時\n- 参加者\n- 議題\n- 決定事項\n- 保留事項\n- アクションアイテム（担当者・期限つき）\n- 次回までの宿題\n\n会議メモ:\n",
+    category: "業務",
+  },
+  {
+    icon: Code,
+    label: "コード相談",
+    prompt:
+      "添付したローカルコードを前提に相談します。\n以下の形式で回答してください。\n1. 結論\n2. 根拠（ファイル名・該当箇所）\n3. 修正案\n4. 追加で確認すべき点\n\n相談内容:\n",
+    category: "業務",
+  },
+  {
+    icon: FileText,
     label: "要約して",
     prompt: "以下の内容を簡潔に要約してください:\n\n",
     category: "文書",
@@ -26,8 +39,7 @@ const TEMPLATES: PromptTemplate[] = [
   {
     icon: Mail,
     label: "メール作成",
-    prompt:
-      "以下の内容でビジネスメールを作成してください。件名も含めてください。\n\n目的: ",
+    prompt: "以下の内容でビジネスメールを作成してください。件名も含めてください。\n\n目的: ",
     category: "文書",
   },
   {
@@ -81,7 +93,7 @@ export function PromptTemplates({ onSelect, visible }: Props) {
 
   if (!visible) return null;
 
-  const displayed = expanded ? TEMPLATES : TEMPLATES.slice(0, 4);
+  const displayed = expanded ? TEMPLATES : TEMPLATES.slice(0, 6);
 
   return (
     <div className="flex flex-wrap items-center gap-1.5 mb-2">
@@ -96,7 +108,7 @@ export function PromptTemplates({ onSelect, visible }: Props) {
           {t.label}
         </button>
       ))}
-      {TEMPLATES.length > 4 && (
+      {TEMPLATES.length > 6 && (
         <button
           type="button"
           onClick={() => setExpanded(!expanded)}

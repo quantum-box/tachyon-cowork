@@ -57,6 +57,7 @@ const STRATEGIES: { value: Strategy; label: string; description: string }[] = [
 export function FileOrganizer() {
   const [directory, setDirectory] = useState("");
   const [strategy, setStrategy] = useState<Strategy>("by_type");
+  const [recursive, setRecursive] = useState(false);
   const [plan, setPlan] = useState<OrganizePlan | null>(null);
   const [results, setResults] = useState<OperationResult[] | null>(null);
   const [isPlanning, setIsPlanning] = useState(false);
@@ -83,6 +84,7 @@ export function FileOrganizer() {
       const p = await invoke<OrganizePlan>("organize_files", {
         directory,
         strategy,
+        recursive,
       });
       setPlan(p);
     } catch (err) {
@@ -91,7 +93,7 @@ export function FileOrganizer() {
     } finally {
       setIsPlanning(false);
     }
-  }, [directory, strategy]);
+  }, [directory, recursive, strategy]);
 
   const handleExecute = useCallback(async () => {
     if (!plan) return;
@@ -142,9 +144,7 @@ export function FileOrganizer() {
 
         {/* Strategy selection */}
         <div className="space-y-2">
-          <label className="text-xs font-medium text-gray-600 dark:text-gray-400">
-            分類方法
-          </label>
+          <label className="text-xs font-medium text-gray-600 dark:text-gray-400">分類方法</label>
           <div className="space-y-1.5">
             {STRATEGIES.map((s) => (
               <label
@@ -188,6 +188,16 @@ export function FileOrganizer() {
             "プランを作成"
           )}
         </button>
+
+        <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-slate-400">
+          <input
+            type="checkbox"
+            checked={recursive}
+            onChange={(e) => setRecursive(e.target.checked)}
+            className="accent-indigo-600"
+          />
+          サブフォルダも整理対象に含める
+        </label>
       </div>
 
       {/* Plan display */}
@@ -212,16 +222,14 @@ export function FileOrganizer() {
                 カテゴリに分類します
               </div>
               <div className="mt-2 flex flex-wrap gap-1.5">
-                {Object.entries(plan.summary.categories).map(
-                  ([cat, count]) => (
-                    <span
-                      key={cat}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-xs"
-                    >
-                      {cat}: {count}
-                    </span>
-                  ),
-                )}
+                {Object.entries(plan.summary.categories).map(([cat, count]) => (
+                  <span
+                    key={cat}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-xs"
+                  >
+                    {cat}: {count}
+                  </span>
+                ))}
               </div>
             </div>
 
@@ -240,7 +248,8 @@ export function FileOrganizer() {
                       key={`${conflict.source}->${conflict.destination}`}
                       className="rounded bg-amber-100/70 dark:bg-amber-900/30 px-2 py-1 text-[11px] text-amber-900 dark:text-amber-200"
                     >
-                      {conflict.source.split(/[/\\]/).pop()} → {conflict.destination.split(/[/\\]/).pop()}
+                      {conflict.source.split(/[/\\]/).pop()} →{" "}
+                      {conflict.destination.split(/[/\\]/).pop()}
                     </div>
                   ))}
                 </div>
@@ -256,9 +265,13 @@ export function FileOrganizer() {
                 >
                   {op.operation === "create_dir" ? (
                     <>
-                      <FolderPlus size={12} className="text-amber-500 dark:text-amber-400 shrink-0" />
+                      <FolderPlus
+                        size={12}
+                        className="text-amber-500 dark:text-amber-400 shrink-0"
+                      />
                       <span className="text-gray-600 dark:text-gray-400 truncate">
-                        フォルダ作成: {op.destination.split("/").pop() ?? op.destination.split("\\").pop()}
+                        フォルダ作成:{" "}
+                        {op.destination.split("/").pop() ?? op.destination.split("\\").pop()}
                       </span>
                     </>
                   ) : (
@@ -266,7 +279,10 @@ export function FileOrganizer() {
                       <span className="text-gray-600 dark:text-gray-400 truncate flex-1 min-w-0">
                         {op.source.split("/").pop() ?? op.source.split("\\").pop()}
                       </span>
-                      <ArrowRight size={12} className="text-gray-400 dark:text-slate-500 shrink-0" />
+                      <ArrowRight
+                        size={12}
+                        className="text-gray-400 dark:text-slate-500 shrink-0"
+                      />
                       <span className="text-indigo-600 dark:text-indigo-400 truncate flex-1 min-w-0 text-right">
                         {op.destination.split("/").pop() ?? op.destination.split("\\").pop()}
                       </span>

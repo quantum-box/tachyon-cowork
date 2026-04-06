@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::io::{BufReader, Read, Seek, SeekFrom};
 use walkdir::WalkDir;
 
 #[derive(Serialize, Clone, Deserialize)]
@@ -35,11 +36,16 @@ pub struct OrganizeConflict {
 }
 
 #[tauri::command]
-pub async fn organize_files(directory: String, strategy: String) -> Result<OrganizePlan, String> {
+pub async fn organize_files(
+    directory: String,
+    strategy: String,
+    recursive: Option<bool>,
+) -> Result<OrganizePlan, String> {
     let dir = std::path::Path::new(&directory);
     if !dir.is_dir() {
         return Err("Not a directory".to_string());
     }
+    let recursive = recursive.unwrap_or(false);
 
     let mut operations = Vec::new();
     let mut categories: HashMap<String, usize> = HashMap::new();
@@ -48,9 +54,13 @@ pub async fn organize_files(directory: String, strategy: String) -> Result<Organ
     let mut movable_files = 0usize;
     let mut conflicts = Vec::new();
 
-    for entry in std::fs::read_dir(dir).map_err(|e| e.to_string())? {
-        let entry = entry.map_err(|e| e.to_string())?;
-        let path = entry.path();
+    for entry in WalkDir::new(dir)
+        .min_depth(1)
+        .max_depth(if recursive { usize::MAX } else { 1 })
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
+        let path = entry.path().to_path_buf();
         if path.is_dir() {
             continue;
         }
@@ -100,6 +110,10 @@ pub async fn organize_files(directory: String, strategy: String) -> Result<Organ
 
         let file_name = path.file_name().unwrap().to_string_lossy().to_string();
         let dest_file = dest_dir.join(&file_name);
+        if path == dest_file {
+            total_files += 1;
+            continue;
+        }
         if dest_file.exists() {
             conflicts.push(OrganizeConflict {
                 source: path.to_string_lossy().to_string(),
@@ -165,7 +179,7 @@ pub async fn execute_organize_plan(
                     error: Some(e.to_string()),
                 }),
             },
-            "move" => match std::fs::rename(&op.source, &op.destination) {
+            "move" => match move_path(&op.source, &op.destination) {
                 Ok(_) => results.push(OperationResult {
                     source: op.source,
                     destination: op.destination,
@@ -225,9 +239,25 @@ pub async fn find_duplicates(
             .push(path.to_string_lossy().to_string());
     }
 
-    // Phase 2: Hash files with same size
-    let mut hash_groups: HashMap<String, (u64, Vec<String>)> = HashMap::new();
+    // Phase 2: Sample-hash files with the same size
+    let mut sampled_groups: HashMap<(u64, String), Vec<String>> = HashMap::new();
     for (size, paths) in size_groups {
+        if paths.len() < 2 {
+            continue;
+        }
+        for path in paths {
+            match sample_hash(&path) {
+                Ok(hash) => {
+                    sampled_groups.entry((size, hash)).or_default().push(path);
+                }
+                Err(_) => continue,
+            }
+        }
+    }
+
+    // Phase 3: Fully hash only files that still collide after sample hashing
+    let mut hash_groups: HashMap<String, (u64, Vec<String>)> = HashMap::new();
+    for ((size, _sample), paths) in sampled_groups {
         if paths.len() < 2 {
             continue;
         }
@@ -256,9 +286,57 @@ pub async fn find_duplicates(
 }
 
 fn hash_file(path: &str) -> Result<String, String> {
-    let data = std::fs::read(path).map_err(|e| e.to_string())?;
-    let hash = blake3::hash(&data);
-    Ok(hash.to_hex().to_string())
+    let file = std::fs::File::open(path).map_err(|e| e.to_string())?;
+    let mut reader = BufReader::new(file);
+    let mut hasher = blake3::Hasher::new();
+    let mut buffer = [0u8; 64 * 1024];
+
+    loop {
+        let read = reader.read(&mut buffer).map_err(|e| e.to_string())?;
+        if read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..read]);
+    }
+
+    Ok(hasher.finalize().to_hex().to_string())
+}
+
+fn sample_hash(path: &str) -> Result<String, String> {
+    const SAMPLE_SIZE: u64 = 64 * 1024;
+    let mut file = std::fs::File::open(path).map_err(|e| e.to_string())?;
+    let metadata = file.metadata().map_err(|e| e.to_string())?;
+    let len = metadata.len();
+    let mut hasher = blake3::Hasher::new();
+    let mut buffer = vec![0u8; SAMPLE_SIZE as usize];
+
+    let head_len = file.read(&mut buffer).map_err(|e| e.to_string())?;
+    hasher.update(&buffer[..head_len]);
+
+    if len > SAMPLE_SIZE {
+        file.seek(SeekFrom::Start(len.saturating_sub(SAMPLE_SIZE)))
+            .map_err(|e| e.to_string())?;
+        let tail_len = file.read(&mut buffer).map_err(|e| e.to_string())?;
+        hasher.update(&buffer[..tail_len]);
+    }
+
+    Ok(hasher.finalize().to_hex().to_string())
+}
+
+fn move_path(source: &str, destination: &str) -> Result<(), std::io::Error> {
+    match std::fs::rename(source, destination) {
+        Ok(_) => Ok(()),
+        Err(rename_error) => {
+            let source_path = std::path::Path::new(source);
+            if !source_path.is_file() {
+                return Err(rename_error);
+            }
+
+            std::fs::copy(source, destination)?;
+            std::fs::remove_file(source)?;
+            Ok(())
+        }
+    }
 }
 
 #[derive(Serialize)]

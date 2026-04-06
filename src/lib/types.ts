@@ -117,6 +117,7 @@ export type FileAttachment = {
   name: string;
   size: number;
   type: string;
+  path?: string;
   data?: Uint8Array;
   url?: string;
   preview?: string; // base64 data URL for image thumbnails

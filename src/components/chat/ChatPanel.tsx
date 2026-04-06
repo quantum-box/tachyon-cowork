@@ -16,6 +16,12 @@ type Props = {
   onFileRemove: (id: string) => void;
   onClearFiles: () => void;
   toInlineAttachments: () => InlineAttachment[];
+  onPrepareMessage: (message: string) => Promise<{
+    task: string;
+    attachments?: InlineAttachment[];
+    warnings: string[];
+  }>;
+  isPreparingFiles?: boolean;
   onOpenArtifact: (artifact: Artifact) => void;
   onOpenCanvas?: (title: string, content: string, contentType: "html" | "jsx") => void;
   isSearchOpen: boolean;
@@ -33,6 +39,8 @@ export function ChatPanel({
   onFileRemove,
   onClearFiles,
   toInlineAttachments,
+  onPrepareMessage,
+  isPreparingFiles = false,
   onOpenArtifact,
   onOpenCanvas,
   isSearchOpen,
@@ -44,14 +52,17 @@ export function ChatPanel({
   const [searchQuery] = useState("");
   const hasNetworkIssue = isOffline || chat.error?.kind === "network";
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isOffline) return;
     if (!chat.input.trim() && files.length === 0) return;
-    const attachments = files.length > 0 ? toInlineAttachments() : undefined;
     const msg = chat.input.trim();
+    const prepared =
+      files.length > 0
+        ? await onPrepareMessage(msg)
+        : { task: msg, attachments: toInlineAttachments(), warnings: [] };
     chat.setInput("");
-    chat.sendMessage(msg, attachments);
+    chat.sendMessage(msg, prepared.attachments, prepared.task);
     onClearFiles();
   };
 
@@ -59,9 +70,7 @@ export function ChatPanel({
     <FileDropZone onFilesDropped={onFilesAdd}>
       <div className="flex flex-col h-full bg-white dark:bg-slate-950 transition-colors duration-150">
         {/* Chat search bar */}
-        {isSearchOpen && (
-          <ChatSearch chunks={chat.chunks} onClose={onSearchClose} />
-        )}
+        {isSearchOpen && <ChatSearch chunks={chat.chunks} onClose={onSearchClose} />}
 
         {/* Error banner with retry/dismiss */}
         {hasNetworkIssue && (
@@ -166,7 +175,7 @@ export function ChatPanel({
           input={chat.input}
           onInputChange={chat.setInput}
           onSubmit={handleSubmit}
-          isLoading={chat.isLoading}
+          isLoading={chat.isLoading || isPreparingFiles}
           files={files}
           onFilesAdd={onFilesAdd}
           onFileRemove={onFileRemove}
@@ -176,7 +185,9 @@ export function ChatPanel({
           placeholder={
             isOffline
               ? "オフライン中のためチャット送信はできません"
-              : undefined
+              : isPreparingFiles
+                ? "添付ファイルを解析しています..."
+                : undefined
           }
         />
       </div>

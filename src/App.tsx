@@ -296,6 +296,8 @@ export default function App() {
             onFileRemove={fileHandler.removeFile}
             onClearFiles={fileHandler.clearFiles}
             toInlineAttachments={fileHandler.toInlineAttachments}
+            onPrepareMessage={fileHandler.prepareMessage}
+            isPreparingFiles={fileHandler.isPreparing}
             onOpenArtifact={handleOpenArtifact}
             onOpenCanvas={artifactState.openCanvas}
             isSearchOpen={searchOpen}
