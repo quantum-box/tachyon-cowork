@@ -1,0 +1,14 @@
+[advisories]
+ignore = [
+    # glib 0.18 unsound VariantStrIter - transitive via tauri -> gtk/webkit2gtk (Linux only)
+    "RUSTSEC-2024-0429",
+    # unic-ucd-version unmaintained - transitive via tauri -> urlpattern -> unic-ucd-ident
+    "RUSTSEC-2025-0098",
+    # rsa timing sidechannel - transitive via microsandbox -> sqlx-mysql (no fix available)
+    "RUSTSEC-2023-0071",
+    # rustls-webpki CRL matching - transitive via tauri/microsandbox -> reqwest -> rustls
+    "RUSTSEC-2026-0049",
+]
+
+[yanked]
+enabled = false  # uds_windows 1.2.0 yanked - transitive via microsandbox -> keyring -> zbus

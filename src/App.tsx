@@ -189,7 +189,10 @@ export default function App() {
     useMemo(
       () => ({
         onNewChat: () => {
-          if (auth) chat.newChat();
+          if (auth) {
+            chat.newChat();
+            artifactState.closeCanvas();
+          }
         },
         onSearch: () => {
           if (auth) setSearchOpen((prev) => !prev);
@@ -203,7 +206,7 @@ export default function App() {
           }
         },
       }),
-      [auth, chat, settingsOpen, searchOpen],
+      [auth, chat, artifactState.closeCanvas, settingsOpen, searchOpen],
     ),
   );
 
@@ -225,8 +228,8 @@ export default function App() {
           sessions={chat.sessions}
           activeSessionId={chat.sessionId}
           pinnedRooms={chat.pinnedRooms}
-          onNewChat={chat.newChat}
-          onSelectSession={chat.selectSession}
+          onNewChat={() => { chat.newChat(); artifactState.closeCanvas(); }}
+          onSelectSession={(id: string) => { chat.selectSession(id); artifactState.closeCanvas(); }}
           onDeleteRoom={chat.deleteRoom}
           onTogglePin={chat.togglePin}
           onLogout={handleLogout}
@@ -252,6 +255,7 @@ export default function App() {
             onClearFiles={fileHandler.clearFiles}
             toInlineAttachments={fileHandler.toInlineAttachments}
             onOpenArtifact={handleOpenArtifact}
+            onOpenCanvas={artifactState.openCanvas}
             isSearchOpen={searchOpen}
             onSearchClose={() => setSearchOpen(false)}
           />

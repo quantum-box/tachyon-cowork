@@ -22,6 +22,12 @@ function inferArtifactType(
       contentType === "application/vnd.ms-powerpoint"
     )
       return "pptx";
+    if (
+      contentType ===
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+      contentType === "application/msword"
+    )
+      return "docx";
     if (contentType === "text/csv") return "csv";
     if (contentType === "text/html") return "html";
     if (contentType === "text/jsx") return "jsx";
@@ -34,6 +40,8 @@ function inferArtifactType(
       xls: "excel",
       pptx: "pptx",
       ppt: "pptx",
+      docx: "docx",
+      doc: "docx",
       pdf: "pdf",
       png: "image",
       jpg: "image",
@@ -66,6 +74,7 @@ function extensionForType(type: Artifact["type"]): string {
     csv: "csv",
     html: "html",
     jsx: "jsx",
+    docx: "docx",
   };
   return map[type];
 }

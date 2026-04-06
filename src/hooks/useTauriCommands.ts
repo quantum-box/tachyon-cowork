@@ -3,6 +3,12 @@ import type {
   ExcelData,
   WriteExcelRequest,
   PptxMetadata,
+  PdfData,
+  DocxData,
+  ExecuteCodeRequest,
+  ExecuteCodeResult,
+  GenerateFileRequest,
+  GenerateFileResult,
 } from "../lib/types";
 
 const isTauri = () => "__TAURI__" in window;
@@ -35,5 +41,38 @@ export function useTauriCommands() {
     return invoke<PptxMetadata>("read_pptx_metadata", { path });
   };
 
-  return { readExcel, writeExcel, saveExcelToFile, readPptxMetadata };
+  const readPdf = async (path: string): Promise<PdfData | null> => {
+    if (!isTauri()) return null;
+    return invoke<PdfData>("read_pdf", { path });
+  };
+
+  const readDocx = async (path: string): Promise<DocxData | null> => {
+    if (!isTauri()) return null;
+    return invoke<DocxData>("read_docx", { path });
+  };
+
+  const executeCode = async (
+    request: ExecuteCodeRequest,
+  ): Promise<ExecuteCodeResult | null> => {
+    if (!isTauri()) return null;
+    return invoke<ExecuteCodeResult>("execute_code", { request });
+  };
+
+  const generateFile = async (
+    request: GenerateFileRequest,
+  ): Promise<GenerateFileResult | null> => {
+    if (!isTauri()) return null;
+    return invoke<GenerateFileResult>("generate_file", { request });
+  };
+
+  return {
+    readExcel,
+    writeExcel,
+    saveExcelToFile,
+    readPptxMetadata,
+    readPdf,
+    readDocx,
+    executeCode,
+    generateFile,
+  };
 }

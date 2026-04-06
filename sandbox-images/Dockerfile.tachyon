@@ -1,0 +1,11 @@
+FROM python:3.12-slim
+
+RUN pip install --no-cache-dir \
+    python-pptx \
+    python-docx \
+    reportlab \
+    PyPDF2 \
+    openpyxl \
+    pillow \
+    matplotlib \
+    pandas
