@@ -14,6 +14,7 @@ import { useFileHandler } from "./hooks/useFileHandler";
 import { useArtifact } from "./hooks/useArtifact";
 import { useTheme } from "./hooks/useTheme";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
+import { useMcpTools } from "./hooks/useMcpTools";
 import { Sidebar } from "./components/layout/Sidebar";
 import { ChatPanel } from "./components/chat/ChatPanel";
 import { ArtifactPanel } from "./components/artifact/ArtifactPanel";
@@ -138,6 +139,7 @@ export default function App() {
 
   const fileHandler = useFileHandler();
   const artifactState = useArtifact();
+  const { mcpTools, refreshMcpTools } = useMcpTools();
 
   const handleArtifactFromSSE = useCallback(
     (artifact: Parameters<typeof artifactState.addArtifact>[0]) => {
@@ -154,7 +156,7 @@ export default function App() {
     [artifactState],
   );
 
-  const chat = useAgentChat(client, handleArtifactFromSSE, handleCanvasToolCall);
+  const chat = useAgentChat(client, handleArtifactFromSSE, handleCanvasToolCall, mcpTools);
 
   const handleLogout = useCallback(() => {
     tokenManagerRef.current?.dispose();
@@ -223,13 +225,21 @@ export default function App() {
   return (
     <div className="flex h-screen bg-white dark:bg-slate-950 transition-colors duration-150">
       {/* Sidebar */}
-      <div className={`shrink-0 ${sidebarCollapsed ? "w-12" : "w-[260px]"} transition-all duration-200`}>
+      <div
+        className={`shrink-0 ${sidebarCollapsed ? "w-12" : "w-[260px]"} transition-all duration-200`}
+      >
         <Sidebar
           sessions={chat.sessions}
           activeSessionId={chat.sessionId}
           pinnedRooms={chat.pinnedRooms}
-          onNewChat={() => { chat.newChat(); artifactState.closeCanvas(); }}
-          onSelectSession={(id: string) => { chat.selectSession(id); artifactState.closeCanvas(); }}
+          onNewChat={() => {
+            chat.newChat();
+            artifactState.closeCanvas();
+          }}
+          onSelectSession={(id: string) => {
+            chat.selectSession(id);
+            artifactState.closeCanvas();
+          }}
           onDeleteRoom={chat.deleteRoom}
           onTogglePin={chat.togglePin}
           onLogout={handleLogout}
@@ -292,6 +302,7 @@ export default function App() {
         onLogout={handleLogout}
         apiBaseUrl={auth.apiBaseUrl}
         tenantId={auth.tenantId}
+        onMcpConfigChanged={refreshMcpTools}
       />
     </div>
   );
