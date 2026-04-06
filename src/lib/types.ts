@@ -70,6 +70,7 @@ export type AgentExecuteRequest = {
   model?: string;
   max_requests?: number;
   tool_access?: ToolAccess;
+  use_json_tool_calls?: boolean;
   client_tools?: ClientToolDefinition[];
   attachments?: InlineAttachment[];
 };
