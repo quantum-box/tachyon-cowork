@@ -18,7 +18,7 @@ import {
   PanelRightOpen,
 } from "lucide-react";
 import type { AgentChunk, Artifact } from "../../lib/types";
-import { chunkToArtifact } from "../../hooks/useArtifact";
+import { chunkToArtifact, isFileWriteTool, fileWriteToArtifact } from "../../hooks/useArtifact";
 import { CodeBlock } from "../artifact/CodeBlock";
 import { MermaidDiagram } from "../artifact/MermaidDiagram";
 
@@ -60,7 +60,7 @@ export function MessageBubble({ chunk, onOpenArtifact, onOptionSelect, onOpenCan
     case "tool_call":
     case "tool_call_args":
     case "tool_call_pending":
-      return <ToolCallMessage chunk={chunk} onOpenCanvas={onOpenCanvas} />;
+      return <ToolCallMessage chunk={chunk} onOpenCanvas={onOpenCanvas} onOpenArtifact={onOpenArtifact} />;
     case "tool_result":
       return <ToolResultMessage chunk={chunk} />;
     case "usage":
@@ -436,10 +436,11 @@ function ThinkingMessage({
   );
 }
 
-function ToolCallMessage({ chunk, onOpenCanvas }: { chunk: AgentChunk; onOpenCanvas?: (title: string, content: string, contentType: "html" | "jsx") => void }) {
+function ToolCallMessage({ chunk, onOpenCanvas, onOpenArtifact }: { chunk: AgentChunk; onOpenCanvas?: (title: string, content: string, contentType: "html" | "jsx") => void; onOpenArtifact?: (artifact: Artifact) => void }) {
   const [expanded, setExpanded] = useState(false);
   const isPending = chunk.type === "tool_call_pending" && !chunk.is_finished;
   const isCanvas = chunk.tool_name === "canvas";
+  const isFileWrite = isFileWriteTool(chunk.tool_name || "");
 
   const handleOpenCanvas = useCallback(() => {
     if (!onOpenCanvas || !chunk.args) return;
@@ -450,6 +451,16 @@ function ToolCallMessage({ chunk, onOpenCanvas }: { chunk: AgentChunk; onOpenCan
       args.content_type || "html",
     );
   }, [onOpenCanvas, chunk.args]);
+
+  const handleOpenFileArtifact = useCallback(() => {
+    if (!onOpenArtifact || !chunk.tool_arguments) return;
+    const artifact = fileWriteToArtifact(
+      chunk.tool_id || chunk.id,
+      chunk.tool_arguments,
+      chunk.created_at,
+    );
+    if (artifact) onOpenArtifact(artifact);
+  }, [onOpenArtifact, chunk.tool_id, chunk.id, chunk.tool_arguments, chunk.created_at]);
 
   return (
     <div className="flex justify-start mb-2 gap-2">
@@ -475,6 +486,15 @@ function ToolCallMessage({ chunk, onOpenCanvas }: { chunk: AgentChunk; onOpenCan
             >
               <PanelRightOpen size={12} />
               Canvasを開く
+            </button>
+          )}
+          {isFileWrite && !isPending && onOpenArtifact && chunk.tool_arguments && (
+            <button
+              onClick={handleOpenFileArtifact}
+              className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-md bg-violet-50 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 border border-violet-200 dark:border-violet-700 hover:bg-violet-100 dark:hover:bg-violet-900/50 transition-colors"
+            >
+              <PanelRightOpen size={12} />
+              Artifactで開く
             </button>
           )}
         </div>
