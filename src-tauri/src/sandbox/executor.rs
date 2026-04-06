@@ -1,7 +1,7 @@
-use base64::Engine;
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
 
+use super::workspace::{self, WorkspaceFile};
 use super::SandboxManager;
 
 const DEFAULT_TIMEOUT_SECS: u64 = 30;
@@ -22,6 +22,10 @@ pub struct ExecuteCodeResult {
     pub exit_code: i32,
     pub timed_out: bool,
     pub duration_ms: u64,
+    /// ID of the workspace directory (use to list/download files later)
+    pub workspace_id: String,
+    /// Files created in the workspace during execution
+    pub workspace_files: Vec<WorkspaceFile>,
 }
 
 #[derive(Deserialize)]
@@ -36,9 +40,13 @@ pub struct GenerateFileResult {
     pub file_bytes: Vec<u8>,
     pub file_name: String,
     pub saved_path: Option<String>,
+    /// ID of the workspace directory
+    pub workspace_id: String,
+    /// Files in the workspace
+    pub workspace_files: Vec<WorkspaceFile>,
 }
 
-/// Execute code in a sandboxed environment
+/// Execute code in a sandboxed environment with a persistent workspace volume
 pub async fn run_code(request: &ExecuteCodeRequest) -> Result<ExecuteCodeResult, String> {
     let timeout_secs = request
         .timeout_secs
@@ -47,9 +55,11 @@ pub async fn run_code(request: &ExecuteCodeRequest) -> Result<ExecuteCodeResult,
     let timeout = Duration::from_secs(timeout_secs);
 
     let sandbox_name = format!("tachyon-exec-{}", uuid_simple());
+    let workspace_dir = workspace::create_workspace(&sandbox_name)?;
+
     let manager = SandboxManager::new();
     let sb = manager
-        .create_code_sandbox(&sandbox_name, &request.language)
+        .create_code_sandbox(&sandbox_name, &request.language, &workspace_dir)
         .await?;
 
     let start = Instant::now();
@@ -77,12 +87,18 @@ pub async fn run_code(request: &ExecuteCodeRequest) -> Result<ExecuteCodeResult,
                 .stderr()
                 .map(|s| truncate_output(&s, MAX_OUTPUT_BYTES))
                 .unwrap_or_default();
+
+            // List files created in the workspace
+            let workspace_files = workspace::list_files(&sandbox_name).unwrap_or_default();
+
             ExecuteCodeResult {
                 stdout,
                 stderr,
                 exit_code: output.status().code,
                 timed_out: false,
                 duration_ms,
+                workspace_id: sandbox_name.clone(),
+                workspace_files,
             }
         }
         Ok(Err(e)) => ExecuteCodeResult {
@@ -91,6 +107,8 @@ pub async fn run_code(request: &ExecuteCodeRequest) -> Result<ExecuteCodeResult,
             exit_code: -1,
             timed_out: false,
             duration_ms,
+            workspace_id: sandbox_name.clone(),
+            workspace_files: vec![],
         },
         Err(_) => {
             // Timeout - try to stop the sandbox
@@ -101,11 +119,13 @@ pub async fn run_code(request: &ExecuteCodeRequest) -> Result<ExecuteCodeResult,
                 exit_code: -1,
                 timed_out: true,
                 duration_ms,
+                workspace_id: sandbox_name.clone(),
+                workspace_files: vec![],
             }
         }
     };
 
-    // Clean up sandbox
+    // Clean up sandbox (but keep the workspace directory for file access)
     let _ = sb.stop().await;
     let _ = microsandbox::Sandbox::remove(&sandbox_name).await;
 
@@ -115,23 +135,22 @@ pub async fn run_code(request: &ExecuteCodeRequest) -> Result<ExecuteCodeResult,
 /// Generate a file (PDF/DOCX/PPTX) using Python libraries in sandbox
 pub async fn generate_file(request: &GenerateFileRequest) -> Result<GenerateFileResult, String> {
     let sandbox_name = format!("tachyon-gen-{}", uuid_simple());
-    let sb = SandboxManager::create_file_sandbox(&sandbox_name).await?;
+    let workspace_dir = workspace::create_workspace(&sandbox_name)?;
 
-    let _start = Instant::now();
+    let sb = SandboxManager::create_file_sandbox(&sandbox_name, &workspace_dir).await?;
 
     // Write the data as JSON for the Python script to consume
     let data_json = serde_json::to_string(&request.data).map_err(|e| e.to_string())?;
     sb.fs()
-        .write("/tmp/data.json", &data_json)
+        .write("/workspace/data.json", &data_json)
         .await
         .map_err(|e| format!("Failed to write data: {}", e))?;
 
     // Generate the appropriate Python script
     let (script, output_filename) = generate_python_script(&request.file_type, &request.data)?;
-    let output_path_in_sandbox = format!("/tmp/{}", output_filename);
 
     sb.fs()
-        .write("/tmp/generate.py", &script)
+        .write("/workspace/generate.py", &script)
         .await
         .map_err(|e| format!("Failed to write script: {}", e))?;
 
@@ -143,7 +162,6 @@ pub async fn generate_file(request: &GenerateFileRequest) -> Result<GenerateFile
         _ => "",
     };
     if !pip_packages.is_empty() {
-        // Try importing first; if it fails, pip install
         let check_cmd = format!(
             "python3 -c \"import {}\" 2>/dev/null || pip install --quiet {}",
             match request.file_type.as_str() {
@@ -159,7 +177,7 @@ pub async fn generate_file(request: &GenerateFileRequest) -> Result<GenerateFile
 
     // Execute the generation script
     let timeout = Duration::from_secs(120);
-    let exec_result = tokio::time::timeout(timeout, sb.shell("python3 /tmp/generate.py"))
+    let exec_result = tokio::time::timeout(timeout, sb.shell("python3 /workspace/generate.py"))
         .await
         .map_err(|_| "File generation timed out".to_string())?
         .map_err(|e| format!("Generation failed: {}", e))?;
@@ -171,25 +189,16 @@ pub async fn generate_file(request: &GenerateFileRequest) -> Result<GenerateFile
         return Err(format!("Generation script failed: {}", stderr));
     }
 
-    // Read the generated file as base64 (binary files can't be read as string)
-    let b64_result = sb
-        .shell(&format!(
-            "python3 -c \"import base64; data=open('{}','rb').read(); print(base64.b64encode(data).decode())\"",
-            output_path_in_sandbox
-        ))
-        .await
-        .map_err(|e| format!("Failed to read generated file: {}", e))?;
-
-    let b64_str = b64_result.stdout().unwrap_or_default().trim().to_string();
-
+    // Stop sandbox before reading files from host
     let _ = sb.stop().await;
     let _ = microsandbox::Sandbox::remove(&sandbox_name).await;
 
-    let file_bytes = base64::engine::general_purpose::STANDARD
-        .decode(&b64_str)
-        .map_err(|e| format!("Failed to decode file: {}", e))?;
+    // Read the generated file directly from the host workspace directory
+    let output_host_path = std::path::Path::new(&workspace_dir).join(&output_filename);
+    let file_bytes = std::fs::read(&output_host_path)
+        .map_err(|e| format!("Failed to read generated file from workspace: {}", e))?;
 
-    // Save to host filesystem if output_path is specified
+    // Save to user-specified path if requested
     let saved_path = if let Some(ref path) = request.output_path {
         std::fs::write(path, &file_bytes).map_err(|e| e.to_string())?;
         Some(path.clone())
@@ -197,10 +206,19 @@ pub async fn generate_file(request: &GenerateFileRequest) -> Result<GenerateFile
         None
     };
 
+    // List workspace files (excluding temp scripts)
+    let workspace_files = workspace::list_files(&sandbox_name).unwrap_or_default();
+
+    // Clean up temp files from workspace (keep the output)
+    let _ = std::fs::remove_file(std::path::Path::new(&workspace_dir).join("data.json"));
+    let _ = std::fs::remove_file(std::path::Path::new(&workspace_dir).join("generate.py"));
+
     Ok(GenerateFileResult {
         file_bytes,
         file_name: output_filename,
         saved_path,
+        workspace_id: sandbox_name,
+        workspace_files,
     })
 }
 
@@ -224,10 +242,10 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.units import inch
 
-with open('/tmp/data.json', 'r') as f:
+with open('/workspace/data.json', 'r') as f:
     data = json.load(f)
 
-doc = SimpleDocTemplate('/tmp/output.pdf', pagesize=A4)
+doc = SimpleDocTemplate('/workspace/output.pdf', pagesize=A4)
 styles = getSampleStyleSheet()
 story = []
 
@@ -264,7 +282,7 @@ import json
 from docx import Document
 from docx.shared import Pt, Inches
 
-with open('/tmp/data.json', 'r') as f:
+with open('/workspace/data.json', 'r') as f:
     data = json.load(f)
 
 doc = Document()
@@ -302,7 +320,7 @@ if 'tables' in data:
                     if i < len(row.cells):
                         row.cells[i].text = str(cell_data)
 
-doc.save('/tmp/output.docx')
+doc.save('/workspace/output.docx')
 print('DOCX generated successfully')
 "#
     .to_string()
@@ -315,7 +333,7 @@ from pptx import Presentation
 from pptx.util import Inches, Pt
 from pptx.enum.text import PP_ALIGN
 
-with open('/tmp/data.json', 'r') as f:
+with open('/workspace/data.json', 'r') as f:
     data = json.load(f)
 
 prs = Presentation()
@@ -370,7 +388,7 @@ if 'slides' in data:
                     p.text = bullet
                     p.level = 0
 
-prs.save('/tmp/output.pptx')
+prs.save('/workspace/output.pptx')
 print('PPTX generated successfully')
 "#
     .to_string()
@@ -411,14 +429,16 @@ mod tests {
         use microsandbox::Sandbox;
 
         let name = format!("test-py-{}", uuid_simple());
+        let workspace_dir = workspace::create_workspace(&name).unwrap();
 
-        // Test sandbox creation directly
         eprintln!("[test] Creating sandbox {}...", name);
         let _ = Sandbox::remove(&name).await;
         let sb = Sandbox::builder(&name)
             .image("python:3.12-slim")
             .memory(512_u32)
             .cpus(1_u8)
+            .volume("/workspace", |m| m.bind(&workspace_dir))
+            .workdir("/workspace")
             .create()
             .await;
 
@@ -431,9 +451,11 @@ mod tests {
         }
         let sb = sb.unwrap();
 
-        // Test shell directly
+        // Test shell and file creation in workspace
         eprintln!("[test] Running shell...");
-        let exec_result = sb.shell("python3 -c \"print('hello from sandbox')\"").await;
+        let exec_result = sb
+            .shell("python3 -c \"print('hello from sandbox'); open('/workspace/test.txt','w').write('persisted!')\"")
+            .await;
 
         match &exec_result {
             Ok(output) => {
@@ -453,6 +475,19 @@ mod tests {
 
         let _ = sb.stop().await;
         let _ = Sandbox::remove(&name).await;
+
+        // Verify file persists on host after sandbox is gone
+        let files = workspace::list_files(&name).unwrap();
+        assert!(
+            files.iter().any(|f| f.name == "test.txt"),
+            "test.txt should persist in workspace: {:?}",
+            files
+        );
+        let content = workspace::read_file(&name, "test.txt").unwrap();
+        assert_eq!(String::from_utf8_lossy(&content), "persisted!");
+
+        // Cleanup
+        workspace::cleanup(&name).unwrap();
     }
 
     #[tokio::test]
@@ -469,12 +504,15 @@ mod tests {
             }),
             output_path: Some("/tmp/tachyon-test/generated.pdf".to_string()),
         };
+        std::fs::create_dir_all("/tmp/tachyon-test").ok();
         let result = generate_file(&request).await;
         match &result {
             Ok(r) => {
                 eprintln!("[test-gen-pdf] file_name: {}", r.file_name);
                 eprintln!("[test-gen-pdf] file_bytes len: {}", r.file_bytes.len());
                 eprintln!("[test-gen-pdf] saved_path: {:?}", r.saved_path);
+                eprintln!("[test-gen-pdf] workspace_id: {}", r.workspace_id);
+                eprintln!("[test-gen-pdf] workspace_files: {:?}", r.workspace_files);
             }
             Err(e) => eprintln!("[test-gen-pdf] Error: {}", e),
         }
@@ -485,8 +523,11 @@ mod tests {
             "Generated PDF should not be empty"
         );
         assert_eq!(r.file_name, "output.pdf");
-        // Check saved file exists
         assert!(std::path::Path::new("/tmp/tachyon-test/generated.pdf").exists());
+        assert!(!r.workspace_id.is_empty());
+
+        // Cleanup
+        workspace::cleanup(&r.workspace_id).ok();
     }
 
     #[tokio::test]
@@ -504,6 +545,7 @@ mod tests {
                 eprintln!("[test-js] stderr: {:?}", r.stderr);
                 eprintln!("[test-js] exit_code: {}", r.exit_code);
                 eprintln!("[test-js] duration_ms: {}", r.duration_ms);
+                eprintln!("[test-js] workspace_id: {}", r.workspace_id);
             }
             Err(e) => eprintln!("[test-js] Error: {}", e),
         }
@@ -520,6 +562,9 @@ mod tests {
             "stdout should contain 3: {}",
             r.stdout
         );
+
+        // Cleanup
+        workspace::cleanup(&r.workspace_id).ok();
     }
 
     #[tokio::test]
@@ -542,5 +587,45 @@ mod tests {
         assert!(result.is_ok());
         let r = result.unwrap();
         assert!(r.stdout.contains("hello_shell"));
+
+        // Cleanup
+        workspace::cleanup(&r.workspace_id).ok();
+    }
+
+    #[tokio::test]
+    #[ignore] // Requires microsandbox (msb) runtime
+    async fn test_workspace_file_persistence() {
+        // Run code that creates a file
+        let request = ExecuteCodeRequest {
+            language: "python".to_string(),
+            code: r#"
+with open('/workspace/report.csv', 'w') as f:
+    f.write('name,value\n')
+    f.write('alpha,100\n')
+    f.write('beta,200\n')
+print('done')
+"#
+            .to_string(),
+            timeout_secs: Some(60),
+        };
+        let result = run_code(&request).await;
+        assert!(result.is_ok());
+        let r = result.unwrap();
+        assert_eq!(r.exit_code, 0);
+        assert!(!r.workspace_files.is_empty(), "Should have workspace files");
+
+        // Verify we can read the file after sandbox is gone
+        let csv_file = r.workspace_files.iter().find(|f| f.name == "report.csv");
+        assert!(
+            csv_file.is_some(),
+            "report.csv should be in workspace files"
+        );
+
+        let content = workspace::read_file(&r.workspace_id, "report.csv").unwrap();
+        let text = String::from_utf8_lossy(&content);
+        assert!(text.contains("alpha,100"));
+
+        // Cleanup
+        workspace::cleanup(&r.workspace_id).ok();
     }
 }

@@ -1,4 +1,5 @@
 pub mod executor;
+pub mod workspace;
 
 use microsandbox::Sandbox;
 
@@ -28,22 +29,37 @@ impl SandboxManager {
         }
     }
 
-    /// Create a sandbox for code execution
-    pub async fn create_code_sandbox(&self, name: &str, language: &str) -> Result<Sandbox, String> {
+    /// Create a sandbox for code execution with a workspace volume
+    pub async fn create_code_sandbox(
+        &self,
+        name: &str,
+        language: &str,
+        workspace_host_dir: &str,
+    ) -> Result<Sandbox, String> {
         let image = Self::image_for_language(language);
-        Self::create_sandbox_with_image(name, image).await
+        Self::create_sandbox_with_volume(name, image, workspace_host_dir).await
     }
 
-    /// Create a sandbox for file generation (uses tachyon image with pre-installed libs)
-    pub async fn create_file_sandbox(name: &str) -> Result<Sandbox, String> {
-        // Try tachyon image first, fall back to plain python
-        match Self::create_sandbox_with_image(name, TACHYON_IMAGE).await {
+    /// Create a sandbox for file generation with a workspace volume
+    pub async fn create_file_sandbox(
+        name: &str,
+        workspace_host_dir: &str,
+    ) -> Result<Sandbox, String> {
+        match Self::create_sandbox_with_volume(name, TACHYON_IMAGE, workspace_host_dir).await {
             Ok(sb) => Ok(sb),
-            Err(_) => Self::create_sandbox_with_image(name, DEFAULT_PYTHON_IMAGE).await,
+            Err(_) => {
+                Self::create_sandbox_with_volume(name, DEFAULT_PYTHON_IMAGE, workspace_host_dir)
+                    .await
+            }
         }
     }
 
-    async fn create_sandbox_with_image(name: &str, image: &str) -> Result<Sandbox, String> {
+    /// Create a sandbox with a bind-mounted workspace volume
+    async fn create_sandbox_with_volume(
+        name: &str,
+        image: &str,
+        workspace_host_dir: &str,
+    ) -> Result<Sandbox, String> {
         // Remove any leftover sandbox with the same name
         let _ = Sandbox::remove(name).await;
 
@@ -51,6 +67,8 @@ impl SandboxManager {
             .image(image)
             .memory(DEFAULT_MEMORY_MIB)
             .cpus(DEFAULT_CPUS)
+            .volume("/workspace", |m| m.bind(workspace_host_dir))
+            .workdir("/workspace")
             .create()
             .await
             .map_err(|e| format!("Failed to create sandbox: {}", e))

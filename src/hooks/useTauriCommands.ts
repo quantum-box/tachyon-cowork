@@ -9,6 +9,7 @@ import type {
   ExecuteCodeResult,
   GenerateFileRequest,
   GenerateFileResult,
+  WorkspaceFile,
 } from "../lib/types";
 
 const isTauri = () => "__TAURI__" in window;
@@ -65,6 +66,31 @@ export function useTauriCommands() {
     return invoke<GenerateFileResult>("generate_file", { request });
   };
 
+  const listWorkspaceFiles = async (
+    workspaceId: string,
+  ): Promise<WorkspaceFile[] | null> => {
+    if (!isTauri()) return null;
+    return invoke<WorkspaceFile[]>("list_workspace_files", { workspaceId });
+  };
+
+  const readWorkspaceFile = async (
+    workspaceId: string,
+    filename: string,
+  ): Promise<number[] | null> => {
+    if (!isTauri()) return null;
+    return invoke<number[]>("read_workspace_file", { workspaceId, filename });
+  };
+
+  const cleanupWorkspace = async (workspaceId: string): Promise<void> => {
+    if (!isTauri()) return;
+    await invoke("cleanup_workspace", { workspaceId });
+  };
+
+  const cleanupStaleWorkspaces = async (): Promise<number | null> => {
+    if (!isTauri()) return null;
+    return invoke<number>("cleanup_stale_workspaces");
+  };
+
   return {
     readExcel,
     writeExcel,
@@ -74,5 +100,9 @@ export function useTauriCommands() {
     readDocx,
     executeCode,
     generateFile,
+    listWorkspaceFiles,
+    readWorkspaceFile,
+    cleanupWorkspace,
+    cleanupStaleWorkspaces,
   };
 }
