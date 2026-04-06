@@ -638,6 +638,7 @@ export function useAgentChat(
             task,
             model: selectedModel,
             max_requests: 10,
+            use_json_tool_calls: true,
             client_tools: [...CLIENT_TOOLS, ...(mcpTools ?? [])],
             ...(attachments && attachments.length > 0 && { attachments }),
           };
