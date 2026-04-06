@@ -2,6 +2,7 @@ use base64::Engine;
 use serde::{Deserialize, Serialize};
 
 use crate::commands;
+use crate::tools::path_validator;
 
 #[derive(Deserialize)]
 pub struct ToolCall {
@@ -31,6 +32,7 @@ pub async fn execute_tool(
                 .and_then(|v| v.as_str())
                 .ok_or("Missing 'path' argument")?
                 .to_string();
+            path_validator::validate_read_path(&path)?;
             match commands::excel::read_excel(path).await {
                 Ok(data) => Ok(ToolResult {
                     tool_id,
@@ -70,6 +72,7 @@ pub async fn execute_tool(
                 .and_then(|v| v.as_str())
                 .ok_or("Missing 'path' argument")?
                 .to_string();
+            path_validator::validate_read_path(&path)?;
             match commands::file_manage::list_directory(path).await {
                 Ok(entries) => Ok(ToolResult {
                     tool_id,
@@ -90,6 +93,7 @@ pub async fn execute_tool(
                 .and_then(|v| v.as_str())
                 .ok_or("Missing 'directory' argument")?
                 .to_string();
+            path_validator::validate_read_path(&directory)?;
             let pattern = tool_call
                 .arguments
                 .get("pattern")
@@ -130,10 +134,122 @@ pub async fn execute_tool(
                 .and_then(|v| v.as_str())
                 .ok_or("Missing 'path' argument")?
                 .to_string();
+            path_validator::validate_read_path(&path)?;
             match commands::file_manage::get_file_info(path).await {
                 Ok(info) => Ok(ToolResult {
                     tool_id,
                     result: serde_json::to_value(info).unwrap_or_default(),
+                    error: None,
+                }),
+                Err(e) => Ok(ToolResult {
+                    tool_id,
+                    result: serde_json::Value::Null,
+                    error: Some(e),
+                }),
+            }
+        }
+        // ── Host filesystem tools (validated, home-dir restricted) ────
+        "host_read_file" => {
+            let path = tool_call
+                .arguments
+                .get("path")
+                .and_then(|v| v.as_str())
+                .ok_or("Missing 'path' argument")?
+                .to_string();
+            match commands::host_fs::host_read_file(path).await {
+                Ok(data) => Ok(ToolResult {
+                    tool_id,
+                    result: serde_json::to_value(data).unwrap_or_default(),
+                    error: None,
+                }),
+                Err(e) => Ok(ToolResult {
+                    tool_id,
+                    result: serde_json::Value::Null,
+                    error: Some(e),
+                }),
+            }
+        }
+        "host_write_file" => {
+            let path = tool_call
+                .arguments
+                .get("path")
+                .and_then(|v| v.as_str())
+                .ok_or("Missing 'path' argument")?
+                .to_string();
+            let content = tool_call
+                .arguments
+                .get("content")
+                .and_then(|v| v.as_str())
+                .ok_or("Missing 'content' argument")?
+                .to_string();
+            let is_base64 = tool_call
+                .arguments
+                .get("is_base64")
+                .and_then(|v| v.as_bool());
+            match commands::host_fs::host_write_file(path, content, is_base64).await {
+                Ok(data) => Ok(ToolResult {
+                    tool_id,
+                    result: serde_json::to_value(data).unwrap_or_default(),
+                    error: None,
+                }),
+                Err(e) => Ok(ToolResult {
+                    tool_id,
+                    result: serde_json::Value::Null,
+                    error: Some(e),
+                }),
+            }
+        }
+        "host_list_dir" => {
+            let path = tool_call
+                .arguments
+                .get("path")
+                .and_then(|v| v.as_str())
+                .ok_or("Missing 'path' argument")?
+                .to_string();
+            let show_hidden = tool_call
+                .arguments
+                .get("show_hidden")
+                .and_then(|v| v.as_bool());
+            match commands::host_fs::host_list_dir(path, show_hidden).await {
+                Ok(data) => Ok(ToolResult {
+                    tool_id,
+                    result: serde_json::to_value(data).unwrap_or_default(),
+                    error: None,
+                }),
+                Err(e) => Ok(ToolResult {
+                    tool_id,
+                    result: serde_json::Value::Null,
+                    error: Some(e),
+                }),
+            }
+        }
+        "host_execute_command" => {
+            let command = tool_call
+                .arguments
+                .get("command")
+                .and_then(|v| v.as_str())
+                .ok_or("Missing 'command' argument")?
+                .to_string();
+            let args = tool_call
+                .arguments
+                .get("args")
+                .and_then(|v| v.as_array())
+                .map(|items| {
+                    items
+                        .iter()
+                        .filter_map(|item| item.as_str().map(|s| s.to_string()))
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default();
+            let working_dir = tool_call
+                .arguments
+                .get("working_dir")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+            match commands::host_fs::host_execute_command(command, args, working_dir).await {
+                Ok(data) => Ok(ToolResult {
+                    tool_id,
+                    result: serde_json::to_value(data).unwrap_or_default(),
                     error: None,
                 }),
                 Err(e) => Ok(ToolResult {
@@ -150,6 +266,7 @@ pub async fn execute_tool(
                 .and_then(|v| v.as_str())
                 .ok_or("Missing 'path' argument")?
                 .to_string();
+            path_validator::validate_read_path(&path)?;
             match commands::pdf::read_pdf(path).await {
                 Ok(data) => Ok(ToolResult {
                     tool_id,
@@ -170,6 +287,7 @@ pub async fn execute_tool(
                 .and_then(|v| v.as_str())
                 .ok_or("Missing 'path' argument")?
                 .to_string();
+            path_validator::validate_read_path(&path)?;
             match commands::docx::read_docx(path).await {
                 Ok(data) => Ok(ToolResult {
                     tool_id,

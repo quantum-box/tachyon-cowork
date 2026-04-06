@@ -3,6 +3,7 @@ pub mod docx;
 pub mod excel;
 pub mod file_manage;
 pub mod file_organize;
+pub mod host_fs;
 pub mod pdf;
 pub mod pptx;
 pub mod sandbox;
