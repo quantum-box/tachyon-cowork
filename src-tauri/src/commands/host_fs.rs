@@ -3,7 +3,7 @@
 //! All paths are validated to be within the user's home directory.
 //! Code execution is NOT handled here — it stays in the sandbox.
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::collections::HashSet;
 use std::sync::LazyLock;
 
