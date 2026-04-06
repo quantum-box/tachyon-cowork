@@ -28,6 +28,68 @@ export async function executeClientTool(toolCall: ToolCall): Promise<ToolResult>
   return invoke<ToolResult>("execute_tool", { toolCall });
 }
 
+// ── MCP Types ──────────────────────────────────────────────────────
+
+export type McpTransportConfig =
+  | { type: "stdio"; command: string; args: string[]; env: Record<string, string> }
+  | { type: "sse"; url: string; headers: Record<string, string> };
+
+export type McpServerConfig = {
+  id: string;
+  name: string;
+  enabled: boolean;
+  transport: McpTransportConfig;
+  builtin: boolean;
+};
+
+export type McpConfig = {
+  servers: McpServerConfig[];
+};
+
+export type McpToolInfo = {
+  namespaced_name: string;
+  original_name: string;
+  server_id: string;
+  server_name: string;
+  description: string;
+  input_schema: Record<string, unknown>;
+};
+
+export type McpServerStatus = {
+  id: string;
+  name: string;
+  enabled: boolean;
+  connected: boolean;
+  tool_count: number;
+  error?: string;
+};
+
+// ── MCP Bridge Functions ───────────────────────────────────────────
+
+export async function mcpGetConfig(): Promise<McpConfig> {
+  return invoke<McpConfig>("mcp_get_config");
+}
+
+export async function mcpAddServer(server: McpServerConfig): Promise<McpConfig> {
+  return invoke<McpConfig>("mcp_add_server", { server });
+}
+
+export async function mcpRemoveServer(serverId: string): Promise<McpConfig> {
+  return invoke<McpConfig>("mcp_remove_server", { serverId });
+}
+
+export async function mcpToggleServer(serverId: string, enabled: boolean): Promise<void> {
+  return invoke<void>("mcp_toggle_server", { serverId, enabled });
+}
+
+export async function mcpGetTools(): Promise<McpToolInfo[]> {
+  return invoke<McpToolInfo[]>("mcp_get_tools");
+}
+
+export async function mcpGetServerStatuses(): Promise<McpServerStatus[]> {
+  return invoke<McpServerStatus[]>("mcp_get_server_statuses");
+}
+
 export type SaveFileOptions = {
   defaultPath?: string;
   filters?: { name: string; extensions: string[] }[];
@@ -47,8 +109,7 @@ export async function saveFile(
       filters: options?.filters,
     });
     if (path) {
-      const bytes =
-        typeof data === "string" ? new TextEncoder().encode(data) : data;
+      const bytes = typeof data === "string" ? new TextEncoder().encode(data) : data;
       await writeFile(path, bytes);
     }
     return;
@@ -75,18 +136,14 @@ export type PickFilesOptions = {
 };
 
 /** Open a file picker and return a FileList. */
-export async function pickFiles(
-  options?: PickFilesOptions,
-): Promise<FileList | null> {
+export async function pickFiles(options?: PickFilesOptions): Promise<FileList | null> {
   if (isTauri()) {
     const { open } = await import("@tauri-apps/plugin-dialog");
     const { readFile } = await import("@tauri-apps/plugin-fs");
 
     const selected = await open({
       multiple: options?.multiple ?? true,
-      filters: options?.accept
-        ? [{ name: "Files", extensions: options.accept }]
-        : undefined,
+      filters: options?.accept ? [{ name: "Files", extensions: options.accept }] : undefined,
     });
     if (!selected) return null;
 

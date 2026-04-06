@@ -17,7 +17,10 @@ pub struct ToolResult {
 }
 
 #[tauri::command]
-pub async fn execute_tool(tool_call: ToolCall) -> Result<ToolResult, String> {
+pub async fn execute_tool(
+    tool_call: ToolCall,
+    mcp_manager: tauri::State<'_, crate::mcp::manager::McpManager>,
+) -> Result<ToolResult, String> {
     let tool_id = format!("tool_{}", uuid_simple());
 
     match tool_call.name.as_str() {
@@ -213,6 +216,23 @@ pub async fn execute_tool(tool_call: ToolCall) -> Result<ToolResult, String> {
                         error: None,
                     })
                 }
+                Err(e) => Ok(ToolResult {
+                    tool_id,
+                    result: serde_json::Value::Null,
+                    error: Some(e),
+                }),
+            }
+        }
+        _ if tool_call.name.starts_with("mcp_") => {
+            match mcp_manager
+                .call_tool(&tool_call.name, tool_call.arguments)
+                .await
+            {
+                Ok(result) => Ok(ToolResult {
+                    tool_id,
+                    result,
+                    error: None,
+                }),
                 Err(e) => Ok(ToolResult {
                     tool_id,
                     result: serde_json::Value::Null,

@@ -1,4 +1,5 @@
 mod commands;
+mod mcp;
 mod sandbox;
 mod tools;
 
@@ -12,13 +13,25 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
-        .setup(|_app| {
+        .manage(mcp::manager::McpManager::new())
+        .setup(|app| {
             #[cfg(debug_assertions)]
             {
                 use tauri::Manager;
-                let window = _app.get_webview_window("main").unwrap();
+                let window = app.get_webview_window("main").unwrap();
                 window.open_devtools();
             }
+
+            // Load MCP config and connect enabled servers in background
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                use tauri::Manager;
+                let manager = handle.state::<mcp::manager::McpManager>();
+                if let Err(e) = manager.load_and_connect_all(&handle).await {
+                    eprintln!("MCP startup error: {}", e);
+                }
+            });
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -45,6 +58,13 @@ pub fn run() {
             commands::docx::read_docx,
             commands::sandbox::execute_code,
             commands::sandbox::generate_file,
+            mcp::commands::mcp_get_config,
+            mcp::commands::mcp_add_server,
+            mcp::commands::mcp_remove_server,
+            mcp::commands::mcp_toggle_server,
+            mcp::commands::mcp_get_tools,
+            mcp::commands::mcp_call_tool,
+            mcp::commands::mcp_get_server_statuses,
         ]);
 
     #[cfg(debug_assertions)]

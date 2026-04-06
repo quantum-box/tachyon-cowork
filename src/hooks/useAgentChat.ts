@@ -61,8 +61,7 @@ const CLIENT_TOOLS: ClientToolDefinition[] = [
         content_type: {
           type: "string",
           enum: ["html", "jsx"],
-          description:
-            "Content type: 'html' for HTML documents, 'jsx' for React JSX components.",
+          description: "Content type: 'html' for HTML documents, 'jsx' for React JSX components.",
         },
       },
       required: ["title", "content", "content_type"],
@@ -233,10 +232,7 @@ function mergeChunk(existing: AgentChunk, incoming: AgentChunk): AgentChunk {
     text: mergeChunkText(existing.text, incoming.text),
     content: mergeChunkText(existing.content, incoming.content),
     thinking: mergeChunkText(existing.thinking, incoming.thinking),
-    tool_arguments: mergeChunkText(
-      existing.tool_arguments,
-      incoming.tool_arguments,
-    ),
+    tool_arguments: mergeChunkText(existing.tool_arguments, incoming.tool_arguments),
     tool_result: mergeChunkText(existing.tool_result, incoming.tool_result),
     result: mergeChunkText(existing.result, incoming.result),
   };
@@ -276,10 +272,7 @@ type StreamScopeState = {
   lastGroup: ChunkGroup | null;
 };
 
-function getChunkStreamKey(
-  chunk: AgentChunk,
-  streamState?: StreamScopeState,
-): string {
+function getChunkStreamKey(chunk: AgentChunk, streamState?: StreamScopeState): string {
   switch (chunk.type) {
     case "assistant":
     case "say":
@@ -339,10 +332,7 @@ function upsertChunk(prev: AgentChunk[], incoming: AgentChunk): AgentChunk[] {
   return next;
 }
 
-function resolvePendingToolCall(
-  prev: AgentChunk[],
-  toolId: string,
-): AgentChunk[] {
+function resolvePendingToolCall(prev: AgentChunk[], toolId: string): AgentChunk[] {
   return prev.map((chunk) => {
     if (chunk.type !== "tool_call_pending" || chunk.tool_id !== toolId) {
       return chunk;
@@ -388,9 +378,7 @@ function normalizeLoadedChunks(chunks: AgentChunk[]): AgentChunk[] {
   const completedToolIds = new Set(
     compacted
       .filter(
-        (chunk) =>
-          !!chunk.tool_id &&
-          (chunk.type === "tool_result" || chunk.type === "tool_call"),
+        (chunk) => !!chunk.tool_id && (chunk.type === "tool_result" || chunk.type === "tool_call"),
       )
       .map((chunk) => chunk.tool_id!),
   );
@@ -444,8 +432,7 @@ function normalizeIncomingChunk(chunk: AgentChunk): AgentChunk {
 
   return {
     ...chunk,
-    tool_arguments:
-      chunk.tool_arguments ?? stringifyToolPayload(chunk.args),
+    tool_arguments: chunk.tool_arguments ?? stringifyToolPayload(chunk.args),
   };
 }
 
@@ -473,6 +460,7 @@ export function useAgentChat(
   client: AgentChatClient | null,
   onArtifact?: (artifact: Artifact) => void,
   onCanvasToolCall?: (args: CanvasToolCallArgs) => void,
+  mcpTools?: ClientToolDefinition[],
 ) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [chunks, setChunks] = useState<AgentChunk[]>([]);
@@ -489,10 +477,7 @@ export function useAgentChat(
   const lastMessageRef = useRef<{ message: string; attachments?: InlineAttachment[] } | null>(null);
 
   const handlePendingToolCall = useCallback(
-    async (
-      currentSessionId: string,
-      chunk: AgentChunk & { args?: Record<string, unknown> },
-    ) => {
+    async (currentSessionId: string, chunk: AgentChunk & { args?: Record<string, unknown> }) => {
       if (!client || !chunk.tool_id || !chunk.tool_name) return;
 
       let resultText = "";
@@ -617,9 +602,7 @@ export function useAgentChat(
       let currentSessionId = sessionId;
       if (!currentSessionId) {
         try {
-          const session = await client.createSession(
-            newRoomTitle || task.slice(0, 50),
-          );
+          const session = await client.createSession(newRoomTitle || task.slice(0, 50));
           currentSessionId = session.session.id;
           skipNextSessionLoadRef.current = currentSessionId;
           setSessionId(currentSessionId);
@@ -655,7 +638,7 @@ export function useAgentChat(
             task,
             model: selectedModel,
             max_requests: 10,
-            client_tools: CLIENT_TOOLS,
+            client_tools: [...CLIENT_TOOLS, ...(mcpTools ?? [])],
             ...(attachments && attachments.length > 0 && { attachments }),
           };
           const response = await client.executeAgent(currentSessionId!, args);
@@ -693,9 +676,7 @@ export function useAgentChat(
                 try {
                   const parsed = JSON.parse(data);
                   if ("error" in parsed && parsed.error) {
-                    const msg =
-                      (parsed.error as { message?: string }).message ??
-                      "Unknown error";
+                    const msg = (parsed.error as { message?: string }).message ?? "Unknown error";
                     setError(new Error(msg));
                     continue;
                   }
@@ -729,9 +710,7 @@ export function useAgentChat(
           const finalData = parseSseEvent(buffer);
           if (finalData && finalData !== "[DONE]") {
             try {
-              const normalized = normalizeIncomingChunk(
-                JSON.parse(finalData) as AgentChunk,
-              );
+              const normalized = normalizeIncomingChunk(JSON.parse(finalData) as AgentChunk);
               const chunk = withStreamScopedId(
                 normalized,
                 mergeableStreamKeys,
@@ -793,7 +772,7 @@ export function useAgentChat(
         }
       }
     },
-    [sessionId, client, selectedModel, onArtifact, handlePendingToolCall],
+    [sessionId, client, selectedModel, onArtifact, handlePendingToolCall, mcpTools],
   );
 
   const sendMessage = useCallback(
@@ -803,10 +782,10 @@ export function useAgentChat(
       if ((!trimmed && !hasAttachments) || isLoading) return;
 
       // Build preview data URLs for image attachments to display in user bubble
-      const imageUrls = attachments
-        ?.filter((a) => a.content_type.startsWith("image/"))
-        .map((a) => `data:${a.content_type};base64,${a.data}`)
-        ?? undefined;
+      const imageUrls =
+        attachments
+          ?.filter((a) => a.content_type.startsWith("image/"))
+          .map((a) => `data:${a.content_type};base64,${a.data}`) ?? undefined;
 
       const userChunk: AgentChunk = {
         type: "user",
@@ -909,9 +888,7 @@ export function useAgentChat(
 
   const togglePin = useCallback((roomId: string) => {
     setPinnedRooms((prev) => {
-      const next = prev.includes(roomId)
-        ? prev.filter((id) => id !== roomId)
-        : [...prev, roomId];
+      const next = prev.includes(roomId) ? prev.filter((id) => id !== roomId) : [...prev, roomId];
       savePinnedRooms(next);
       return next;
     });
@@ -925,11 +902,7 @@ export function useAgentChat(
     if (!lastMessageRef.current || isLoading) return;
     setError(null);
     const { message, attachments } = lastMessageRef.current;
-    await startTask(
-      message.trim() || "この画像について説明してください",
-      undefined,
-      attachments,
-    );
+    await startTask(message.trim() || "この画像について説明してください", undefined, attachments);
   }, [isLoading, startTask]);
 
   const stopGeneration = useCallback(() => {
