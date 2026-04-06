@@ -2,6 +2,74 @@ import { useCallback, useState } from "react";
 import { saveFile } from "../lib/tauri-bridge";
 import type { AgentChunk, Artifact, ArtifactVersion } from "../lib/types";
 
+/** Infer a language hint for syntax highlighting from a filename */
+function inferLanguage(filename: string): string | undefined {
+  const ext = filename.split(".").pop()?.toLowerCase();
+  if (!ext) return undefined;
+  const langMap: Record<string, string> = {
+    py: "python",
+    js: "javascript",
+    ts: "typescript",
+    jsx: "jsx",
+    tsx: "tsx",
+    rs: "rust",
+    go: "go",
+    java: "java",
+    rb: "ruby",
+    css: "css",
+    json: "json",
+    yaml: "yaml",
+    yml: "yaml",
+    toml: "toml",
+    sh: "bash",
+    sql: "sql",
+    xml: "xml",
+    c: "c",
+    cpp: "cpp",
+    txt: "text",
+  };
+  return langMap[ext];
+}
+
+/** Tool names that create/overwrite files on the server side */
+const FILE_WRITE_TOOLS = new Set(["write_to_file", "create_file"]);
+
+/** Check if a tool name is a file-writing tool */
+export function isFileWriteTool(toolName: string): boolean {
+  return FILE_WRITE_TOOLS.has(toolName);
+}
+
+/** Create an Artifact from a write_to_file tool call's arguments */
+export function fileWriteToArtifact(
+  toolId: string,
+  toolArguments: string,
+  timestamp: string,
+): Artifact | null {
+  try {
+    const args = JSON.parse(toolArguments);
+    const filePath: string = args.path || args.file_path || "";
+    const content: string = args.content ?? "";
+    if (!filePath) return null;
+
+    const filename = filePath.split("/").pop() || "file";
+    const type = inferArtifactType(undefined, filename);
+    const language = type === "code" ? inferLanguage(filename) : undefined;
+
+    return {
+      id: `file-${toolId}`,
+      type,
+      title: filename,
+      content,
+      language,
+      createdAt: timestamp,
+      versions: [{ version: 1, content, createdAt: timestamp }],
+      currentVersion: 1,
+    };
+  } catch {
+    return null;
+  }
+}
+
 /** Map content_type from SSE to Artifact type */
 function inferArtifactType(
   contentType?: string,

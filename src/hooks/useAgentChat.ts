@@ -10,7 +10,7 @@ import type {
   ToolCall,
 } from "../lib/types";
 import { executeClientTool, isTauri } from "../lib/tauri-bridge";
-import { chunkToArtifact } from "./useArtifact";
+import { chunkToArtifact, isFileWriteTool, fileWriteToArtifact } from "./useArtifact";
 
 const MODEL_KEY = "tachyon-cowork-model";
 const PINNED_KEY = "tachyon-cowork-pinned";
@@ -632,6 +632,51 @@ export function useAgentChat(
       };
       let receivedStreamChunk = false;
 
+      // Track server-side tool_call metadata so we can detect file-write results
+      const toolCallMeta = new Map<string, { toolName: string; toolArguments: string }>();
+
+      const trackToolCall = (chunk: AgentChunk) => {
+        if (!chunk.tool_id) return;
+        if (
+          (chunk.type === "tool_call" || chunk.type === "tool_call_args" || chunk.type === "tool_call_pending") &&
+          chunk.tool_name
+        ) {
+          const existing = toolCallMeta.get(chunk.tool_id);
+          if (!existing) {
+            toolCallMeta.set(chunk.tool_id, {
+              toolName: chunk.tool_name,
+              toolArguments: chunk.tool_arguments || "",
+            });
+          } else {
+            if (chunk.tool_arguments) {
+              existing.toolArguments =
+                mergeChunkText(existing.toolArguments, chunk.tool_arguments) || "";
+            }
+          }
+        } else if (
+          (chunk.type === "tool_call_args") &&
+          chunk.tool_arguments
+        ) {
+          const existing = toolCallMeta.get(chunk.tool_id);
+          if (existing) {
+            existing.toolArguments =
+              mergeChunkText(existing.toolArguments, chunk.tool_arguments) || "";
+          }
+        }
+      };
+
+      const detectFileWriteArtifact = (chunk: AgentChunk) => {
+        if (chunk.type !== "tool_result" || !chunk.tool_id || !onArtifact) return;
+        const meta = toolCallMeta.get(chunk.tool_id);
+        if (!meta || !isFileWriteTool(meta.toolName)) return;
+        const artifact = fileWriteToArtifact(
+          chunk.tool_id,
+          meta.toolArguments,
+          chunk.created_at || new Date().toISOString(),
+        );
+        if (artifact) onArtifact(artifact);
+      };
+
       const executeWithRetry = async (attempt: number): Promise<void> => {
         try {
           const args: AgentExecuteRequest = {
@@ -699,6 +744,8 @@ export function useAgentChat(
                   if (chunk.type === "artifact" && onArtifact) {
                     onArtifact(chunkToArtifact(chunk));
                   }
+                  trackToolCall(chunk);
+                  detectFileWriteArtifact(chunk);
                 } catch {
                   // skip malformed JSON
                 }
@@ -731,6 +778,8 @@ export function useAgentChat(
               if (chunk.type === "artifact" && onArtifact) {
                 onArtifact(chunkToArtifact(chunk));
               }
+              trackToolCall(chunk);
+              detectFileWriteArtifact(chunk);
             } catch {
               // ignore trailing partial event
             }
