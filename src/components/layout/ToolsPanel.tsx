@@ -19,6 +19,7 @@ type Props = {
   backLabel?: string;
   title?: string;
   description?: string;
+  projectDirectory?: string | null;
 };
 
 export function ToolsPanel({
@@ -26,6 +27,7 @@ export function ToolsPanel({
   backLabel = "チャットに戻る",
   title = "ファイルツール",
   description = "ローカルの検索・整理・重複検出・容量分析",
+  projectDirectory,
 }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>("search");
 
@@ -71,10 +73,10 @@ export function ToolsPanel({
 
       {/* Tab content */}
       <div className="flex-1 min-h-0">
-        {activeTab === "search" && <FileSearchPanel />}
-        {activeTab === "organize" && <FileOrganizer />}
-        {activeTab === "duplicates" && <DuplicateDetector />}
-        {activeTab === "usage" && <DiskUsageChart />}
+        {activeTab === "search" && <FileSearchPanel defaultDirectory={projectDirectory} />}
+        {activeTab === "organize" && <FileOrganizer defaultDirectory={projectDirectory} />}
+        {activeTab === "duplicates" && <DuplicateDetector defaultDirectory={projectDirectory} />}
+        {activeTab === "usage" && <DiskUsageChart defaultDirectory={projectDirectory} />}
       </div>
     </div>
   );

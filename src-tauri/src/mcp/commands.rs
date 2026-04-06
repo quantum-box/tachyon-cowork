@@ -5,6 +5,7 @@ use super::{
     config::{McpConfig, McpServerConfig, McpServerStatus, McpToolInfo},
     manager::McpManager,
 };
+use crate::project::ProjectManager;
 use crate::tools::executor::ToolResult;
 
 #[tauri::command]
@@ -84,10 +85,15 @@ pub async fn mcp_get_tools(
 #[tauri::command]
 pub async fn mcp_call_tool(
     state: tauri::State<'_, McpManager>,
+    project_manager: tauri::State<'_, ProjectManager>,
     namespaced_name: String,
     arguments: serde_json::Value,
 ) -> Result<ToolResult, String> {
-    match state.call_tool(&namespaced_name, arguments).await {
+    let project_root = project_manager.active_project_root().await;
+    match state
+        .call_tool(&namespaced_name, arguments, project_root.as_deref())
+        .await
+    {
         Ok(result) => Ok(ToolResult {
             tool_id: format!("mcp_{}", uuid::Uuid::new_v4()),
             result,

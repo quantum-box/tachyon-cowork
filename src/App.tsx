@@ -16,6 +16,7 @@ import { useTheme } from "./hooks/useTheme";
 import { useSendKey } from "./hooks/useSendKey";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useMcpTools } from "./hooks/useMcpTools";
+import { useProjectState } from "./hooks/useProjectState";
 import { Sidebar } from "./components/layout/Sidebar";
 import { ChatPanel } from "./components/chat/ChatPanel";
 import { ArtifactPanel } from "./components/artifact/ArtifactPanel";
@@ -23,6 +24,8 @@ import { CanvasView } from "./components/canvas/CanvasView";
 import { LoginScreen } from "./components/layout/LoginScreen";
 import { ToolsPanel } from "./components/layout/ToolsPanel";
 import { SettingsPanel } from "./components/layout/SettingsPanel";
+import { open } from "@tauri-apps/plugin-dialog";
+import { isTauri } from "./lib/tauri-bridge";
 
 export default function App() {
   const [auth, setAuth] = useState<AuthState | null>(loadAuth);
@@ -155,7 +158,14 @@ export default function App() {
 
   const fileHandler = useFileHandler();
   const artifactState = useArtifact();
-  const { mcpTools, refreshMcpTools } = useMcpTools();
+  const {
+    activeProject,
+    recentProjects,
+    activateProject,
+    removeProject,
+    isLoading: isProjectLoading,
+  } = useProjectState();
+  const { mcpTools, refreshMcpTools } = useMcpTools(activeProject?.path);
 
   const handleArtifactFromSSE = useCallback(
     (artifact: Parameters<typeof artifactState.addArtifact>[0]) => {
@@ -172,7 +182,13 @@ export default function App() {
     [artifactState],
   );
 
-  const chat = useAgentChat(client, handleArtifactFromSSE, handleCanvasToolCall, mcpTools);
+  const chat = useAgentChat(
+    client,
+    handleArtifactFromSSE,
+    handleCanvasToolCall,
+    mcpTools,
+    activeProject?.path,
+  );
 
   const handleLogout = useCallback(() => {
     tokenManagerRef.current?.dispose();
@@ -202,6 +218,31 @@ export default function App() {
   const handleBackToChat = useCallback(() => {
     setShowTools(false);
   }, []);
+
+  const handlePickProject = useCallback(async () => {
+    if (!isTauri()) return;
+    const selected = await open({ directory: true, multiple: false });
+    if (selected && typeof selected === "string") {
+      await activateProject(selected);
+      await refreshMcpTools();
+    }
+  }, [activateProject, refreshMcpTools]);
+
+  const handleSelectProject = useCallback(
+    async (path: string) => {
+      await activateProject(path);
+      await refreshMcpTools();
+    },
+    [activateProject, refreshMcpTools],
+  );
+
+  const handleRemoveProject = useCallback(
+    async (path: string) => {
+      await removeProject(path);
+      await refreshMcpTools();
+    },
+    [removeProject, refreshMcpTools],
+  );
 
   // Keyboard shortcuts
   useKeyboardShortcuts(
@@ -280,13 +321,19 @@ export default function App() {
           onOpenSettings={() => setSettingsOpen(true)}
           isCollapsed={sidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed((prev) => !prev)}
+          activeProject={activeProject}
+          recentProjects={recentProjects}
+          onPickProject={handlePickProject}
+          onSelectProject={handleSelectProject}
+          onRemoveProject={handleRemoveProject}
+          isProjectLoading={isProjectLoading}
         />
       </div>
 
       {/* Main area */}
       <div className="flex-1 min-w-0">
         {showTools ? (
-          <ToolsPanel onBack={handleBackToChat} />
+          <ToolsPanel onBack={handleBackToChat} projectDirectory={activeProject?.path} />
         ) : (
           <ChatPanel
             chat={chat}

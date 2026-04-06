@@ -3,6 +3,8 @@ use std::collections::HashSet;
 use std::fs;
 use walkdir::WalkDir;
 
+use crate::{project::ProjectManager, tools::path_validator};
+
 #[derive(Serialize, Clone)]
 pub struct FileInfo {
     pub path: String,
@@ -42,8 +44,7 @@ fn file_info_from_path(path: &std::path::Path) -> Option<FileInfo> {
     })
 }
 
-#[tauri::command]
-pub async fn search_files(
+pub async fn search_files_impl(
     directory: String,
     pattern: Option<String>,
     extensions: Option<Vec<String>>,
@@ -123,7 +124,34 @@ pub async fn search_files(
 }
 
 #[tauri::command]
-pub async fn list_directory(path: String) -> Result<Vec<FileInfo>, String> {
+pub async fn search_files(
+    project_manager: tauri::State<'_, ProjectManager>,
+    directory: String,
+    pattern: Option<String>,
+    extensions: Option<Vec<String>>,
+    max_results: Option<usize>,
+    recursive: Option<bool>,
+    include_hidden: Option<bool>,
+) -> Result<Vec<FileInfo>, String> {
+    let project_root = project_manager
+        .active_project_root()
+        .await
+        .ok_or("No active project selected")?;
+    let directory = path_validator::resolve_project_path(&project_root, &directory, true)?
+        .to_string_lossy()
+        .to_string();
+    search_files_impl(
+        directory,
+        pattern,
+        extensions,
+        max_results,
+        recursive,
+        include_hidden,
+    )
+    .await
+}
+
+pub async fn list_directory_impl(path: String) -> Result<Vec<FileInfo>, String> {
     let entries = fs::read_dir(&path).map_err(|e| e.to_string())?;
     let mut results = Vec::new();
     for entry in entries.filter_map(|e| e.ok()) {
@@ -140,18 +168,64 @@ pub async fn list_directory(path: String) -> Result<Vec<FileInfo>, String> {
 }
 
 #[tauri::command]
-pub async fn get_file_info(path: String) -> Result<FileInfo, String> {
+pub async fn list_directory(
+    project_manager: tauri::State<'_, ProjectManager>,
+    path: String,
+) -> Result<Vec<FileInfo>, String> {
+    let project_root = project_manager
+        .active_project_root()
+        .await
+        .ok_or("No active project selected")?;
+    let path = path_validator::resolve_project_path(&project_root, &path, true)?
+        .to_string_lossy()
+        .to_string();
+    list_directory_impl(path).await
+}
+
+pub async fn get_file_info_impl(path: String) -> Result<FileInfo, String> {
     file_info_from_path(std::path::Path::new(&path)).ok_or_else(|| "File not found".to_string())
 }
 
 #[tauri::command]
-pub async fn move_file(source: String, destination: String) -> Result<String, String> {
+pub async fn get_file_info(
+    project_manager: tauri::State<'_, ProjectManager>,
+    path: String,
+) -> Result<FileInfo, String> {
+    let project_root = project_manager
+        .active_project_root()
+        .await
+        .ok_or("No active project selected")?;
+    let path = path_validator::resolve_project_path(&project_root, &path, true)?
+        .to_string_lossy()
+        .to_string();
+    get_file_info_impl(path).await
+}
+
+pub async fn move_file_impl(source: String, destination: String) -> Result<String, String> {
     fs::rename(&source, &destination).map_err(|e| e.to_string())?;
     Ok(destination)
 }
 
 #[tauri::command]
-pub async fn move_to_trash(path: String) -> Result<(), String> {
+pub async fn move_file(
+    project_manager: tauri::State<'_, ProjectManager>,
+    source: String,
+    destination: String,
+) -> Result<String, String> {
+    let project_root = project_manager
+        .active_project_root()
+        .await
+        .ok_or("No active project selected")?;
+    let source = path_validator::resolve_project_path(&project_root, &source, true)?
+        .to_string_lossy()
+        .to_string();
+    let destination = path_validator::resolve_project_path(&project_root, &destination, false)?
+        .to_string_lossy()
+        .to_string();
+    move_file_impl(source, destination).await
+}
+
+pub async fn move_to_trash_impl(path: String) -> Result<(), String> {
     trash::delete(&path).map_err(|e| e.to_string())
 }
 
@@ -170,21 +244,54 @@ pub struct RenameResult {
 }
 
 #[tauri::command]
-pub async fn batch_rename(files: Vec<RenameOperation>) -> Result<Vec<RenameResult>, String> {
+pub async fn move_to_trash(
+    project_manager: tauri::State<'_, ProjectManager>,
+    path: String,
+) -> Result<(), String> {
+    let project_root = project_manager
+        .active_project_root()
+        .await
+        .ok_or("No active project selected")?;
+    let path = path_validator::resolve_project_path(&project_root, &path, true)?
+        .to_string_lossy()
+        .to_string();
+    move_to_trash_impl(path).await
+}
+
+#[tauri::command]
+pub async fn batch_rename(
+    project_manager: tauri::State<'_, ProjectManager>,
+    files: Vec<RenameOperation>,
+) -> Result<Vec<RenameResult>, String> {
+    let project_root = project_manager
+        .active_project_root()
+        .await
+        .ok_or("No active project selected")?;
     let mut results = Vec::new();
     for op in files {
-        let src = std::path::Path::new(&op.source);
-        let dest = src.parent().unwrap_or(src).join(&op.new_name);
+        let src = match path_validator::resolve_project_path(&project_root, &op.source, true) {
+            Ok(path) => path,
+            Err(error) => {
+                results.push(RenameResult {
+                    source: op.source,
+                    destination: String::new(),
+                    success: false,
+                    error: Some(error),
+                });
+                continue;
+            }
+        };
+        let dest = src.parent().unwrap_or(src.as_path()).join(&op.new_name);
         let dest_str = dest.to_string_lossy().to_string();
-        match fs::rename(&op.source, &dest) {
+        match fs::rename(&src, &dest) {
             Ok(_) => results.push(RenameResult {
-                source: op.source,
+                source: src.to_string_lossy().to_string(),
                 destination: dest_str,
                 success: true,
                 error: None,
             }),
             Err(e) => results.push(RenameResult {
-                source: op.source,
+                source: src.to_string_lossy().to_string(),
                 destination: dest_str,
                 success: false,
                 error: Some(e.to_string()),

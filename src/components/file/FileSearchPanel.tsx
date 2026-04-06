@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import {
@@ -50,8 +50,8 @@ function sortResults(files: FileInfo[], mode: SortMode): FileInfo[] {
   return next;
 }
 
-export function FileSearchPanel() {
-  const [directory, setDirectory] = useState("");
+export function FileSearchPanel({ defaultDirectory }: { defaultDirectory?: string | null }) {
+  const [directory, setDirectory] = useState(defaultDirectory ?? "");
   const [searchText, setSearchText] = useState("");
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [results, setResults] = useState<FileInfo[]>([]);
@@ -62,6 +62,10 @@ export function FileSearchPanel() {
   const [includeHidden, setIncludeHidden] = useState(false);
   const [maxResults, setMaxResults] = useState(500);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setDirectory(defaultDirectory ?? "");
+  }, [defaultDirectory]);
 
   const handleBrowse = useCallback(async () => {
     const selected = await open({ directory: true, multiple: false });

@@ -1,5 +1,6 @@
 mod commands;
 mod mcp;
+mod project;
 mod sandbox;
 mod tools;
 
@@ -14,12 +15,22 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(mcp::manager::McpManager::new())
+        .manage(project::ProjectManager::new())
         .setup(|app| {
             #[cfg(debug_assertions)]
             {
                 use tauri::Manager;
                 let window = app.get_webview_window("main").unwrap();
                 window.open_devtools();
+            }
+
+            {
+                use tauri::Manager;
+                let project_manager = app.state::<project::ProjectManager>();
+                if let Err(e) = tauri::async_runtime::block_on(project_manager.load(&app.handle()))
+                {
+                    eprintln!("Project startup error: {}", e);
+                }
             }
 
             // Load MCP config and connect enabled servers in background
@@ -41,6 +52,9 @@ pub fn run() {
             commands::excel::write_excel,
             commands::excel::save_excel_to_file,
             commands::pptx::read_pptx_metadata,
+            commands::project::project_get_state,
+            commands::project::project_set_active,
+            commands::project::project_remove_recent,
             tools::executor::execute_tool,
             commands::file_manage::search_files,
             commands::file_manage::list_directory,

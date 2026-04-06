@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { ClientToolDefinition } from "../lib/types";
 import { isTauri, mcpGetTools } from "../lib/tauri-bridge";
 
-export function useMcpTools() {
+export function useMcpTools(activeProjectPath?: string | null) {
   const [mcpTools, setMcpTools] = useState<ClientToolDefinition[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -14,7 +14,11 @@ export function useMcpTools() {
       setMcpTools(
         tools.map((t) => ({
           name: t.namespaced_name,
-          description: `[${t.server_name}] ${t.description}`,
+          description:
+            `[${t.server_name}] ${t.description}` +
+            (activeProjectPath
+              ? ` Current project: ${activeProjectPath}. Relative paths should resolve from this directory.`
+              : " No active project is selected yet."),
           parameters: t.input_schema,
         })),
       );
@@ -23,7 +27,7 @@ export function useMcpTools() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [activeProjectPath]);
 
   useEffect(() => {
     refresh();

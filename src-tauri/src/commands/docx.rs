@@ -3,6 +3,8 @@ use quick_xml::reader::Reader;
 use serde::Serialize;
 use std::io::Read;
 
+use crate::{project::ProjectManager, tools::path_validator};
+
 #[derive(Serialize)]
 pub struct DocxData {
     pub paragraphs: Vec<DocxParagraph>,
@@ -28,8 +30,7 @@ pub struct DocxMetadata {
     pub description: Option<String>,
 }
 
-#[tauri::command]
-pub async fn read_docx(path: String) -> Result<DocxData, String> {
+pub async fn read_docx_impl(path: String) -> Result<DocxData, String> {
     let file = std::fs::File::open(&path).map_err(|e| e.to_string())?;
     let mut archive = zip::ZipArchive::new(file).map_err(|e| e.to_string())?;
 
@@ -52,6 +53,21 @@ pub async fn read_docx(path: String) -> Result<DocxData, String> {
         tables,
         metadata,
     })
+}
+
+#[tauri::command]
+pub async fn read_docx(
+    project_manager: tauri::State<'_, ProjectManager>,
+    path: String,
+) -> Result<DocxData, String> {
+    let project_root = project_manager
+        .active_project_root()
+        .await
+        .ok_or("No active project selected")?;
+    let path = path_validator::resolve_project_path(&project_root, &path, true)?
+        .to_string_lossy()
+        .to_string();
+    read_docx_impl(path).await
 }
 
 fn read_zip_entry(

@@ -111,7 +111,12 @@ function toChatError(error: unknown): ChatErrorState {
   return { kind: "unknown", message };
 }
 
-const CLIENT_TOOLS: ClientToolDefinition[] = [
+function buildClientTools(activeProjectPath?: string | null): ClientToolDefinition[] {
+  const projectNote = activeProjectPath
+    ? ` Relative paths are resolved from the current project directory: ${activeProjectPath}.`
+    : " No current project directory is selected yet; prompt the user to choose one before filesystem work.";
+
+  return [
   {
     name: "canvas",
     description:
@@ -141,7 +146,8 @@ const CLIENT_TOOLS: ClientToolDefinition[] = [
   {
     name: "local_list_directory",
     description:
-      "List files and subdirectories in a local directory on this device. Use this to inspect what exists inside a folder before reading or processing files.",
+      "List files and subdirectories in a local directory on this device. Use this to inspect what exists inside a folder before reading or processing files." +
+      projectNote,
     parameters: {
       type: "object",
       properties: {
@@ -157,7 +163,8 @@ const CLIENT_TOOLS: ClientToolDefinition[] = [
   {
     name: "local_search_files",
     description:
-      "Search for files inside a local directory on this device by filename and optional extension filters.",
+      "Search for files inside a local directory on this device by filename and optional extension filters." +
+      projectNote,
     parameters: {
       type: "object",
       properties: {
@@ -194,7 +201,8 @@ const CLIENT_TOOLS: ClientToolDefinition[] = [
   {
     name: "local_get_file_info",
     description:
-      "Get metadata for a local file or directory on this device, including size, timestamps, type, and extension.",
+      "Get metadata for a local file or directory on this device, including size, timestamps, type, and extension." +
+      projectNote,
     parameters: {
       type: "object",
       properties: {
@@ -261,7 +269,8 @@ const CLIENT_TOOLS: ClientToolDefinition[] = [
   {
     name: "pdf_read",
     description:
-      "Read and extract text content from a PDF file on this device. Returns page-by-page text and metadata (title, author).",
+      "Read and extract text content from a PDF file on this device. Returns page-by-page text and metadata (title, author)." +
+      projectNote,
     parameters: {
       type: "object",
       properties: {
@@ -277,7 +286,8 @@ const CLIENT_TOOLS: ClientToolDefinition[] = [
   {
     name: "docx_read",
     description:
-      "Read and extract content from a Word document (.docx) on this device. Returns paragraphs with styles, tables, and metadata.",
+      "Read and extract content from a Word document (.docx) on this device. Returns paragraphs with styles, tables, and metadata." +
+      projectNote,
     parameters: {
       type: "object",
       properties: {
@@ -294,7 +304,8 @@ const CLIENT_TOOLS: ClientToolDefinition[] = [
   {
     name: "host_read_file",
     description:
-      "Read a file from the host filesystem. Only files within the user's home directory are accessible. Returns text content or base64-encoded binary. Use this for reading config files, scripts, data files, etc.",
+      "Read a file from the host filesystem inside the active project directory. Returns text content or base64-encoded binary. Use this for reading config files, scripts, data files, etc." +
+      projectNote,
     parameters: {
       type: "object",
       properties: {
@@ -310,7 +321,8 @@ const CLIENT_TOOLS: ClientToolDefinition[] = [
   {
     name: "host_write_file",
     description:
-      "Write content to a file on the host filesystem. Only paths within the user's home directory are allowed. Use this for saving config files, scripts, data files, etc.",
+      "Write content to a file on the host filesystem inside the active project directory. Use this for saving config files, scripts, data files, etc." +
+      projectNote,
     parameters: {
       type: "object",
       properties: {
@@ -334,7 +346,8 @@ const CLIENT_TOOLS: ClientToolDefinition[] = [
   {
     name: "host_list_dir",
     description:
-      "List the contents of a directory on the host filesystem. Only directories within the user's home directory are accessible.",
+      "List the contents of a directory on the host filesystem inside the active project directory." +
+      projectNote,
     parameters: {
       type: "object",
       properties: {
@@ -354,7 +367,8 @@ const CLIENT_TOOLS: ClientToolDefinition[] = [
   {
     name: "host_execute_command",
     description:
-      "Execute a safe, allow-listed command on the host OS. Only specific commands are permitted: ls, stat, file, du, wc, find, which, cat, head, tail, grep, sort, uniq, diff, tar, zip, unzip, date, echo, pwd, basename, dirname, realpath. All path arguments must be within the home directory.",
+      "Execute a safe, allow-listed command on the host OS. Only specific commands are permitted: ls, stat, file, du, wc, find, which, cat, head, tail, grep, sort, uniq, diff, tar, zip, unzip, date, echo, pwd, basename, dirname, realpath. The default working directory is the active project directory." +
+      projectNote,
     parameters: {
       type: "object",
       properties: {
@@ -378,6 +392,7 @@ const CLIENT_TOOLS: ClientToolDefinition[] = [
     },
   },
 ];
+}
 
 function mergeChunkText(
   currentValue: string | undefined,
@@ -626,6 +641,7 @@ export function useAgentChat(
   onArtifact?: (artifact: Artifact) => void,
   onCanvasToolCall?: (args: CanvasToolCallArgs) => void,
   mcpTools?: ClientToolDefinition[],
+  activeProjectPath?: string | null,
 ) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [chunks, setChunks] = useState<AgentChunk[]>([]);
@@ -863,12 +879,15 @@ export function useAgentChat(
 
       const executeWithRetry = async (attempt: number): Promise<void> => {
         try {
+          const taskWithProjectContext = activeProjectPath
+            ? `Current project directory: ${activeProjectPath}\nUse this as the working directory for relative paths and project-scoped file operations unless the user says otherwise.\n\nUser request:\n${task}`
+            : task;
           const args: AgentExecuteRequest = {
-            task,
+            task: taskWithProjectContext,
             model: selectedModel,
             max_requests: 10,
             use_json_tool_calls: true,
-            client_tools: [...CLIENT_TOOLS, ...(mcpTools ?? [])],
+            client_tools: [...buildClientTools(activeProjectPath), ...(mcpTools ?? [])],
             ...(attachments && attachments.length > 0 && { attachments }),
           };
           const response = await client.executeAgent(currentSessionId!, args);
@@ -1010,7 +1029,7 @@ export function useAgentChat(
         }
       }
     },
-    [sessionId, client, selectedModel, onArtifact, handlePendingToolCall, mcpTools],
+    [sessionId, client, selectedModel, onArtifact, handlePendingToolCall, mcpTools, activeProjectPath],
   );
 
   const sendMessage = useCallback(

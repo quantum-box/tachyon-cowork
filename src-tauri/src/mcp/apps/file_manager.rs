@@ -1,7 +1,9 @@
 use serde_json::json;
+use std::path::Path;
 
 use super::{BuiltinAppInfo, BuiltinToolDef};
 use crate::commands::{file_manage, file_organize};
+use crate::tools::path_validator;
 
 pub fn app_info() -> BuiltinAppInfo {
     BuiltinAppInfo {
@@ -140,15 +142,20 @@ pub fn app_info() -> BuiltinAppInfo {
     }
 }
 
-pub async fn call_tool(name: &str, args: serde_json::Value) -> Result<serde_json::Value, String> {
+pub async fn call_tool(
+    name: &str,
+    args: serde_json::Value,
+    project_root: Option<&Path>,
+) -> Result<serde_json::Value, String> {
+    let project_root = project_root.ok_or("No active project selected")?;
     match name {
         "list_directory" => {
-            let path = get_str(&args, "path")?;
-            let result = file_manage::list_directory(path).await?;
+            let path = resolve(project_root, &get_str(&args, "path")?, true)?;
+            let result = file_manage::list_directory_impl(path).await?;
             serde_json::to_value(result).map_err(|e| e.to_string())
         }
         "search_files" => {
-            let directory = get_str(&args, "directory")?;
+            let directory = resolve(project_root, &get_str(&args, "directory")?, true)?;
             let pattern = args
                 .get("pattern")
                 .and_then(|v| v.as_str())
@@ -166,7 +173,7 @@ pub async fn call_tool(name: &str, args: serde_json::Value) -> Result<serde_json
                 .map(|n| n as usize);
             let recursive = args.get("recursive").and_then(|v| v.as_bool());
             let include_hidden = args.get("include_hidden").and_then(|v| v.as_bool());
-            let result = file_manage::search_files(
+            let result = file_manage::search_files_impl(
                 directory,
                 pattern,
                 extensions,
@@ -178,12 +185,12 @@ pub async fn call_tool(name: &str, args: serde_json::Value) -> Result<serde_json
             serde_json::to_value(result).map_err(|e| e.to_string())
         }
         "get_file_info" => {
-            let path = get_str(&args, "path")?;
-            let result = file_manage::get_file_info(path).await?;
+            let path = resolve(project_root, &get_str(&args, "path")?, true)?;
+            let result = file_manage::get_file_info_impl(path).await?;
             serde_json::to_value(result).map_err(|e| e.to_string())
         }
         "read_text_file" => {
-            let path = get_str(&args, "path")?;
+            let path = resolve(project_root, &get_str(&args, "path")?, true)?;
             let max_bytes = args
                 .get("max_bytes")
                 .and_then(|v| v.as_u64())
@@ -197,39 +204,39 @@ pub async fn call_tool(name: &str, args: serde_json::Value) -> Result<serde_json
             Ok(json!({ "content": truncated, "path": path }))
         }
         "write_text_file" => {
-            let path = get_str(&args, "path")?;
+            let path = resolve(project_root, &get_str(&args, "path")?, false)?;
             let content = get_str(&args, "content")?;
             std::fs::write(&path, &content).map_err(|e| e.to_string())?;
             Ok(json!({ "path": path, "bytes_written": content.len() }))
         }
         "create_directory" => {
-            let path = get_str(&args, "path")?;
+            let path = resolve(project_root, &get_str(&args, "path")?, false)?;
             std::fs::create_dir_all(&path).map_err(|e| e.to_string())?;
             Ok(json!({ "path": path, "created": true }))
         }
         "move_file" => {
-            let source = get_str(&args, "source")?;
-            let destination = get_str(&args, "destination")?;
-            let result = file_manage::move_file(source, destination).await?;
+            let source = resolve(project_root, &get_str(&args, "source")?, true)?;
+            let destination = resolve(project_root, &get_str(&args, "destination")?, false)?;
+            let result = file_manage::move_file_impl(source, destination).await?;
             Ok(json!({ "destination": result }))
         }
         "move_to_trash" => {
-            let path = get_str(&args, "path")?;
-            file_manage::move_to_trash(path.clone()).await?;
+            let path = resolve(project_root, &get_str(&args, "path")?, true)?;
+            file_manage::move_to_trash_impl(path.clone()).await?;
             Ok(json!({ "path": path, "deleted": true }))
         }
         "find_duplicates" => {
-            let directory = get_str(&args, "directory")?;
+            let directory = resolve(project_root, &get_str(&args, "directory")?, true)?;
             let recursive = args
                 .get("recursive")
                 .and_then(|v| v.as_bool())
                 .unwrap_or(true);
-            let result = file_organize::find_duplicates(directory, recursive).await?;
+            let result = file_organize::find_duplicates_impl(directory, recursive).await?;
             serde_json::to_value(result).map_err(|e| e.to_string())
         }
         "get_disk_usage" => {
-            let directory = get_str(&args, "directory")?;
-            let result = file_organize::get_disk_usage(directory).await?;
+            let directory = resolve(project_root, &get_str(&args, "directory")?, true)?;
+            let result = file_organize::get_disk_usage_impl(directory).await?;
             serde_json::to_value(result).map_err(|e| e.to_string())
         }
         _ => Err(format!("Unknown file_manager tool: {}", name)),
@@ -241,4 +248,12 @@ fn get_str(args: &serde_json::Value, key: &str) -> Result<String, String> {
         .and_then(|v| v.as_str())
         .map(String::from)
         .ok_or_else(|| format!("Missing '{}' argument", key))
+}
+
+fn resolve(project_root: &Path, raw: &str, require_exists: bool) -> Result<String, String> {
+    Ok(
+        path_validator::resolve_project_path(project_root, raw, require_exists)?
+            .to_string_lossy()
+            .to_string(),
+    )
 }
