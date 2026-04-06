@@ -13,6 +13,7 @@ import { useAgentChat } from "./hooks/useAgentChat";
 import { useFileHandler } from "./hooks/useFileHandler";
 import { useArtifact } from "./hooks/useArtifact";
 import { useTheme } from "./hooks/useTheme";
+import { useSendKey } from "./hooks/useSendKey";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useMcpTools } from "./hooks/useMcpTools";
 import { Sidebar } from "./components/layout/Sidebar";
@@ -33,6 +34,7 @@ export default function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const { theme, setTheme } = useTheme();
+  const { sendKey, setSendKey } = useSendKey();
 
   // ── OAuth2 Callback Handler ──────────────────────────────────────
   useEffect(() => {
@@ -268,6 +270,7 @@ export default function App() {
             onOpenCanvas={artifactState.openCanvas}
             isSearchOpen={searchOpen}
             onSearchClose={() => setSearchOpen(false)}
+            sendKey={sendKey}
           />
         )}
       </div>
@@ -303,6 +306,8 @@ export default function App() {
         apiBaseUrl={auth.apiBaseUrl}
         tenantId={auth.tenantId}
         onMcpConfigChanged={refreshMcpTools}
+        sendKey={sendKey}
+        onSendKeyChange={setSendKey}
       />
     </div>
   );

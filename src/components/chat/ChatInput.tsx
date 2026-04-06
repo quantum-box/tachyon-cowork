@@ -9,6 +9,7 @@ import {
 import { SendHorizonal, Paperclip } from "lucide-react";
 import { pickFiles } from "../../lib/tauri-bridge";
 import type { FileAttachment } from "../../lib/types";
+import type { SendKeyMode } from "../../hooks/useSendKey";
 import { FilePreview } from "../file/FilePreview";
 import { PromptTemplates } from "./PromptTemplates";
 
@@ -22,6 +23,7 @@ type ChatInputProps = {
   onFilesAdd: (fileList: FileList) => void;
   onFileRemove: (id: string) => void;
   showPromptTemplates?: boolean;
+  sendKey?: SendKeyMode;
 };
 
 export function ChatInput({
@@ -34,19 +36,34 @@ export function ChatInput({
   onFilesAdd,
   onFileRemove,
   showPromptTemplates,
+  sendKey = "enter",
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        if ((input.trim() || files.length > 0) && !isLoading) {
-          onSubmit(e as unknown as FormEvent);
+      if (e.key !== "Enter") return;
+
+      if (sendKey === "cmd-enter") {
+        // Cmd/Ctrl+Enter = send, plain Enter = newline
+        if (e.metaKey || e.ctrlKey) {
+          e.preventDefault();
+          if ((input.trim() || files.length > 0) && !isLoading) {
+            onSubmit(e as unknown as FormEvent);
+          }
+        }
+        // Shift+Enter and plain Enter: allow default (newline)
+      } else {
+        // Enter = send, Shift+Enter = newline, Cmd/Ctrl+Enter also sends
+        if (!e.shiftKey) {
+          e.preventDefault();
+          if ((input.trim() || files.length > 0) && !isLoading) {
+            onSubmit(e as unknown as FormEvent);
+          }
         }
       }
     },
-    [input, files.length, isLoading, onSubmit],
+    [input, files.length, isLoading, onSubmit, sendKey],
   );
 
   const handleChange = useCallback(
