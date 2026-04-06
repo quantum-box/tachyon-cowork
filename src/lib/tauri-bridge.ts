@@ -164,6 +164,56 @@ export type PickFilesOptions = {
   accept?: string[];
 };
 
+function guessMimeType(name: string): string {
+  const ext = name.split(".").pop()?.toLowerCase() ?? "";
+  switch (ext) {
+    case "csv":
+      return "text/csv";
+    case "css":
+      return "text/css";
+    case "docx":
+      return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    case "gif":
+      return "image/gif";
+    case "html":
+      return "text/html";
+    case "jpeg":
+    case "jpg":
+      return "image/jpeg";
+    case "js":
+    case "mjs":
+      return "text/javascript";
+    case "json":
+      return "application/json";
+    case "md":
+      return "text/markdown";
+    case "pdf":
+      return "application/pdf";
+    case "png":
+      return "image/png";
+    case "pptx":
+      return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+    case "py":
+      return "text/x-python";
+    case "svg":
+      return "image/svg+xml";
+    case "ts":
+    case "tsx":
+      return "text/typescript";
+    case "txt":
+      return "text/plain";
+    case "xlsx":
+      return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    case "xml":
+      return "application/xml";
+    case "yaml":
+    case "yml":
+      return "application/yaml";
+    default:
+      return "application/octet-stream";
+  }
+}
+
 /** Open a file picker and return a FileList. */
 export async function pickFiles(options?: PickFilesOptions): Promise<FileList | null> {
   if (isTauri()) {
@@ -181,7 +231,11 @@ export async function pickFiles(options?: PickFilesOptions): Promise<FileList | 
     for (const p of paths) {
       const bytes = await readFile(p);
       const name = p.split(/[/\\]/).pop() ?? "file";
-      const file = new File([bytes], name);
+      const file = new File([bytes], name, { type: guessMimeType(name) });
+      Object.defineProperty(file, "path", {
+        value: p,
+        configurable: true,
+      });
       dt.items.add(file);
     }
     return dt.files;

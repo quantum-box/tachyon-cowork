@@ -33,7 +33,9 @@ pub fn app_info() -> BuiltinAppInfo {
                             "items": { "type": "string" },
                             "description": "拡張子フィルタ（例: [\"pdf\", \"docx\"]）"
                         },
-                        "max_results": { "type": "integer", "description": "最大結果数（デフォルト200）" }
+                        "max_results": { "type": "integer", "description": "最大結果数（デフォルト500）" },
+                        "recursive": { "type": "boolean", "description": "サブディレクトリも検索するか（デフォルト true）" },
+                        "include_hidden": { "type": "boolean", "description": "隠しファイルを含めるか" }
                     },
                     "required": ["directory"]
                 }),
@@ -162,8 +164,17 @@ pub async fn call_tool(name: &str, args: serde_json::Value) -> Result<serde_json
                 .get("max_results")
                 .and_then(|v| v.as_u64())
                 .map(|n| n as usize);
-            let result =
-                file_manage::search_files(directory, pattern, extensions, max_results).await?;
+            let recursive = args.get("recursive").and_then(|v| v.as_bool());
+            let include_hidden = args.get("include_hidden").and_then(|v| v.as_bool());
+            let result = file_manage::search_files(
+                directory,
+                pattern,
+                extensions,
+                max_results,
+                recursive,
+                include_hidden,
+            )
+            .await?;
             serde_json::to_value(result).map_err(|e| e.to_string())
         }
         "get_file_info" => {

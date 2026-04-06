@@ -112,8 +112,23 @@ pub async fn execute_tool(
                 .get("max_results")
                 .and_then(|v| v.as_u64())
                 .map(|n| n as usize);
-            match commands::file_manage::search_files(directory, pattern, extensions, max_results)
-                .await
+            let recursive = tool_call
+                .arguments
+                .get("recursive")
+                .and_then(|v| v.as_bool());
+            let include_hidden = tool_call
+                .arguments
+                .get("include_hidden")
+                .and_then(|v| v.as_bool());
+            match commands::file_manage::search_files(
+                directory,
+                pattern,
+                extensions,
+                max_results,
+                recursive,
+                include_hidden,
+            )
+            .await
             {
                 Ok(entries) => Ok(ToolResult {
                     tool_id,

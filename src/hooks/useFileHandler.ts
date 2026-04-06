@@ -1,9 +1,7 @@
 import { useCallback, useState } from "react";
 import type { FileAttachment, InlineAttachment } from "../lib/types";
-import {
-  isVisionAttachment,
-  getVisionValidationError,
-} from "../lib/vision";
+import { buildAttachmentAwareMessage } from "../lib/attachment-context";
+import { isVisionAttachment, getVisionValidationError } from "../lib/vision";
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
 
@@ -34,6 +32,7 @@ function generatePreview(file: File): Promise<string | undefined> {
 export function useFileHandler() {
   const [files, setFiles] = useState<FileAttachment[]>([]);
   const [fileError, setFileError] = useState<string | null>(null);
+  const [isPreparing, setIsPreparing] = useState(false);
 
   const addFiles = useCallback(async (fileList: FileList) => {
     setFileError(null);
@@ -43,9 +42,7 @@ export function useFileHandler() {
     for (let i = 0; i < fileList.length; i++) {
       const file = fileList[i];
       if (file.size > MAX_FILE_SIZE) {
-        warnings.push(
-          `「${file.name}」は${formatFileSize(MAX_FILE_SIZE)}を超えています`,
-        );
+        warnings.push(`「${file.name}」は${formatFileSize(MAX_FILE_SIZE)}を超えています`);
         continue;
       }
 
@@ -70,6 +67,7 @@ export function useFileHandler() {
         name: file.name,
         size: file.size,
         type: file.type,
+        path: (file as File & { path?: string }).path,
         data: new Uint8Array(arrayBuffer),
         preview,
         isVision: isVisionAttachment({
@@ -109,16 +107,34 @@ export function useFileHandler() {
       }));
   }, [files]);
 
+  const prepareMessage = useCallback(
+    async (message: string) => {
+      setIsPreparing(true);
+      try {
+        const prepared = await buildAttachmentAwareMessage(message, files, toInlineAttachments());
+        if (prepared.warnings.length > 0) {
+          setFileError(prepared.warnings.join("\n"));
+        }
+        return prepared;
+      } finally {
+        setIsPreparing(false);
+      }
+    },
+    [files, toInlineAttachments],
+  );
+
   /** Check if any attached file is a vision image */
   const hasVisionImages = files.some((f) => f.isVision);
 
   return {
     files,
     fileError,
+    isPreparing,
     hasVisionImages,
     addFiles,
     removeFile,
     clearFiles,
     toInlineAttachments,
+    prepareMessage,
   };
 }

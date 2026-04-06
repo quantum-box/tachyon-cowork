@@ -58,6 +58,9 @@ export function FileSearchPanel() {
   const [isSearching, setIsSearching] = useState(false);
   const [searched, setSearched] = useState(false);
   const [sortMode, setSortMode] = useState<SortMode>("modified_desc");
+  const [recursive, setRecursive] = useState(true);
+  const [includeHidden, setIncludeHidden] = useState(false);
+  const [maxResults, setMaxResults] = useState(500);
   const [error, setError] = useState<string | null>(null);
 
   const handleBrowse = useCallback(async () => {
@@ -69,9 +72,7 @@ export function FileSearchPanel() {
 
   const toggleFilter = useCallback((label: string) => {
     setActiveFilters((prev) =>
-      prev.includes(label)
-        ? prev.filter((f) => f !== label)
-        : [...prev, label],
+      prev.includes(label) ? prev.filter((f) => f !== label) : [...prev, label],
     );
   }, []);
 
@@ -81,15 +82,17 @@ export function FileSearchPanel() {
     setSearched(true);
     setError(null);
     try {
-      const activeExts = EXTENSION_FILTERS.filter((f) =>
-        activeFilters.includes(f.label),
-      ).flatMap((f) => f.extensions);
+      const activeExts = EXTENSION_FILTERS.filter((f) => activeFilters.includes(f.label)).flatMap(
+        (f) => f.extensions,
+      );
 
       const files = await invoke<FileInfo[]>("search_files", {
         directory,
         pattern: searchText || null,
         extensions: activeExts.length > 0 ? activeExts : null,
-        maxResults: 200,
+        maxResults,
+        recursive,
+        includeHidden,
       });
       setResults(sortResults(files, sortMode));
     } catch (err) {
@@ -99,7 +102,7 @@ export function FileSearchPanel() {
     } finally {
       setIsSearching(false);
     }
-  }, [directory, searchText, activeFilters, sortMode]);
+  }, [activeFilters, directory, includeHidden, maxResults, recursive, searchText, sortMode]);
 
   const handleShowInFolder = useCallback(async (path: string) => {
     try {
@@ -182,6 +185,41 @@ export function FileSearchPanel() {
           </select>
         </div>
 
+        <div className="grid grid-cols-2 gap-2">
+          <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-slate-400">
+            <input
+              type="checkbox"
+              checked={recursive}
+              onChange={(e) => setRecursive(e.target.checked)}
+              className="accent-indigo-600"
+            />
+            サブフォルダを含む
+          </label>
+          <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-slate-400">
+            <input
+              type="checkbox"
+              checked={includeHidden}
+              onChange={(e) => setIncludeHidden(e.target.checked)}
+              className="accent-indigo-600"
+            />
+            隠しファイルを含む
+          </label>
+        </div>
+
+        <div className="flex items-center justify-between gap-2">
+          <label className="text-[11px] text-gray-500 dark:text-slate-400">取得件数上限</label>
+          <select
+            value={maxResults}
+            onChange={(e) => setMaxResults(Number(e.target.value))}
+            className="rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1.5 text-xs text-gray-700 dark:text-gray-200"
+          >
+            <option value={200}>200件</option>
+            <option value={500}>500件</option>
+            <option value={1000}>1000件</option>
+            <option value={2000}>2000件</option>
+          </select>
+        </div>
+
         <div className="flex flex-wrap items-center gap-1.5">
           {EXTENSION_FILTERS.map((filter) => (
             <button
@@ -252,6 +290,7 @@ export function FileSearchPanel() {
               {results.length}件のファイル
               {searchText ? ` / "${searchText}"` : ""}
               {activeFilters.length > 0 ? ` / ${activeFilters.join("・")}` : ""}
+              {results.length === maxResults ? " / 上限到達" : ""}
             </div>
             {results.map((file) => (
               <div
@@ -259,11 +298,7 @@ export function FileSearchPanel() {
                 className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-slate-800 group transition-colors"
               >
                 <div className="shrink-0 text-gray-400 dark:text-slate-500">
-                  {file.is_dir ? (
-                    <Folder size={16} />
-                  ) : (
-                    <File size={16} />
-                  )}
+                  {file.is_dir ? <Folder size={16} /> : <File size={16} />}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm text-gray-800 dark:text-gray-200 truncate">
