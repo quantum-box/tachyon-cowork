@@ -1,5 +1,5 @@
 use rmcp::{
-    model::{CallToolRequestParams, Implementation},
+    model::{CallToolRequestParams, ClientInfo, Implementation},
     service::RunningService,
     RoleClient,
 };
@@ -10,12 +10,12 @@ use super::config::McpTransportConfig;
 pub struct McpClientSession {
     pub server_id: String,
     pub server_name: String,
-    client: RunningService<RoleClient, ()>,
+    client: RunningService<RoleClient, ClientInfo>,
     pub tools: Vec<rmcp::model::Tool>,
 }
 
-fn client_info() -> rmcp::model::ClientInfo {
-    let mut info = rmcp::model::ClientInfo::default();
+fn client_info() -> ClientInfo {
+    let mut info = ClientInfo::default();
     info.client_info = Implementation::new("tachyon-cowork", "0.1.0");
     info
 }
@@ -30,8 +30,8 @@ impl McpClientSession {
             McpTransportConfig::Stdio { command, args, env } => {
                 Self::connect_stdio(server_id, server_name, command, args, env).await
             }
-            McpTransportConfig::Sse { url, headers: _ } => {
-                Self::connect_sse(server_id, server_name, url).await
+            McpTransportConfig::Sse { url: _, headers: _ } => {
+                Err("SSE transport is not yet supported".to_string())
             }
         }
     }
@@ -51,37 +51,6 @@ impl McpClientSession {
 
         let transport = rmcp::transport::TokioChildProcess::new(cmd)
             .map_err(|e| format!("Failed to spawn MCP server '{}': {}", server_name, e))?;
-
-        let client = rmcp::serve_client(client_info(), transport)
-            .await
-            .map_err(|e| format!("Failed to initialize MCP server '{}': {}", server_name, e))?;
-
-        let tools_result = client
-            .peer()
-            .list_tools(None)
-            .await
-            .map_err(|e| format!("Failed to list tools from '{}': {}", server_name, e))?;
-
-        Ok(Self {
-            server_id,
-            server_name,
-            client,
-            tools: tools_result.tools,
-        })
-    }
-
-    async fn connect_sse(
-        server_id: String,
-        server_name: String,
-        url: &str,
-    ) -> Result<Self, String> {
-        use rmcp::transport::streamable_http_client::{
-            StreamableHttpClientTransport, StreamableHttpClientTransportConfig,
-        };
-
-        let config = StreamableHttpClientTransportConfig::with_uri(url);
-        let http_client = reqwest::Client::new();
-        let transport = StreamableHttpClientTransport::with_client(http_client, config);
 
         let client = rmcp::serve_client(client_info(), transport)
             .await
