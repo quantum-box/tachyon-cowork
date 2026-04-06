@@ -78,6 +78,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+    #[ignore] // Requires fixture file at /tmp/tachyon-test/test.pdf
     async fn test_read_pdf() {
         let result = read_pdf("/tmp/tachyon-test/test.pdf".to_string()).await;
         assert!(result.is_ok(), "Failed to read PDF: {:?}", result.err());

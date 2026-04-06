@@ -223,6 +223,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+    #[ignore] // Requires fixture file at /tmp/tachyon-test/test.docx
     async fn test_read_docx() {
         let result = read_docx("/tmp/tachyon-test/test.docx".to_string()).await;
         assert!(result.is_ok(), "Failed to read DOCX: {:?}", result.err());
