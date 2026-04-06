@@ -1,6 +1,7 @@
 use tauri::AppHandle;
 
 use super::{
+    apps,
     config::{McpConfig, McpServerConfig, McpServerStatus, McpToolInfo},
     manager::McpManager,
 };
@@ -105,4 +106,25 @@ pub async fn mcp_get_server_statuses(
     state: tauri::State<'_, McpManager>,
 ) -> Result<Vec<McpServerStatus>, String> {
     Ok(state.get_server_statuses().await)
+}
+
+#[tauri::command]
+pub async fn mcp_toggle_builtin_app(
+    state: tauri::State<'_, McpManager>,
+    app_handle: AppHandle,
+    app_id: String,
+    enabled: bool,
+) -> Result<(), String> {
+    // Verify the app exists
+    if !apps::all_apps().iter().any(|a| a.id == app_id) {
+        return Err(format!("Unknown built-in app: {}", app_id));
+    }
+    state.toggle_builtin_app(&app_id, enabled).await;
+    state.save_config(&app_handle).await?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn mcp_get_builtin_apps() -> Result<Vec<apps::BuiltinAppInfo>, String> {
+    Ok(apps::all_apps())
 }

@@ -65,6 +65,8 @@ pub fn run() {
             mcp::commands::mcp_get_tools,
             mcp::commands::mcp_call_tool,
             mcp::commands::mcp_get_server_statuses,
+            mcp::commands::mcp_toggle_builtin_app,
+            mcp::commands::mcp_get_builtin_apps,
         ]);
 
     #[cfg(debug_assertions)]
