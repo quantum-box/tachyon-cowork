@@ -74,9 +74,69 @@ pub fn validate_read_path(raw: &str) -> Result<PathBuf, String> {
     Ok(path)
 }
 
-/// Validate a path for write operations (parent must exist).
-pub fn validate_write_path(raw: &str) -> Result<PathBuf, String> {
-    validate_path(raw)
+/// Resolve a project-scoped path.
+///
+/// Relative paths are resolved from the project root.
+/// Absolute paths must stay within the project root after canonicalization.
+pub fn resolve_project_path(
+    project_root: &Path,
+    raw: &str,
+    require_exists: bool,
+) -> Result<PathBuf, String> {
+    let raw = raw.trim();
+    if raw.is_empty() {
+        return Err("Path must not be empty".to_string());
+    }
+
+    let candidate = if Path::new(raw).is_absolute() {
+        PathBuf::from(raw)
+    } else {
+        project_root.join(raw)
+    };
+
+    let canonical = if candidate.exists() {
+        candidate
+            .canonicalize()
+            .map_err(|e| format!("Failed to resolve path '{}': {}", raw, e))?
+    } else {
+        let parent = candidate
+            .parent()
+            .ok_or_else(|| format!("Invalid path (no parent): {}", raw))?;
+        if !parent.exists() {
+            return Err(format!(
+                "Parent directory does not exist: {}",
+                parent.display()
+            ));
+        }
+        let canonical_parent = parent
+            .canonicalize()
+            .map_err(|e| format!("Failed to resolve parent of '{}': {}", raw, e))?;
+        let file_name = candidate
+            .file_name()
+            .ok_or_else(|| format!("Invalid path (no filename): {}", raw))?;
+        canonical_parent.join(file_name)
+    };
+
+    let canonical_project = project_root.canonicalize().map_err(|e| {
+        format!(
+            "Failed to resolve project root '{}': {}",
+            project_root.display(),
+            e
+        )
+    })?;
+
+    if !canonical.starts_with(&canonical_project) {
+        return Err(format!(
+            "Access denied: path '{}' is outside the active project directory",
+            raw
+        ));
+    }
+
+    if require_exists && !canonical.exists() {
+        return Err(format!("File or directory not found: {}", raw));
+    }
+
+    Ok(canonical)
 }
 
 #[cfg(test)]

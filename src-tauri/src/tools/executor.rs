@@ -2,6 +2,7 @@ use base64::Engine;
 use serde::{Deserialize, Serialize};
 
 use crate::commands;
+use crate::project::ProjectManager;
 use crate::tools::path_validator;
 
 #[derive(Deserialize)]
@@ -21,8 +22,10 @@ pub struct ToolResult {
 pub async fn execute_tool(
     tool_call: ToolCall,
     mcp_manager: tauri::State<'_, crate::mcp::manager::McpManager>,
+    project_manager: tauri::State<'_, ProjectManager>,
 ) -> Result<ToolResult, String> {
     let tool_id = format!("tool_{}", uuid_simple());
+    let project_root = project_manager.active_project_root().await;
 
     match tool_call.name.as_str() {
         "excel_read" => {
@@ -72,8 +75,11 @@ pub async fn execute_tool(
                 .and_then(|v| v.as_str())
                 .ok_or("Missing 'path' argument")?
                 .to_string();
-            path_validator::validate_read_path(&path)?;
-            match commands::file_manage::list_directory(path).await {
+            let project_root = project_root.as_ref().ok_or("No active project selected")?;
+            let path = path_validator::resolve_project_path(project_root, &path, true)?
+                .to_string_lossy()
+                .to_string();
+            match commands::file_manage::list_directory_impl(path).await {
                 Ok(entries) => Ok(ToolResult {
                     tool_id,
                     result: serde_json::to_value(entries).unwrap_or_default(),
@@ -93,7 +99,10 @@ pub async fn execute_tool(
                 .and_then(|v| v.as_str())
                 .ok_or("Missing 'directory' argument")?
                 .to_string();
-            path_validator::validate_read_path(&directory)?;
+            let project_root = project_root.as_ref().ok_or("No active project selected")?;
+            let directory = path_validator::resolve_project_path(project_root, &directory, true)?
+                .to_string_lossy()
+                .to_string();
             let pattern = tool_call
                 .arguments
                 .get("pattern")
@@ -120,7 +129,7 @@ pub async fn execute_tool(
                 .arguments
                 .get("include_hidden")
                 .and_then(|v| v.as_bool());
-            match commands::file_manage::search_files(
+            match commands::file_manage::search_files_impl(
                 directory,
                 pattern,
                 extensions,
@@ -149,8 +158,11 @@ pub async fn execute_tool(
                 .and_then(|v| v.as_str())
                 .ok_or("Missing 'path' argument")?
                 .to_string();
-            path_validator::validate_read_path(&path)?;
-            match commands::file_manage::get_file_info(path).await {
+            let project_root = project_root.as_ref().ok_or("No active project selected")?;
+            let path = path_validator::resolve_project_path(project_root, &path, true)?
+                .to_string_lossy()
+                .to_string();
+            match commands::file_manage::get_file_info_impl(path).await {
                 Ok(info) => Ok(ToolResult {
                     tool_id,
                     result: serde_json::to_value(info).unwrap_or_default(),
@@ -171,7 +183,7 @@ pub async fn execute_tool(
                 .and_then(|v| v.as_str())
                 .ok_or("Missing 'path' argument")?
                 .to_string();
-            match commands::host_fs::host_read_file(path).await {
+            match commands::host_fs::host_read_file(project_manager.clone(), path).await {
                 Ok(data) => Ok(ToolResult {
                     tool_id,
                     result: serde_json::to_value(data).unwrap_or_default(),
@@ -201,7 +213,14 @@ pub async fn execute_tool(
                 .arguments
                 .get("is_base64")
                 .and_then(|v| v.as_bool());
-            match commands::host_fs::host_write_file(path, content, is_base64).await {
+            match commands::host_fs::host_write_file(
+                project_manager.clone(),
+                path,
+                content,
+                is_base64,
+            )
+            .await
+            {
                 Ok(data) => Ok(ToolResult {
                     tool_id,
                     result: serde_json::to_value(data).unwrap_or_default(),
@@ -225,7 +244,8 @@ pub async fn execute_tool(
                 .arguments
                 .get("show_hidden")
                 .and_then(|v| v.as_bool());
-            match commands::host_fs::host_list_dir(path, show_hidden).await {
+            match commands::host_fs::host_list_dir(project_manager.clone(), path, show_hidden).await
+            {
                 Ok(data) => Ok(ToolResult {
                     tool_id,
                     result: serde_json::to_value(data).unwrap_or_default(),
@@ -261,7 +281,14 @@ pub async fn execute_tool(
                 .get("working_dir")
                 .and_then(|v| v.as_str())
                 .map(|s| s.to_string());
-            match commands::host_fs::host_execute_command(command, args, working_dir).await {
+            match commands::host_fs::host_execute_command(
+                project_manager.clone(),
+                command,
+                args,
+                working_dir,
+            )
+            .await
+            {
                 Ok(data) => Ok(ToolResult {
                     tool_id,
                     result: serde_json::to_value(data).unwrap_or_default(),
@@ -281,8 +308,11 @@ pub async fn execute_tool(
                 .and_then(|v| v.as_str())
                 .ok_or("Missing 'path' argument")?
                 .to_string();
-            path_validator::validate_read_path(&path)?;
-            match commands::pdf::read_pdf(path).await {
+            let project_root = project_root.as_ref().ok_or("No active project selected")?;
+            let path = path_validator::resolve_project_path(project_root, &path, true)?
+                .to_string_lossy()
+                .to_string();
+            match commands::pdf::read_pdf_impl(path).await {
                 Ok(data) => Ok(ToolResult {
                     tool_id,
                     result: serde_json::to_value(data).unwrap_or_default(),
@@ -302,8 +332,11 @@ pub async fn execute_tool(
                 .and_then(|v| v.as_str())
                 .ok_or("Missing 'path' argument")?
                 .to_string();
-            path_validator::validate_read_path(&path)?;
-            match commands::docx::read_docx(path).await {
+            let project_root = project_root.as_ref().ok_or("No active project selected")?;
+            let path = path_validator::resolve_project_path(project_root, &path, true)?
+                .to_string_lossy()
+                .to_string();
+            match commands::docx::read_docx_impl(path).await {
                 Ok(data) => Ok(ToolResult {
                     tool_id,
                     result: serde_json::to_value(data).unwrap_or_default(),
@@ -368,7 +401,11 @@ pub async fn execute_tool(
         }
         _ if tool_call.name.starts_with("mcp_") => {
             match mcp_manager
-                .call_tool(&tool_call.name, tool_call.arguments)
+                .call_tool(
+                    &tool_call.name,
+                    tool_call.arguments,
+                    project_root.as_deref(),
+                )
                 .await
             {
                 Ok(result) => Ok(ToolResult {

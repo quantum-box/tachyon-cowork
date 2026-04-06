@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import {
@@ -18,8 +18,8 @@ type DuplicateGroup = {
   files: string[];
 };
 
-export function DuplicateDetector() {
-  const [directory, setDirectory] = useState("");
+export function DuplicateDetector({ defaultDirectory }: { defaultDirectory?: string | null }) {
+  const [directory, setDirectory] = useState(defaultDirectory ?? "");
   const [recursive, setRecursive] = useState(true);
   const [groups, setGroups] = useState<DuplicateGroup[]>([]);
   const [isScanning, setIsScanning] = useState(false);
@@ -28,6 +28,10 @@ export function DuplicateDetector() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteComplete, setDeleteComplete] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setDirectory(defaultDirectory ?? "");
+  }, [defaultDirectory]);
 
   const handleBrowse = useCallback(async () => {
     const sel = await open({ directory: true, multiple: false });

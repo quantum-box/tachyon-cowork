@@ -6,5 +6,6 @@ pub mod file_organize;
 pub mod host_fs;
 pub mod pdf;
 pub mod pptx;
+pub mod project;
 pub mod sandbox;
 pub mod system;

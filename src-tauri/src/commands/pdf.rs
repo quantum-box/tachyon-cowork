@@ -1,6 +1,8 @@
 use lopdf::Document;
 use serde::Serialize;
 
+use crate::{project::ProjectManager, tools::path_validator};
+
 #[derive(Serialize)]
 pub struct PdfData {
     pub page_count: usize,
@@ -22,8 +24,7 @@ pub struct PdfMetadata {
     pub creator: Option<String>,
 }
 
-#[tauri::command]
-pub async fn read_pdf(path: String) -> Result<PdfData, String> {
+pub async fn read_pdf_impl(path: String) -> Result<PdfData, String> {
     let doc = Document::load(&path).map_err(|e| format!("Failed to open PDF: {}", e))?;
 
     let metadata = extract_metadata(&doc);
@@ -44,6 +45,21 @@ pub async fn read_pdf(path: String) -> Result<PdfData, String> {
         pages,
         metadata,
     })
+}
+
+#[tauri::command]
+pub async fn read_pdf(
+    project_manager: tauri::State<'_, ProjectManager>,
+    path: String,
+) -> Result<PdfData, String> {
+    let project_root = project_manager
+        .active_project_root()
+        .await
+        .ok_or("No active project selected")?;
+    let path = path_validator::resolve_project_path(&project_root, &path, true)?
+        .to_string_lossy()
+        .to_string();
+    read_pdf_impl(path).await
 }
 
 fn extract_metadata(doc: &Document) -> PdfMetadata {
@@ -80,7 +96,7 @@ mod tests {
     #[tokio::test]
     #[ignore] // Requires fixture file at /tmp/tachyon-test/test.pdf
     async fn test_read_pdf() {
-        let result = read_pdf("/tmp/tachyon-test/test.pdf".to_string()).await;
+        let result = read_pdf_impl("/tmp/tachyon-test/test.pdf".to_string()).await;
         assert!(result.is_ok(), "Failed to read PDF: {:?}", result.err());
         let data = result.unwrap();
         assert_eq!(data.page_count, 2);

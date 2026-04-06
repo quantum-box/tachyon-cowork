@@ -3,6 +3,8 @@ use std::collections::HashMap;
 use std::io::{BufReader, Read, Seek, SeekFrom};
 use walkdir::WalkDir;
 
+use crate::{project::ProjectManager, tools::path_validator};
+
 #[derive(Serialize, Clone, Deserialize)]
 pub struct FileOperation {
     pub source: String,
@@ -35,8 +37,7 @@ pub struct OrganizeConflict {
     pub reason: String,
 }
 
-#[tauri::command]
-pub async fn organize_files(
+pub async fn organize_files_impl(
     directory: String,
     strategy: String,
     recursive: Option<bool>,
@@ -150,6 +151,23 @@ pub async fn organize_files(
     })
 }
 
+#[tauri::command]
+pub async fn organize_files(
+    project_manager: tauri::State<'_, ProjectManager>,
+    directory: String,
+    strategy: String,
+    recursive: Option<bool>,
+) -> Result<OrganizePlan, String> {
+    let project_root = project_manager
+        .active_project_root()
+        .await
+        .ok_or("No active project selected")?;
+    let directory = path_validator::resolve_project_path(&project_root, &directory, true)?
+        .to_string_lossy()
+        .to_string();
+    organize_files_impl(directory, strategy, recursive).await
+}
+
 #[derive(Serialize)]
 pub struct OperationResult {
     pub source: String,
@@ -158,8 +176,7 @@ pub struct OperationResult {
     pub error: Option<String>,
 }
 
-#[tauri::command]
-pub async fn execute_organize_plan(
+pub async fn execute_organize_plan_impl(
     operations: Vec<FileOperation>,
 ) -> Result<Vec<OperationResult>, String> {
     let mut results = Vec::new();
@@ -204,6 +221,39 @@ pub async fn execute_organize_plan(
     Ok(results)
 }
 
+#[tauri::command]
+pub async fn execute_organize_plan(
+    project_manager: tauri::State<'_, ProjectManager>,
+    operations: Vec<FileOperation>,
+) -> Result<Vec<OperationResult>, String> {
+    let project_root = project_manager
+        .active_project_root()
+        .await
+        .ok_or("No active project selected")?;
+    let scoped_operations = operations
+        .into_iter()
+        .map(|op| {
+            let destination =
+                path_validator::resolve_project_path(&project_root, &op.destination, false)?
+                    .to_string_lossy()
+                    .to_string();
+            let source = if op.source.is_empty() {
+                String::new()
+            } else {
+                path_validator::resolve_project_path(&project_root, &op.source, true)?
+                    .to_string_lossy()
+                    .to_string()
+            };
+            Ok(FileOperation {
+                source,
+                destination,
+                operation: op.operation,
+            })
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+    execute_organize_plan_impl(scoped_operations).await
+}
+
 #[derive(Serialize)]
 pub struct DuplicateGroup {
     pub hash: String,
@@ -211,8 +261,7 @@ pub struct DuplicateGroup {
     pub files: Vec<String>,
 }
 
-#[tauri::command]
-pub async fn find_duplicates(
+pub async fn find_duplicates_impl(
     directory: String,
     recursive: bool,
 ) -> Result<Vec<DuplicateGroup>, String> {
@@ -285,6 +334,22 @@ pub async fn find_duplicates(
     Ok(duplicates)
 }
 
+#[tauri::command]
+pub async fn find_duplicates(
+    project_manager: tauri::State<'_, ProjectManager>,
+    directory: String,
+    recursive: bool,
+) -> Result<Vec<DuplicateGroup>, String> {
+    let project_root = project_manager
+        .active_project_root()
+        .await
+        .ok_or("No active project selected")?;
+    let directory = path_validator::resolve_project_path(&project_root, &directory, true)?
+        .to_string_lossy()
+        .to_string();
+    find_duplicates_impl(directory, recursive).await
+}
+
 fn hash_file(path: &str) -> Result<String, String> {
     let file = std::fs::File::open(path).map_err(|e| e.to_string())?;
     let mut reader = BufReader::new(file);
@@ -353,8 +418,7 @@ pub struct ExtensionUsage {
     pub total_size: u64,
 }
 
-#[tauri::command]
-pub async fn get_disk_usage(directory: String) -> Result<DiskUsage, String> {
+pub async fn get_disk_usage_impl(directory: String) -> Result<DiskUsage, String> {
     let mut total_size = 0u64;
     let mut file_count = 0usize;
     let mut dir_count = 0usize;
@@ -389,4 +453,19 @@ pub async fn get_disk_usage(directory: String) -> Result<DiskUsage, String> {
         dir_count,
         by_extension,
     })
+}
+
+#[tauri::command]
+pub async fn get_disk_usage(
+    project_manager: tauri::State<'_, ProjectManager>,
+    directory: String,
+) -> Result<DiskUsage, String> {
+    let project_root = project_manager
+        .active_project_root()
+        .await
+        .ok_or("No active project selected")?;
+    let directory = path_validator::resolve_project_path(&project_root, &directory, true)?
+        .to_string_lossy()
+        .to_string();
+    get_disk_usage_impl(directory).await
 }

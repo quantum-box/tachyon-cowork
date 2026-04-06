@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import {
@@ -54,8 +54,8 @@ const STRATEGIES: { value: Strategy; label: string; description: string }[] = [
   },
 ];
 
-export function FileOrganizer() {
-  const [directory, setDirectory] = useState("");
+export function FileOrganizer({ defaultDirectory }: { defaultDirectory?: string | null }) {
+  const [directory, setDirectory] = useState(defaultDirectory ?? "");
   const [strategy, setStrategy] = useState<Strategy>("by_type");
   const [recursive, setRecursive] = useState(false);
   const [plan, setPlan] = useState<OrganizePlan | null>(null);
@@ -63,6 +63,10 @@ export function FileOrganizer() {
   const [isPlanning, setIsPlanning] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setDirectory(defaultDirectory ?? "");
+  }, [defaultDirectory]);
 
   const handleBrowse = useCallback(async () => {
     const selected = await open({ directory: true, multiple: false });

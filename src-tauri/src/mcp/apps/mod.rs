@@ -54,9 +54,10 @@ pub async fn call_tool(
     app_id: &str,
     tool_name: &str,
     arguments: serde_json::Value,
+    project_root: Option<&std::path::Path>,
 ) -> Result<serde_json::Value, String> {
     match app_id {
-        "file_manager" => file_manager::call_tool(tool_name, arguments).await,
+        "file_manager" => file_manager::call_tool(tool_name, arguments, project_root).await,
         "office_worker" => office_worker::call_tool(tool_name, arguments).await,
         "web_search" => web_search::call_tool(tool_name, arguments).await,
         _ => Err(format!("Unknown built-in app: {}", app_id)),

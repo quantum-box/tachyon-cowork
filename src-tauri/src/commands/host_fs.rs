@@ -7,6 +7,7 @@ use serde::Serialize;
 use std::collections::HashSet;
 use std::sync::LazyLock;
 
+use crate::project::ProjectManager;
 use crate::tools::path_validator;
 
 // ── Allowed commands for host execution ──────────────────────────────
@@ -66,8 +67,15 @@ pub struct HostCommandResult {
 
 /// Read a file from the host filesystem (home directory only).
 #[tauri::command]
-pub async fn host_read_file(path: String) -> Result<HostReadResult, String> {
-    let validated = path_validator::validate_read_path(&path)?;
+pub async fn host_read_file(
+    project_manager: tauri::State<'_, ProjectManager>,
+    path: String,
+) -> Result<HostReadResult, String> {
+    let project_root = project_manager
+        .active_project_root()
+        .await
+        .ok_or("No active project selected")?;
+    let validated = path_validator::resolve_project_path(&project_root, &path, true)?;
 
     let metadata = std::fs::metadata(&validated).map_err(|e| e.to_string())?;
     if metadata.is_dir() {
@@ -106,11 +114,16 @@ pub async fn host_read_file(path: String) -> Result<HostReadResult, String> {
 /// Write content to a file on the host filesystem (home directory only).
 #[tauri::command]
 pub async fn host_write_file(
+    project_manager: tauri::State<'_, ProjectManager>,
     path: String,
     content: String,
     is_base64: Option<bool>,
 ) -> Result<HostWriteResult, String> {
-    let validated = path_validator::validate_write_path(&path)?;
+    let project_root = project_manager
+        .active_project_root()
+        .await
+        .ok_or("No active project selected")?;
+    let validated = path_validator::resolve_project_path(&project_root, &path, false)?;
 
     let bytes = if is_base64.unwrap_or(false) {
         base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &content)
@@ -131,10 +144,15 @@ pub async fn host_write_file(
 /// List directory contents on the host filesystem (home directory only).
 #[tauri::command]
 pub async fn host_list_dir(
+    project_manager: tauri::State<'_, ProjectManager>,
     path: String,
     show_hidden: Option<bool>,
 ) -> Result<HostDirResult, String> {
-    let validated = path_validator::validate_read_path(&path)?;
+    let project_root = project_manager
+        .active_project_root()
+        .await
+        .ok_or("No active project selected")?;
+    let validated = path_validator::resolve_project_path(&project_root, &path, true)?;
 
     if !validated.is_dir() {
         return Err("Not a directory".to_string());
@@ -187,6 +205,7 @@ pub async fn host_list_dir(
 /// Working directory is restricted to the home directory.
 #[tauri::command]
 pub async fn host_execute_command(
+    project_manager: tauri::State<'_, ProjectManager>,
     command: String,
     args: Vec<String>,
     working_dir: Option<String>,
@@ -205,20 +224,20 @@ pub async fn host_execute_command(
     }
 
     // Validate working directory if provided
+    let project_root = project_manager
+        .active_project_root()
+        .await
+        .ok_or("No active project selected")?;
     let cwd = match working_dir {
-        Some(dir) => path_validator::validate_read_path(&dir)?,
-        None => path_validator::validate_read_path(
-            &dirs::home_dir()
-                .ok_or("Cannot determine home directory")?
-                .to_string_lossy(),
-        )?,
+        Some(dir) => path_validator::resolve_project_path(&project_root, &dir, true)?,
+        None => project_root,
     };
 
     // Validate any path-like arguments
     for arg in &args {
         if arg.starts_with('/') {
             // Absolute path argument — validate it
-            path_validator::validate_path(arg)?;
+            path_validator::resolve_project_path(&cwd, arg, true)?;
         }
     }
 

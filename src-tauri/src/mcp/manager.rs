@@ -162,6 +162,7 @@ impl McpManager {
         &self,
         namespaced_name: &str,
         arguments: serde_json::Value,
+        project_root: Option<&std::path::Path>,
     ) -> Result<serde_json::Value, String> {
         // 1. Check built-in apps first
         let config = self.config.lock().await;
@@ -175,7 +176,7 @@ impl McpManager {
                 // Verify the tool exists
                 if app.tools.iter().any(|t| t.name == tool_name) {
                     drop(config);
-                    return apps::call_tool(&app.id, tool_name, arguments).await;
+                    return apps::call_tool(&app.id, tool_name, arguments, project_root).await;
                 }
             }
         }

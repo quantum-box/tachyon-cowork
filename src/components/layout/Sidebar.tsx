@@ -10,8 +10,12 @@ import {
   PinOff,
   PanelLeftClose,
   PanelLeftOpen,
+  Clock3,
+  Check,
+  X,
 } from "lucide-react";
 import type { SessionSummary } from "../../lib/types";
+import type { ProjectEntry } from "../../lib/tauri-bridge";
 
 type Props = {
   sessions: SessionSummary[];
@@ -27,6 +31,12 @@ type Props = {
   onOpenSettings: () => void;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
+  activeProject?: ProjectEntry | null;
+  recentProjects: ProjectEntry[];
+  onPickProject: () => void;
+  onSelectProject: (path: string) => void;
+  onRemoveProject: (path: string) => void;
+  isProjectLoading?: boolean;
 };
 
 export function Sidebar({
@@ -43,6 +53,12 @@ export function Sidebar({
   onOpenSettings,
   isCollapsed = false,
   onToggleCollapse,
+  activeProject,
+  recentProjects,
+  onPickProject,
+  onSelectProject,
+  onRemoveProject,
+  isProjectLoading = false,
 }: Props) {
   const [search, setSearch] = useState("");
 
@@ -129,6 +145,72 @@ export function Sidebar({
             placeholder="検索..."
             className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400/20 placeholder:text-gray-400 dark:placeholder:text-slate-500 transition-colors duration-150"
           />
+        </div>
+
+        <div className="mt-3 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <div className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-slate-500">
+                Project
+              </div>
+              <div className="truncate text-xs font-medium text-gray-800 dark:text-gray-200">
+                {activeProject?.name ?? "未選択"}
+              </div>
+            </div>
+            <button
+              onClick={onPickProject}
+              className="shrink-0 rounded-lg border border-gray-200 dark:border-slate-600 px-2 py-1 text-[11px] text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+            >
+              {isProjectLoading ? "..." : "選択"}
+            </button>
+          </div>
+          <div className="mt-1 truncate text-[11px] text-gray-500 dark:text-slate-400">
+            {activeProject?.path ?? "ディレクトリを選択してください"}
+          </div>
+          {recentProjects.length > 0 && (
+            <div className="mt-3">
+              <div className="mb-1 flex items-center gap-1 text-[10px] uppercase tracking-wider text-gray-400 dark:text-slate-500">
+                <Clock3 size={10} />
+                Recent
+              </div>
+              <div className="space-y-1">
+                {recentProjects.map((project) => {
+                  const isActiveProject = activeProject?.path === project.path;
+                  return (
+                    <div
+                      key={project.path}
+                      className={`group flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs ${
+                        isActiveProject
+                          ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300"
+                          : "text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700"
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => onSelectProject(project.path)}
+                        className="min-w-0 flex-1 truncate text-left"
+                        title={project.path}
+                      >
+                        {project.name}
+                      </button>
+                      {isActiveProject && <Check size={12} />}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onRemoveProject(project.path);
+                        }}
+                        className="opacity-0 transition-opacity group-hover:opacity-100 text-gray-400 hover:text-red-500 dark:text-slate-500 dark:hover:text-red-400"
+                        title="一覧から削除"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

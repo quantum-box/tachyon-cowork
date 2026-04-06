@@ -73,6 +73,17 @@ export type BuiltinAppInfo = {
   tools: { name: string; description: string; input_schema: Record<string, unknown> }[];
 };
 
+export type ProjectEntry = {
+  path: string;
+  name: string;
+  last_accessed_at: string;
+};
+
+export type ProjectState = {
+  active_project: ProjectEntry | null;
+  recent_projects: ProjectEntry[];
+};
+
 // ── MCP Bridge Functions ───────────────────────────────────────────
 
 export async function mcpGetConfig(): Promise<McpConfig> {
@@ -105,6 +116,18 @@ export async function mcpToggleBuiltinApp(appId: string, enabled: boolean): Prom
 
 export async function mcpGetBuiltinApps(): Promise<BuiltinAppInfo[]> {
   return invoke<BuiltinAppInfo[]>("mcp_get_builtin_apps");
+}
+
+export async function projectGetState(): Promise<ProjectState> {
+  return invoke<ProjectState>("project_get_state");
+}
+
+export async function projectSetActive(path: string): Promise<ProjectState> {
+  return invoke<ProjectState>("project_set_active", { path });
+}
+
+export async function projectRemoveRecent(path: string): Promise<ProjectState> {
+  return invoke<ProjectState>("project_remove_recent", { path });
 }
 
 /** Read a file from a sandbox workspace. Returns raw bytes. */

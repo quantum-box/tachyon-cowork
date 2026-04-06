@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { FolderOpen, HardDrive, Loader2 } from "lucide-react";
@@ -29,11 +29,15 @@ const BAR_COLORS = [
   "bg-purple-500",
 ];
 
-export function DiskUsageChart() {
-  const [directory, setDirectory] = useState("");
+export function DiskUsageChart({ defaultDirectory }: { defaultDirectory?: string | null }) {
+  const [directory, setDirectory] = useState(defaultDirectory ?? "");
   const [usage, setUsage] = useState<DiskUsage | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [analyzed, setAnalyzed] = useState(false);
+
+  useEffect(() => {
+    setDirectory(defaultDirectory ?? "");
+  }, [defaultDirectory]);
 
   const handleBrowse = useCallback(async () => {
     const sel = await open({ directory: true, multiple: false });
