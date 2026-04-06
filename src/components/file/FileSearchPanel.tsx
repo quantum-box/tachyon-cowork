@@ -8,6 +8,8 @@ import {
   Folder,
   ExternalLink,
   Loader2,
+  SlidersHorizontal,
+  X,
 } from "lucide-react";
 import { formatFileSize } from "../../lib/format";
 
@@ -32,6 +34,22 @@ const EXTENSION_FILTERS: { label: string; extensions: string[] }[] = [
   { label: "アーカイブ", extensions: ["zip", "rar", "7z", "tar", "gz"] },
 ];
 
+type SortMode = "modified_desc" | "name_asc" | "size_desc";
+
+function sortResults(files: FileInfo[], mode: SortMode): FileInfo[] {
+  const next = [...files];
+  next.sort((a, b) => {
+    if (mode === "name_asc") {
+      return a.name.localeCompare(b.name, "ja");
+    }
+    if (mode === "size_desc") {
+      return b.size - a.size;
+    }
+    return (b.modified ?? "").localeCompare(a.modified ?? "");
+  });
+  return next;
+}
+
 export function FileSearchPanel() {
   const [directory, setDirectory] = useState("");
   const [searchText, setSearchText] = useState("");
@@ -39,6 +57,8 @@ export function FileSearchPanel() {
   const [results, setResults] = useState<FileInfo[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searched, setSearched] = useState(false);
+  const [sortMode, setSortMode] = useState<SortMode>("modified_desc");
+  const [error, setError] = useState<string | null>(null);
 
   const handleBrowse = useCallback(async () => {
     const selected = await open({ directory: true, multiple: false });
@@ -59,6 +79,7 @@ export function FileSearchPanel() {
     if (!directory) return;
     setIsSearching(true);
     setSearched(true);
+    setError(null);
     try {
       const activeExts = EXTENSION_FILTERS.filter((f) =>
         activeFilters.includes(f.label),
@@ -70,14 +91,15 @@ export function FileSearchPanel() {
         extensions: activeExts.length > 0 ? activeExts : null,
         maxResults: 200,
       });
-      setResults(files);
+      setResults(sortResults(files, sortMode));
     } catch (err) {
       console.error("Search error:", err);
       setResults([]);
+      setError(err instanceof Error ? err.message : "検索に失敗しました");
     } finally {
       setIsSearching(false);
     }
-  }, [directory, searchText, activeFilters]);
+  }, [directory, searchText, activeFilters, sortMode]);
 
   const handleShowInFolder = useCallback(async (path: string) => {
     try {
@@ -92,6 +114,14 @@ export function FileSearchPanel() {
     const d = new Date(dateStr);
     return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
   };
+
+  const clearSearch = useCallback(() => {
+    setSearchText("");
+    setActiveFilters([]);
+    setResults([]);
+    setSearched(false);
+    setError(null);
+  }, []);
 
   return (
     <div className="flex flex-col h-full">
@@ -132,8 +162,27 @@ export function FileSearchPanel() {
           />
         </div>
 
-        {/* Extension filter chips */}
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-[11px] text-gray-500 dark:text-slate-400">
+            <SlidersHorizontal size={12} />
+            <span>並び順</span>
+          </div>
+          <select
+            value={sortMode}
+            onChange={(e) => {
+              const nextMode = e.target.value as SortMode;
+              setSortMode(nextMode);
+              setResults((prev) => sortResults(prev, nextMode));
+            }}
+            className="rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1.5 text-xs text-gray-700 dark:text-gray-200"
+          >
+            <option value="modified_desc">更新日順</option>
+            <option value="name_asc">名前順</option>
+            <option value="size_desc">サイズ順</option>
+          </select>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-1.5">
           {EXTENSION_FILTERS.map((filter) => (
             <button
               key={filter.label}
@@ -147,6 +196,15 @@ export function FileSearchPanel() {
               {filter.label}
             </button>
           ))}
+          {(searchText || activeFilters.length > 0) && (
+            <button
+              onClick={clearSearch}
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700"
+            >
+              <X size={12} />
+              クリア
+            </button>
+          )}
         </div>
 
         {/* Search button */}
@@ -168,6 +226,12 @@ export function FileSearchPanel() {
 
       {/* Results */}
       <div className="flex-1 overflow-y-auto">
+        {error && (
+          <div className="mx-4 mt-4 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 px-3 py-2 text-xs text-red-700 dark:text-red-300">
+            {error}
+          </div>
+        )}
+
         {!searched && (
           <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-slate-500">
             <Search size={32} className="mb-2 opacity-50" />
@@ -186,6 +250,8 @@ export function FileSearchPanel() {
           <div className="divide-y divide-gray-100 dark:divide-slate-800">
             <div className="px-4 py-2 text-xs text-gray-500 dark:text-slate-400 bg-gray-50 dark:bg-slate-800">
               {results.length}件のファイル
+              {searchText ? ` / "${searchText}"` : ""}
+              {activeFilters.length > 0 ? ` / ${activeFilters.join("・")}` : ""}
             </div>
             {results.map((file) => (
               <div

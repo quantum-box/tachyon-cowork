@@ -8,6 +8,7 @@ import {
   Trash2,
   Hash,
   CheckCircle2,
+  ExternalLink,
 } from "lucide-react";
 import { formatFileSize } from "../../lib/format";
 
@@ -26,6 +27,7 @@ export function DuplicateDetector() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteComplete, setDeleteComplete] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleBrowse = useCallback(async () => {
     const sel = await open({ directory: true, multiple: false });
@@ -35,6 +37,7 @@ export function DuplicateDetector() {
       setScanned(false);
       setSelected(new Set());
       setDeleteComplete(false);
+      setError(null);
     }
   }, []);
 
@@ -44,6 +47,7 @@ export function DuplicateDetector() {
     setScanned(true);
     setSelected(new Set());
     setDeleteComplete(false);
+    setError(null);
     try {
       const dups = await invoke<DuplicateGroup[]>("find_duplicates", {
         directory,
@@ -53,6 +57,7 @@ export function DuplicateDetector() {
     } catch (err) {
       console.error("Scan error:", err);
       setGroups([]);
+      setError(err instanceof Error ? err.message : "重複スキャンに失敗しました");
     } finally {
       setIsScanning(false);
     }
@@ -73,6 +78,7 @@ export function DuplicateDetector() {
   const handleDeleteSelected = useCallback(async () => {
     if (selected.size === 0) return;
     setIsDeleting(true);
+    setError(null);
     try {
       for (const path of selected) {
         await invoke("move_to_trash", { path });
@@ -90,10 +96,32 @@ export function DuplicateDetector() {
       setDeleteComplete(true);
     } catch (err) {
       console.error("Delete error:", err);
+      setError(err instanceof Error ? err.message : "削除に失敗しました");
     } finally {
       setIsDeleting(false);
     }
   }, [selected]);
+
+  const selectAllDuplicates = useCallback(() => {
+    setSelected(
+      new Set(
+        groups.flatMap((group) => group.files.slice(1)),
+      ),
+    );
+  }, [groups]);
+
+  const clearSelection = useCallback(() => {
+    setSelected(new Set());
+  }, []);
+
+  const handleShowInFolder = useCallback(async (path: string) => {
+    try {
+      await invoke("show_in_folder", { path });
+    } catch (err) {
+      console.error("show_in_folder error:", err);
+      setError(err instanceof Error ? err.message : "フォルダを開けませんでした");
+    }
+  }, []);
 
   const summary = useMemo(() => {
     const totalDuplicates = groups.reduce(
@@ -110,6 +138,20 @@ export function DuplicateDetector() {
       saveable,
     };
   }, [groups]);
+
+  const selectedBytes = useMemo(
+    () =>
+      groups.reduce((total, group) => {
+        const selectedCount = group.files.filter((file) => selected.has(file)).length;
+        return total + group.size * selectedCount;
+      }, 0),
+    [groups, selected],
+  );
+
+  const sortedGroups = useMemo(
+    () => [...groups].sort((a, b) => b.size * (b.files.length - 1) - a.size * (a.files.length - 1)),
+    [groups],
+  );
 
   return (
     <div className="flex flex-col h-full">
@@ -159,6 +201,12 @@ export function DuplicateDetector() {
 
       {/* Results */}
       <div className="flex-1 overflow-y-auto">
+        {error && (
+          <div className="mx-4 mt-4 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 px-3 py-2 text-xs text-red-700 dark:text-red-300">
+            {error}
+          </div>
+        )}
+
         {!scanned && (
           <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-slate-500">
             <Copy size={32} className="mb-2 opacity-50" />
@@ -181,6 +229,9 @@ export function DuplicateDetector() {
                 {summary.groupCount}グループ, {summary.duplicateCount}
                 個の重複, {formatFileSize(summary.saveable)} 節約可能
               </div>
+              <div className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+                先頭のファイルを保持対象として固定し、残りだけ選択できます。
+              </div>
             </div>
 
             {deleteComplete && (
@@ -188,6 +239,21 @@ export function DuplicateDetector() {
                 選択したファイルをゴミ箱に移動しました
               </div>
             )}
+
+            <div className="flex gap-2">
+              <button
+                onClick={selectAllDuplicates}
+                className="flex-1 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+              >
+                重複分を全選択
+              </button>
+              <button
+                onClick={clearSelection}
+                className="flex-1 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+              >
+                選択解除
+              </button>
+            </div>
 
             {/* Delete button */}
             {selected.size > 0 && (
@@ -204,14 +270,14 @@ export function DuplicateDetector() {
                 ) : (
                   <span className="flex items-center justify-center gap-2">
                     <Trash2 size={14} />
-                    選択したファイルをゴミ箱に移動 ({selected.size}件)
+                    選択したファイルをゴミ箱に移動 ({selected.size}件 / {formatFileSize(selectedBytes)})
                   </span>
                 )}
               </button>
             )}
 
             {/* Duplicate groups */}
-            {groups.map((group) => (
+            {sortedGroups.map((group) => (
               <div
                 key={group.hash}
                 className="rounded-lg border border-gray-200 dark:border-slate-700 overflow-hidden"
@@ -222,7 +288,7 @@ export function DuplicateDetector() {
                     {group.hash.slice(0, 16)}...
                   </span>
                   <span className="text-xs text-gray-400 dark:text-slate-500 ml-auto">
-                    {formatFileSize(group.size)} x {group.files.length}
+                    {formatFileSize(group.size)} x {group.files.length} / 節約 {formatFileSize(group.size * (group.files.length - 1))}
                   </span>
                 </div>
                 <div className="divide-y divide-gray-100 dark:divide-slate-800">
@@ -244,6 +310,18 @@ export function DuplicateDetector() {
                         {i === 0 && "(保持) "}
                         {file}
                       </span>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          void handleShowInFolder(file);
+                        }}
+                        className="ml-auto shrink-0 p-1 rounded text-gray-400 dark:text-slate-500 hover:bg-gray-100 dark:hover:bg-slate-700 hover:text-gray-600 dark:hover:text-slate-300 transition-colors"
+                        title="フォルダで開く"
+                      >
+                        <ExternalLink size={12} />
+                      </button>
                     </label>
                   ))}
                 </div>

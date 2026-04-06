@@ -46,6 +46,66 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function isNetworkErrorMessage(message: string): boolean {
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("failed to fetch") ||
+    normalized.includes("networkerror") ||
+    normalized.includes("network error") ||
+    normalized.includes("network request failed") ||
+    normalized.includes("fetch failed") ||
+    normalized.includes("offline") ||
+    normalized.includes("econnrefused") ||
+    normalized.includes("timed out") ||
+    normalized.includes("timeout")
+  );
+}
+
+export type ChatErrorKind = "network" | "auth" | "server" | "unknown";
+
+export type ChatErrorState = {
+  kind: ChatErrorKind;
+  message: string;
+};
+
+function toChatError(error: unknown): ChatErrorState {
+  if (!(error instanceof Error)) {
+    return { kind: "unknown", message: String(error) };
+  }
+
+  const message = error.message || "Unknown error";
+  const normalized = message.toLowerCase();
+
+  if (isNetworkErrorMessage(message)) {
+    return {
+      kind: "network",
+      message: "Agent API に接続できません。ネットワークを確認するか、ローカルのファイルツールを利用してください。",
+    };
+  }
+
+  if (normalized.includes("401") || normalized.includes("403") || normalized.includes("unauthorized")) {
+    return {
+      kind: "auth",
+      message: "認証が無効です。再ログインしてから再試行してください。",
+    };
+  }
+
+  if (
+    normalized.includes("500") ||
+    normalized.includes("502") ||
+    normalized.includes("503") ||
+    normalized.includes("504") ||
+    normalized.includes("agent execute failed")
+  ) {
+    return {
+      kind: "server",
+      message: "Agent API が応答できませんでした。少し待ってから再試行してください。",
+    };
+  }
+
+  return { kind: "unknown", message };
+}
+
 const CLIENT_TOOLS: ClientToolDefinition[] = [
   {
     name: "canvas",
@@ -557,7 +617,7 @@ export function useAgentChat(
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [chunks, setChunks] = useState<AgentChunk[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
+  const [error, setError] = useState<ChatErrorState | null>(null);
   const [input, setInput] = useState("");
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [pinnedRooms, setPinnedRooms] = useState<string[]>(loadPinnedRooms);
@@ -671,7 +731,7 @@ export function useAgentChat(
       .catch((e) => {
         if (!cancelled) {
           setChunks([]);
-          setError(e instanceof Error ? e : new Error(String(e)));
+          setError(toChatError(e));
           setIsLoading(false);
         }
         console.error("Failed to fetch session messages:", e);
@@ -723,7 +783,7 @@ export function useAgentChat(
             ...prev,
           ]);
         } catch (e) {
-          setError(e instanceof Error ? e : new Error(String(e)));
+          setError(toChatError(e));
           setIsLoading(false);
           return;
         }
@@ -807,7 +867,10 @@ export function useAgentChat(
             if (streamTimeoutId) clearTimeout(streamTimeoutId);
             streamTimeoutId = setTimeout(() => {
               ac.abort();
-              setError(new Error("応答がタイムアウトしました。再試行してください。"));
+              setError({
+                kind: "network",
+                message: "Agent API の応答がタイムアウトしました。接続を確認して再試行してください。",
+              });
             }, STREAM_TIMEOUT_MS);
           };
 
@@ -831,7 +894,7 @@ export function useAgentChat(
                   const parsed = JSON.parse(data);
                   if ("error" in parsed && parsed.error) {
                     const msg = (parsed.error as { message?: string }).message ?? "Unknown error";
-                    setError(new Error(msg));
+                    setError(toChatError(new Error(msg)));
                     continue;
                   }
                   const normalized = normalizeIncomingChunk(parsed as AgentChunk);
@@ -910,7 +973,7 @@ export function useAgentChat(
         await executeWithRetry(0);
       } catch (e) {
         if (e instanceof Error && e.name !== "AbortError") {
-          setError(e);
+          setError(toChatError(e));
         }
       } finally {
         setIsLoading(false);

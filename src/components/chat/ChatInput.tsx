@@ -18,6 +18,7 @@ type ChatInputProps = {
   onInputChange: (value: string) => void;
   onSubmit: (e: FormEvent) => void;
   isLoading?: boolean;
+  isDisabled?: boolean;
   placeholder?: string;
   files: FileAttachment[];
   onFilesAdd: (fileList: FileList) => void;
@@ -37,6 +38,7 @@ export function ChatInput({
   onFileRemove,
   showPromptTemplates,
   sendKey = "enter",
+  isDisabled = false,
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -48,7 +50,7 @@ export function ChatInput({
         // Cmd/Ctrl+Enter = send, plain Enter = newline
         if (e.metaKey || e.ctrlKey) {
           e.preventDefault();
-          if ((input.trim() || files.length > 0) && !isLoading) {
+          if ((input.trim() || files.length > 0) && !isLoading && !isDisabled) {
             onSubmit(e as unknown as FormEvent);
           }
         }
@@ -57,13 +59,13 @@ export function ChatInput({
         // Enter = send, Shift+Enter = newline, Cmd/Ctrl+Enter also sends
         if (!e.shiftKey) {
           e.preventDefault();
-          if ((input.trim() || files.length > 0) && !isLoading) {
+          if ((input.trim() || files.length > 0) && !isLoading && !isDisabled) {
             onSubmit(e as unknown as FormEvent);
           }
         }
       }
     },
-    [input, files.length, isLoading, onSubmit, sendKey],
+    [input, files.length, isDisabled, isLoading, onSubmit, sendKey],
   );
 
   const handleChange = useCallback(
@@ -132,7 +134,7 @@ export function ChatInput({
           <button
             type="button"
             onClick={handlePickFiles}
-            disabled={isLoading}
+            disabled={isLoading || isDisabled}
             className="shrink-0 rounded-2xl p-3 text-gray-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors duration-150"
             aria-label="ファイルを添付"
           >
@@ -146,13 +148,13 @@ export function ChatInput({
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
             placeholder={placeholder ?? "メッセージを入力..."}
-            disabled={isLoading}
+            disabled={isLoading || isDisabled}
             rows={1}
             className="flex-1 resize-none rounded-2xl border border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-800 px-4 py-3 text-sm text-gray-900 dark:text-gray-100 outline-none focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 dark:focus:ring-indigo-400/20 disabled:opacity-50 placeholder:text-gray-400 dark:placeholder:text-slate-500 transition-all duration-150"
           />
           <button
             type="submit"
-            disabled={!hasContent || isLoading}
+            disabled={!hasContent || isLoading || isDisabled}
             className="shrink-0 rounded-2xl bg-indigo-600 dark:bg-indigo-600 p-3 text-white hover:bg-indigo-700 dark:hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors duration-150"
           >
             <SendHorizonal size={18} />
