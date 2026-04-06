@@ -149,12 +149,12 @@ pub async fn call_tool(name: &str, args: serde_json::Value) -> Result<serde_json
         }
         "read_pdf" => {
             let path = get_str(&args, "path")?;
-            let data = commands::pdf::read_pdf(path).await?;
+            let data = commands::pdf::read_pdf_impl(path).await?;
             serde_json::to_value(data).map_err(|e| e.to_string())
         }
         "read_docx" => {
             let path = get_str(&args, "path")?;
-            let data = commands::docx::read_docx(path).await?;
+            let data = commands::docx::read_docx_impl(path).await?;
             serde_json::to_value(data).map_err(|e| e.to_string())
         }
         _ => Err(format!("Unknown office_worker tool: {}", name)),

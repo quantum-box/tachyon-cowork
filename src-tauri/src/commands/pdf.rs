@@ -96,7 +96,7 @@ mod tests {
     #[tokio::test]
     #[ignore] // Requires fixture file at /tmp/tachyon-test/test.pdf
     async fn test_read_pdf() {
-        let result = read_pdf("/tmp/tachyon-test/test.pdf".to_string()).await;
+        let result = read_pdf_impl("/tmp/tachyon-test/test.pdf".to_string()).await;
         assert!(result.is_ok(), "Failed to read PDF: {:?}", result.err());
         let data = result.unwrap();
         assert_eq!(data.page_count, 2);

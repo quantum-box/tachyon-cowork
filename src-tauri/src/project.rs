@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 use tauri_plugin_fs::FsExt;
 use tauri_plugin_store::StoreExt;
 use tokio::sync::Mutex;
@@ -77,6 +77,7 @@ impl ProjectManager {
         let previous = state.clone();
         let mut recent_projects = previous
             .recent_projects
+            .clone()
             .into_iter()
             .filter(|entry| entry.path != next_entry.path)
             .collect::<Vec<_>>();
@@ -105,12 +106,14 @@ impl ProjectManager {
         let previous = state.clone();
         let recent_projects = previous
             .recent_projects
+            .clone()
             .into_iter()
             .filter(|entry| entry.path != normalized_path)
             .collect::<Vec<_>>();
 
         let active_project = previous
             .active_project
+            .clone()
             .filter(|entry| entry.path != normalized_path);
 
         let next_state = ProjectState {
