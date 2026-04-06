@@ -7,9 +7,7 @@ use super::{
 use crate::tools::executor::ToolResult;
 
 #[tauri::command]
-pub async fn mcp_get_config(
-    state: tauri::State<'_, McpManager>,
-) -> Result<McpConfig, String> {
+pub async fn mcp_get_config(state: tauri::State<'_, McpManager>) -> Result<McpConfig, String> {
     Ok(state.get_config().await)
 }
 

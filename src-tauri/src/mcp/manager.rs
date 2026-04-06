@@ -81,12 +81,8 @@ impl McpManager {
         // Disconnect existing session if any
         self.disconnect_server(server_id).await;
 
-        match McpClientSession::connect(
-            server.id.clone(),
-            server.name.clone(),
-            &server.transport,
-        )
-        .await
+        match McpClientSession::connect(server.id.clone(), server.name.clone(), &server.transport)
+            .await
         {
             Ok(session) => {
                 self.errors.lock().await.remove(server_id);
@@ -131,11 +127,7 @@ impl McpManager {
         for session in sessions.values() {
             let sanitized_name = sanitize_name(&session.server_name);
             for tool in &session.tools {
-                let description = tool
-                    .description
-                    .as_deref()
-                    .unwrap_or("")
-                    .to_string();
+                let description = tool.description.as_deref().unwrap_or("").to_string();
 
                 let input_schema = serde_json::to_value(&tool.input_schema)
                     .unwrap_or(serde_json::json!({"type": "object"}));
@@ -167,7 +159,11 @@ impl McpManager {
             let prefix = format!("mcp_{}_", sanitized_name);
             if let Some(original_name) = namespaced_name.strip_prefix(&prefix) {
                 // Verify the tool exists on this server
-                if session.tools.iter().any(|t| t.name.as_ref() == original_name) {
+                if session
+                    .tools
+                    .iter()
+                    .any(|t| t.name.as_ref() == original_name)
+                {
                     return session.call_tool(original_name, arguments).await;
                 }
             }
@@ -186,10 +182,8 @@ impl McpManager {
             .iter()
             .map(|server| {
                 let connected = sessions.contains_key(&server.id);
-                let tool_count = sessions
-                    .get(&server.id)
-                    .map(|s| s.tools.len())
-                    .unwrap_or(0);
+                let tool_count =
+                    sessions.get(&server.id).map(|s| s.tools.len()).unwrap_or(0);
                 let error = errors.get(&server.id).cloned();
 
                 McpServerStatus {
