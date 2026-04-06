@@ -103,16 +103,10 @@ async fn search_ddg(query: &str, max_results: usize) -> Result<Vec<SearchResult>
         let href = extract_attr(block, "href");
 
         // Extract title text between > and </a>
-        let title = if let Some(tag_close) = block.find('>') {
+        let title = block.find('>').and_then(|tag_close| {
             let after = &block[tag_close + 1..];
-            if let Some(end) = after.find("</a>") {
-                Some(strip_html(&after[..end]))
-            } else {
-                None
-            }
-        } else {
-            None
-        };
+            after.find("</a>").map(|end| strip_html(&after[..end]))
+        });
 
         // Extract snippet
         let snippet = if let Some(sp) = block.find("class=\"result__snippet\"") {
