@@ -107,10 +107,8 @@ pub fn cleanup_stale() -> Result<u32, String> {
         }
         let modified = metadata.modified().unwrap_or(now);
         if let Ok(age) = now.duration_since(modified) {
-            if age.as_secs() > WORKSPACE_TTL_SECS {
-                if std::fs::remove_dir_all(entry.path()).is_ok() {
-                    removed += 1;
-                }
+            if age.as_secs() > WORKSPACE_TTL_SECS && std::fs::remove_dir_all(entry.path()).is_ok() {
+                removed += 1;
             }
         }
     }
