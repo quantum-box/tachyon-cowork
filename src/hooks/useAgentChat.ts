@@ -9,7 +9,11 @@ import type {
   SessionSummary,
   ToolCall,
 } from "../lib/types";
-import { executeClientTool, isTauri } from "../lib/tauri-bridge";
+import {
+  executeClientTool,
+  isTauri,
+  type ProjectContext,
+} from "../lib/tauri-bridge";
 import {
   chunkToArtifact,
   isFileWriteTool,
@@ -19,6 +23,7 @@ import {
 
 const MODEL_KEY = "tachyon-cowork-model";
 const PINNED_KEY = "tachyon-cowork-pinned";
+const SESSION_PROJECTS_KEY = "tachyon-cowork-session-projects";
 
 /** Streaming timeout: abort if no data received for this duration (ms) */
 const STREAM_TIMEOUT_MS = 90_000;
@@ -104,294 +109,328 @@ function toChatError(error: unknown): ChatErrorState {
   ) {
     return {
       kind: "server",
-      message: "Agent API が応答できませんでした。少し待ってから再試行してください。",
+      message:
+        "Agent API が応答できませんでした。少し待ってから再試行してください。",
     };
   }
 
   return { kind: "unknown", message };
 }
 
-function buildClientTools(activeProjectPath?: string | null): ClientToolDefinition[] {
+function buildClientTools(
+  activeProjectPath?: string | null,
+): ClientToolDefinition[] {
   const projectNote = activeProjectPath
-    ? ` Relative paths are resolved from the current project directory: ${activeProjectPath}.`
+    ? ` Relative paths are resolved from the current project directory: ${activeProjectPath}. Use the selected project directory directly unless the user specifies another location.`
     : " No current project directory is selected yet; prompt the user to choose one before filesystem work.";
 
   return [
-  {
-    name: "canvas",
-    description:
-      "Open a canvas to display and edit a document with live preview. Use this when creating HTML pages, React components, or any visual content the user wants to see rendered.",
-    parameters: {
-      type: "object",
-      properties: {
-        title: {
-          type: "string",
-          description: "Document title.",
+    {
+      name: "canvas",
+      description:
+        "Open a canvas to display and edit a document with live preview. Use this when creating HTML pages, React components, or any visual content the user wants to see rendered.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: {
+            type: "string",
+            description: "Document title.",
+          },
+          content: {
+            type: "string",
+            description:
+              "Full document content. For HTML: a complete HTML document. For JSX: a React component with a default export.",
+          },
+          content_type: {
+            type: "string",
+            enum: ["html", "jsx"],
+            description:
+              "Content type: 'html' for HTML documents, 'jsx' for React JSX components.",
+          },
         },
-        content: {
-          type: "string",
-          description:
-            "Full document content. For HTML: a complete HTML document. For JSX: a React component with a default export.",
-        },
-        content_type: {
-          type: "string",
-          enum: ["html", "jsx"],
-          description: "Content type: 'html' for HTML documents, 'jsx' for React JSX components.",
-        },
+        required: ["title", "content", "content_type"],
+        additionalProperties: false,
       },
-      required: ["title", "content", "content_type"],
-      additionalProperties: false,
     },
-  },
-  {
-    name: "local_list_directory",
-    description:
-      "List files and subdirectories in a local directory on this device. Use this to inspect what exists inside a folder before reading or processing files." +
-      projectNote,
-    parameters: {
-      type: "object",
-      properties: {
-        path: {
-          type: "string",
-          description: "Absolute path of the local directory to inspect.",
+    {
+      name: "local_list_directory",
+      description:
+        "List files and subdirectories in a local directory on this device. Use this to inspect what exists inside a folder before reading or processing files." +
+        projectNote,
+      parameters: {
+        type: "object",
+        properties: {
+          path: {
+            type: "string",
+            description: "Absolute path of the local directory to inspect.",
+          },
         },
+        required: ["path"],
+        additionalProperties: false,
       },
-      required: ["path"],
-      additionalProperties: false,
     },
-  },
-  {
-    name: "local_search_files",
-    description:
-      "Search for files inside a local directory on this device by filename and optional extension filters." +
-      projectNote,
-    parameters: {
-      type: "object",
-      properties: {
-        directory: {
-          type: "string",
-          description: "Absolute path of the local directory to search inside.",
+    {
+      name: "local_search_files",
+      description:
+        "Search for files inside a local directory on this device by filename and optional extension filters." +
+        projectNote,
+      parameters: {
+        type: "object",
+        properties: {
+          directory: {
+            type: "string",
+            description:
+              "Absolute path of the local directory to search inside.",
+          },
+          pattern: {
+            type: "string",
+            description:
+              "Case-insensitive substring to match against filenames.",
+          },
+          extensions: {
+            type: "array",
+            items: { type: "string" },
+            description:
+              "Optional file extensions to include, without dots if possible.",
+          },
+          max_results: {
+            type: "integer",
+            description: "Maximum number of matches to return.",
+          },
+          recursive: {
+            type: "boolean",
+            description: "Whether to include subdirectories in the search.",
+          },
+          include_hidden: {
+            type: "boolean",
+            description: "Whether to include hidden files and folders.",
+          },
         },
-        pattern: {
-          type: "string",
-          description: "Case-insensitive substring to match against filenames.",
-        },
-        extensions: {
-          type: "array",
-          items: { type: "string" },
-          description: "Optional file extensions to include, without dots if possible.",
-        },
-        max_results: {
-          type: "integer",
-          description: "Maximum number of matches to return.",
-        },
-        recursive: {
-          type: "boolean",
-          description: "Whether to include subdirectories in the search.",
-        },
-        include_hidden: {
-          type: "boolean",
-          description: "Whether to include hidden files and folders.",
-        },
+        required: ["directory"],
+        additionalProperties: false,
       },
-      required: ["directory"],
-      additionalProperties: false,
     },
-  },
-  {
-    name: "local_get_file_info",
-    description:
-      "Get metadata for a local file or directory on this device, including size, timestamps, type, and extension." +
-      projectNote,
-    parameters: {
-      type: "object",
-      properties: {
-        path: {
-          type: "string",
-          description: "Absolute path of the local file or directory.",
+    {
+      name: "local_get_file_info",
+      description:
+        "Get metadata for a local file or directory on this device, including size, timestamps, type, and extension." +
+        projectNote,
+      parameters: {
+        type: "object",
+        properties: {
+          path: {
+            type: "string",
+            description: "Absolute path of the local file or directory.",
+          },
         },
+        required: ["path"],
+        additionalProperties: false,
       },
-      required: ["path"],
-      additionalProperties: false,
     },
-  },
-  {
-    name: "execute_code",
-    description:
-      "Execute code in a sandboxed microVM environment. Supports Python, JavaScript (Node.js), and Shell. The code runs in complete isolation with no network access. Use this when the user asks to run, execute, or test code.",
-    parameters: {
-      type: "object",
-      properties: {
-        language: {
-          type: "string",
-          enum: ["python", "javascript", "shell"],
-          description: "Programming language to execute.",
+    {
+      name: "execute_code",
+      description:
+        "Execute code in a sandboxed microVM environment. Supports Python, JavaScript (Node.js), and Shell. The code runs in complete isolation with no network access. Use this when the user asks to run, execute, or test code.",
+      parameters: {
+        type: "object",
+        properties: {
+          language: {
+            type: "string",
+            enum: ["python", "javascript", "shell"],
+            description: "Programming language to execute.",
+          },
+          code: {
+            type: "string",
+            description: "Source code to execute.",
+          },
+          timeout_secs: {
+            type: "integer",
+            description:
+              "Execution timeout in seconds (default: 30, max: 300).",
+          },
         },
-        code: {
-          type: "string",
-          description: "Source code to execute.",
-        },
-        timeout_secs: {
-          type: "integer",
-          description: "Execution timeout in seconds (default: 30, max: 300).",
-        },
+        required: ["language", "code"],
+        additionalProperties: false,
       },
-      required: ["language", "code"],
-      additionalProperties: false,
     },
-  },
-  {
-    name: "generate_file",
-    description:
-      "Generate a document file (PDF, DOCX, or PPTX) using Python libraries in a sandboxed environment. The data object specifies the document content structure.",
-    parameters: {
-      type: "object",
-      properties: {
-        file_type: {
-          type: "string",
-          enum: ["pdf", "docx", "pptx"],
-          description: "Type of file to generate.",
+    {
+      name: "generate_file",
+      description:
+        "Generate a document file (PDF, DOCX, or PPTX) using Python libraries in a sandboxed environment. The data object specifies the document content structure. Any output_path must point to a real host path inside the current project; do not use sandbox-only paths like /workspace." +
+        projectNote,
+      parameters: {
+        type: "object",
+        properties: {
+          file_type: {
+            type: "string",
+            enum: ["pdf", "docx", "pptx"],
+            description: "Type of file to generate.",
+          },
+          data: {
+            type: "object",
+            description:
+              "Document content. Common fields: title (string), content (string), sections (array of {heading, body}). For PPTX: slides (array of {title, content, bullets}). For DOCX: tables (array of {headers, rows}).",
+          },
+          output_path: {
+            type: "string",
+            description:
+              "Optional host filesystem path to save the generated file. Relative paths resolve from the current project workspace; never use sandbox-only paths like /workspace.",
+          },
         },
-        data: {
-          type: "object",
-          description:
-            "Document content. Common fields: title (string), content (string), sections (array of {heading, body}). For PPTX: slides (array of {title, content, bullets}). For DOCX: tables (array of {headers, rows}).",
-        },
-        output_path: {
-          type: "string",
-          description: "Optional absolute path to save the generated file on the local device.",
-        },
+        required: ["file_type", "data"],
+        additionalProperties: false,
       },
-      required: ["file_type", "data"],
-      additionalProperties: false,
     },
-  },
-  {
-    name: "pdf_read",
-    description:
-      "Read and extract text content from a PDF file on this device. Returns page-by-page text and metadata (title, author)." +
-      projectNote,
-    parameters: {
-      type: "object",
-      properties: {
-        path: {
-          type: "string",
-          description: "Absolute path of the PDF file to read.",
+    {
+      name: "pdf_read",
+      description:
+        "Read and extract text content from a PDF file on this device. Returns page-by-page text and metadata (title, author)." +
+        projectNote,
+      parameters: {
+        type: "object",
+        properties: {
+          path: {
+            type: "string",
+            description: "Absolute path of the PDF file to read.",
+          },
         },
+        required: ["path"],
+        additionalProperties: false,
       },
-      required: ["path"],
-      additionalProperties: false,
     },
-  },
-  {
-    name: "docx_read",
-    description:
-      "Read and extract content from a Word document (.docx) on this device. Returns paragraphs with styles, tables, and metadata." +
-      projectNote,
-    parameters: {
-      type: "object",
-      properties: {
-        path: {
-          type: "string",
-          description: "Absolute path of the DOCX file to read.",
+    {
+      name: "docx_read",
+      description:
+        "Read and extract content from a Word document (.docx) on this device. Returns paragraphs with styles, tables, and metadata." +
+        projectNote,
+      parameters: {
+        type: "object",
+        properties: {
+          path: {
+            type: "string",
+            description: "Absolute path of the DOCX file to read.",
+          },
         },
+        required: ["path"],
+        additionalProperties: false,
       },
-      required: ["path"],
-      additionalProperties: false,
     },
-  },
-  // ── Host filesystem tools (runs on host OS, restricted to home dir) ──
-  {
-    name: "host_read_file",
-    description:
-      "Read a file from the host filesystem inside the active project directory. Returns text content or base64-encoded binary. Use this for reading config files, scripts, data files, etc." +
-      projectNote,
-    parameters: {
-      type: "object",
-      properties: {
-        path: {
-          type: "string",
-          description: "Absolute path of the file to read (must be within home directory).",
+    // ── Host filesystem tools (runs on host OS, restricted to home dir) ──
+    {
+      name: "host_read_file",
+      description:
+        "Read a file from the host filesystem inside the active project directory. Returns text content or base64-encoded binary. Use this for reading config files, scripts, data files, etc." +
+        projectNote,
+      parameters: {
+        type: "object",
+        properties: {
+          path: {
+            type: "string",
+            description:
+              "Absolute path of the file to read (must be within home directory).",
+          },
         },
+        required: ["path"],
+        additionalProperties: false,
       },
-      required: ["path"],
-      additionalProperties: false,
     },
-  },
-  {
-    name: "host_write_file",
-    description:
-      "Write content to a file on the host filesystem inside the active project directory. Use this for saving config files, scripts, data files, etc." +
-      projectNote,
-    parameters: {
-      type: "object",
-      properties: {
-        path: {
-          type: "string",
-          description: "Absolute path to write the file (must be within home directory).",
+    {
+      name: "host_write_file",
+      description:
+        "Write content to a file on the host filesystem inside the active project directory. Use this for saving config files, scripts, data files, etc." +
+        projectNote,
+      parameters: {
+        type: "object",
+        properties: {
+          path: {
+            type: "string",
+            description:
+              "Absolute path to write the file (must be within home directory).",
+          },
+          content: {
+            type: "string",
+            description:
+              "File content as text, or base64-encoded string if is_base64 is true.",
+          },
+          is_base64: {
+            type: "boolean",
+            description: "If true, content is base64-encoded binary data.",
+          },
         },
-        content: {
-          type: "string",
-          description: "File content as text, or base64-encoded string if is_base64 is true.",
-        },
-        is_base64: {
-          type: "boolean",
-          description: "If true, content is base64-encoded binary data.",
-        },
+        required: ["path", "content"],
+        additionalProperties: false,
       },
-      required: ["path", "content"],
-      additionalProperties: false,
     },
-  },
-  {
-    name: "host_list_dir",
-    description:
-      "List the contents of a directory on the host filesystem inside the active project directory." +
-      projectNote,
-    parameters: {
-      type: "object",
-      properties: {
-        path: {
-          type: "string",
-          description: "Absolute path of the directory to list (must be within home directory).",
+    {
+      name: "host_list_dir",
+      description:
+        "List the contents of a directory on the host filesystem inside the active project directory." +
+        projectNote,
+      parameters: {
+        type: "object",
+        properties: {
+          path: {
+            type: "string",
+            description:
+              "Absolute path of the directory to list (must be within home directory).",
+          },
+          show_hidden: {
+            type: "boolean",
+            description: "If true, include hidden files (starting with '.').",
+          },
         },
-        show_hidden: {
-          type: "boolean",
-          description: "If true, include hidden files (starting with '.').",
-        },
+        required: ["path"],
+        additionalProperties: false,
       },
-      required: ["path"],
-      additionalProperties: false,
     },
-  },
-  {
-    name: "host_execute_command",
-    description:
-      "Execute a safe, allow-listed command on the host OS. Only specific commands are permitted: ls, stat, file, du, wc, find, which, cat, head, tail, grep, sort, uniq, diff, tar, zip, unzip, date, echo, pwd, basename, dirname, realpath. The default working directory is the active project directory." +
-      projectNote,
-    parameters: {
-      type: "object",
-      properties: {
-        command: {
-          type: "string",
-          description: "Command name from the allow-list.",
+    {
+      name: "host_execute_command",
+      description:
+        "Execute a safe, allow-listed command on the host OS. Only specific commands are permitted: ls, stat, file, du, wc, find, which, cat, head, tail, grep, sort, uniq, diff, tar, zip, unzip, date, echo, pwd, basename, dirname, realpath. The default working directory is the active project directory." +
+        projectNote,
+      parameters: {
+        type: "object",
+        properties: {
+          command: {
+            type: "string",
+            description: "Command name from the allow-list.",
+          },
+          args: {
+            type: "array",
+            items: { type: "string" },
+            description: "Command arguments.",
+          },
+          working_dir: {
+            type: "string",
+            description:
+              "Working directory for the command (must be within home directory, defaults to home).",
+          },
         },
-        args: {
-          type: "array",
-          items: { type: "string" },
-          description: "Command arguments.",
-        },
-        working_dir: {
-          type: "string",
-          description:
-            "Working directory for the command (must be within home directory, defaults to home).",
-        },
+        required: ["command"],
+        additionalProperties: false,
       },
-      required: ["command"],
-      additionalProperties: false,
     },
-  },
-];
+  ];
+}
+
+function buildProjectCustomInstructions(
+  activeProjectPath?: string | null,
+  activeProjectContext?: ProjectContext | null,
+): string | undefined {
+  if (!activeProjectPath) return undefined;
+
+  const sections = [
+    `Current project directory: ${activeProjectPath}`,
+    "Work directly in the selected project directory by default. Do not create or prefer a separate scratch workspace unless the user explicitly asks for one.",
+    activeProjectContext?.is_initialized
+      ? "This project has project-specific custom instructions. Follow them unless the user overrides them."
+      : null,
+    activeProjectContext?.prompt_context?.trim()
+      ? activeProjectContext.prompt_context.trim()
+      : null,
+  ].filter(Boolean);
+
+  return sections.length > 0 ? sections.join("\n\n") : undefined;
 }
 
 function mergeChunkText(
@@ -412,7 +451,10 @@ function mergeChunk(existing: AgentChunk, incoming: AgentChunk): AgentChunk {
     text: mergeChunkText(existing.text, incoming.text),
     content: mergeChunkText(existing.content, incoming.content),
     thinking: mergeChunkText(existing.thinking, incoming.thinking),
-    tool_arguments: mergeChunkText(existing.tool_arguments, incoming.tool_arguments),
+    tool_arguments: mergeChunkText(
+      existing.tool_arguments,
+      incoming.tool_arguments,
+    ),
     tool_result: mergeChunkText(existing.tool_result, incoming.tool_result),
     result: mergeChunkText(existing.result, incoming.result),
   };
@@ -422,7 +464,13 @@ function getChunkSourceId(chunk: AgentChunk): string {
   return chunk.id || chunk.tool_id || chunk.created_at || "unknown";
 }
 
-type ChunkGroup = "assistant" | "thinking" | "tool" | "artifact" | "usage" | "other";
+type ChunkGroup =
+  | "assistant"
+  | "thinking"
+  | "tool"
+  | "artifact"
+  | "usage"
+  | "other";
 
 function getChunkGroup(chunk: AgentChunk): ChunkGroup {
   switch (chunk.type) {
@@ -452,7 +500,10 @@ type StreamScopeState = {
   lastGroup: ChunkGroup | null;
 };
 
-function getChunkStreamKey(chunk: AgentChunk, streamState?: StreamScopeState): string {
+function getChunkStreamKey(
+  chunk: AgentChunk,
+  streamState?: StreamScopeState,
+): string {
   switch (chunk.type) {
     case "assistant":
     case "say":
@@ -512,7 +563,10 @@ function upsertChunk(prev: AgentChunk[], incoming: AgentChunk): AgentChunk[] {
   return next;
 }
 
-function resolvePendingToolCall(prev: AgentChunk[], toolId: string): AgentChunk[] {
+function resolvePendingToolCall(
+  prev: AgentChunk[],
+  toolId: string,
+): AgentChunk[] {
   return prev.map((chunk) => {
     if (chunk.type !== "tool_call_pending" || chunk.tool_id !== toolId) {
       return chunk;
@@ -558,7 +612,9 @@ function normalizeLoadedChunks(chunks: AgentChunk[]): AgentChunk[] {
   const completedToolIds = new Set(
     compacted
       .filter(
-        (chunk) => !!chunk.tool_id && (chunk.type === "tool_result" || chunk.type === "tool_call"),
+        (chunk) =>
+          !!chunk.tool_id &&
+          (chunk.type === "tool_result" || chunk.type === "tool_call"),
       )
       .map((chunk) => chunk.tool_id!),
   );
@@ -630,6 +686,33 @@ function savePinnedRooms(ids: string[]): void {
   localStorage.setItem(PINNED_KEY, JSON.stringify(ids));
 }
 
+function loadSessionProjectMap(): Record<string, string> {
+  try {
+    const raw = localStorage.getItem(SESSION_PROJECTS_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return typeof parsed === "object" && parsed
+      ? (parsed as Record<string, string>)
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveSessionProjectMap(mapping: Record<string, string>): void {
+  localStorage.setItem(SESSION_PROJECTS_KEY, JSON.stringify(mapping));
+}
+
+function attachProjectPaths(
+  sessions: SessionSummary[],
+  mapping: Record<string, string>,
+): SessionSummary[] {
+  return sessions.map((session) => ({
+    ...session,
+    project_path: mapping[session.id],
+  }));
+}
+
 export type CanvasToolCallArgs = {
   title: string;
   content: string;
@@ -642,6 +725,7 @@ export function useAgentChat(
   onCanvasToolCall?: (args: CanvasToolCallArgs) => void,
   mcpTools?: ClientToolDefinition[],
   activeProjectPath?: string | null,
+  activeProjectContext?: ProjectContext | null,
 ) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [chunks, setChunks] = useState<AgentChunk[]>([]);
@@ -662,7 +746,10 @@ export function useAgentChat(
   } | null>(null);
 
   const handlePendingToolCall = useCallback(
-    async (currentSessionId: string, chunk: AgentChunk & { args?: Record<string, unknown> }) => {
+    async (
+      currentSessionId: string,
+      chunk: AgentChunk & { args?: Record<string, unknown> },
+    ) => {
       if (!client || !chunk.tool_id || !chunk.tool_name) return;
 
       let resultText: string;
@@ -703,7 +790,11 @@ export function useAgentChat(
           );
 
           // Detect workspace files and create artifacts for download
-          if (onArtifact && outcome.result && typeof outcome.result === "object") {
+          if (
+            onArtifact &&
+            outcome.result &&
+            typeof outcome.result === "object"
+          ) {
             const res = outcome.result as Record<string, unknown>;
             const wsId = res.workspace_id as string | undefined;
             const wsFiles = res.workspace_files as
@@ -726,11 +817,22 @@ export function useAgentChat(
       }
 
       if (chunk.fire_and_forget) return;
-      await client.submitToolResult(currentSessionId, {
-        tool_id: chunk.tool_id,
-        result: resultText,
-        is_finished: true,
-      });
+      try {
+        await client.submitToolResult(currentSessionId, {
+          tool_id: chunk.tool_id,
+          result: resultText,
+          is_finished: true,
+        });
+      } catch (error) {
+        console.error("Failed to submit tool result:", {
+          sessionId: currentSessionId,
+          toolId: chunk.tool_id,
+          toolName: chunk.tool_name,
+          resultText,
+          error,
+        });
+        throw error;
+      }
       setChunks((prev) => resolvePendingToolCall(prev, chunk.tool_id!));
     },
     [client, onCanvasToolCall, onArtifact],
@@ -778,7 +880,7 @@ export function useAgentChat(
     if (!client) return;
     try {
       const items = await client.getSessions();
-      setSessions(items);
+      setSessions(attachProjectPaths(items, loadSessionProjectMap()));
       setSessionId((prev) => {
         if (prev && items.some((item) => item.id === prev)) {
           return prev;
@@ -795,7 +897,11 @@ export function useAgentChat(
   }, [fetchSessions]);
 
   const startTask = useCallback(
-    async (task: string, newRoomTitle?: string, attachments?: InlineAttachment[]) => {
+    async (
+      task: string,
+      newRoomTitle?: string,
+      attachments?: InlineAttachment[],
+    ) => {
       if (!client) return;
       setIsLoading(true);
       setError(null);
@@ -803,18 +909,30 @@ export function useAgentChat(
       let currentSessionId = sessionId;
       if (!currentSessionId) {
         try {
-          const session = await client.createSession(newRoomTitle || task.slice(0, 50));
+          const session = await client.createSession(
+            newRoomTitle || task.slice(0, 50),
+          );
           currentSessionId = session.session.id;
+          if (activeProjectPath) {
+            const mapping = loadSessionProjectMap();
+            mapping[currentSessionId] = activeProjectPath;
+            saveSessionProjectMap(mapping);
+          }
           skipNextSessionLoadRef.current = currentSessionId;
           setSessionId(currentSessionId);
-          setSessions((prev) => [
-            {
-              id: session.session.id,
-              name: session.session.name,
-              created_at: new Date().toISOString(),
-            },
-            ...prev,
-          ]);
+          setSessions((prev) =>
+            attachProjectPaths(
+              [
+                {
+                  id: session.session.id,
+                  name: session.session.name,
+                  created_at: new Date().toISOString(),
+                },
+                ...prev,
+              ],
+              loadSessionProjectMap(),
+            ),
+          );
         } catch (e) {
           setError(toChatError(e));
           setIsLoading(false);
@@ -834,7 +952,10 @@ export function useAgentChat(
       let receivedStreamChunk = false;
 
       // Track server-side tool_call metadata so we can detect file-write results
-      const toolCallMeta = new Map<string, { toolName: string; toolArguments: string }>();
+      const toolCallMeta = new Map<
+        string,
+        { toolName: string; toolArguments: string }
+      >();
 
       const trackToolCall = (chunk: AgentChunk) => {
         if (!chunk.tool_id) return;
@@ -853,20 +974,23 @@ export function useAgentChat(
           } else {
             if (chunk.tool_arguments) {
               existing.toolArguments =
-                mergeChunkText(existing.toolArguments, chunk.tool_arguments) || "";
+                mergeChunkText(existing.toolArguments, chunk.tool_arguments) ||
+                "";
             }
           }
         } else if (chunk.type === "tool_call_args" && chunk.tool_arguments) {
           const existing = toolCallMeta.get(chunk.tool_id);
           if (existing) {
             existing.toolArguments =
-              mergeChunkText(existing.toolArguments, chunk.tool_arguments) || "";
+              mergeChunkText(existing.toolArguments, chunk.tool_arguments) ||
+              "";
           }
         }
       };
 
       const detectFileWriteArtifact = (chunk: AgentChunk) => {
-        if (chunk.type !== "tool_result" || !chunk.tool_id || !onArtifact) return;
+        if (chunk.type !== "tool_result" || !chunk.tool_id || !onArtifact)
+          return;
         const meta = toolCallMeta.get(chunk.tool_id);
         if (!meta || !isFileWriteTool(meta.toolName)) return;
         const artifact = fileWriteToArtifact(
@@ -877,17 +1001,59 @@ export function useAgentChat(
         if (artifact) onArtifact(artifact);
       };
 
+      const processIncomingChunk = async (
+        parsedChunk: AgentChunk & { args?: Record<string, unknown> },
+      ) => {
+        const normalized = normalizeIncomingChunk(parsedChunk);
+        const chunk = withStreamScopedId(
+          normalized,
+          mergeableStreamKeys,
+          streamInstanceId,
+          streamScopeState,
+        );
+        receivedStreamChunk = true;
+        setChunks((prev) => upsertChunk(prev, chunk));
+
+        if (chunk.type === "tool_call_pending" && currentSessionId) {
+          try {
+            await handlePendingToolCall(currentSessionId, parsedChunk);
+          } catch (error) {
+            const message =
+              error instanceof Error
+                ? error.message
+                : "Tool result submission failed";
+            setError({
+              kind: "server",
+              message: `Tool result の送信に失敗しました: ${message}`,
+            });
+          }
+        }
+
+        if (chunk.type === "artifact" && onArtifact) {
+          onArtifact(chunkToArtifact(chunk));
+        }
+        trackToolCall(chunk);
+        detectFileWriteArtifact(chunk);
+      };
+
       const executeWithRetry = async (attempt: number): Promise<void> => {
         try {
-          const taskWithProjectContext = activeProjectPath
-            ? `Current project directory: ${activeProjectPath}\nUse this as the working directory for relative paths and project-scoped file operations unless the user says otherwise.\n\nUser request:\n${task}`
-            : task;
+          const customInstructions = buildProjectCustomInstructions(
+            activeProjectPath,
+            activeProjectContext,
+          );
           const args: AgentExecuteRequest = {
-            task: taskWithProjectContext,
+            task,
             model: selectedModel,
             max_requests: 10,
             use_json_tool_calls: true,
-            client_tools: [...buildClientTools(activeProjectPath), ...(mcpTools ?? [])],
+            ...(customInstructions && {
+              custom_instructions: customInstructions,
+            }),
+            client_tools: [
+              ...buildClientTools(activeProjectPath),
+              ...(mcpTools ?? []),
+            ],
             ...(attachments && attachments.length > 0 && { attachments }),
           };
           const response = await client.executeAgent(currentSessionId!, args);
@@ -927,34 +1093,23 @@ export function useAgentChat(
                 const data = parseSseEvent(eventBlock);
                 if (!data || data === "[DONE]") continue;
                 try {
-                  const parsed = JSON.parse(data);
+                  const parsed = JSON.parse(data) as AgentChunk & {
+                    args?: Record<string, unknown>;
+                  };
                   if ("error" in parsed && parsed.error) {
-                    const msg = (parsed.error as { message?: string }).message ?? "Unknown error";
+                    const msg =
+                      (parsed.error as { message?: string }).message ??
+                      "Unknown error";
                     setError(toChatError(new Error(msg)));
                     continue;
                   }
-                  const normalized = normalizeIncomingChunk(parsed as AgentChunk);
-                  const chunk = withStreamScopedId(
-                    normalized,
-                    mergeableStreamKeys,
-                    streamInstanceId,
-                    streamScopeState,
-                  );
-                  receivedStreamChunk = true;
-                  setChunks((prev) => upsertChunk(prev, chunk));
-                  if (chunk.type === "tool_call_pending" && currentSessionId) {
-                    await handlePendingToolCall(
-                      currentSessionId,
-                      parsed as AgentChunk & { args?: Record<string, unknown> },
-                    );
+                  await processIncomingChunk(parsed);
+                } catch (error) {
+                  if (error instanceof SyntaxError) {
+                    // skip malformed JSON
+                    continue;
                   }
-                  if (chunk.type === "artifact" && onArtifact) {
-                    onArtifact(chunkToArtifact(chunk));
-                  }
-                  trackToolCall(chunk);
-                  detectFileWriteArtifact(chunk);
-                } catch {
-                  // skip malformed JSON
+                  console.error("Failed to process SSE chunk:", error);
                 }
               }
             }
@@ -965,36 +1120,26 @@ export function useAgentChat(
           const finalData = parseSseEvent(buffer);
           if (finalData && finalData !== "[DONE]") {
             try {
-              const normalized = normalizeIncomingChunk(JSON.parse(finalData) as AgentChunk);
-              const chunk = withStreamScopedId(
-                normalized,
-                mergeableStreamKeys,
-                streamInstanceId,
-                streamScopeState,
-              );
-              receivedStreamChunk = true;
-              setChunks((prev) => upsertChunk(prev, chunk));
-              if (chunk.type === "tool_call_pending" && currentSessionId) {
-                await handlePendingToolCall(
-                  currentSessionId,
-                  JSON.parse(finalData) as AgentChunk & {
-                    args?: Record<string, unknown>;
-                  },
-                );
+              const parsed = JSON.parse(finalData) as AgentChunk & {
+                args?: Record<string, unknown>;
+              };
+              await processIncomingChunk(parsed);
+            } catch (error) {
+              if (error instanceof SyntaxError) {
+                // ignore trailing partial event
+              } else {
+                console.error("Failed to process trailing SSE chunk:", error);
               }
-              if (chunk.type === "artifact" && onArtifact) {
-                onArtifact(chunkToArtifact(chunk));
-              }
-              trackToolCall(chunk);
-              detectFileWriteArtifact(chunk);
-            } catch {
-              // ignore trailing partial event
             }
           }
         } catch (e) {
           if (e instanceof Error && e.name === "AbortError") throw e;
           // Retry on transient errors if we haven't received any chunks yet
-          if (!receivedStreamChunk && attempt < MAX_RETRIES && isRetryableError(e)) {
+          if (
+            !receivedStreamChunk &&
+            attempt < MAX_RETRIES &&
+            isRetryableError(e)
+          ) {
             const backoff = RETRY_BASE_DELAY_MS * Math.pow(2, attempt);
             await delay(backoff);
             if (!ac.signal.aborted) {
@@ -1029,11 +1174,24 @@ export function useAgentChat(
         }
       }
     },
-    [sessionId, client, selectedModel, onArtifact, handlePendingToolCall, mcpTools, activeProjectPath],
+    [
+      sessionId,
+      client,
+      selectedModel,
+      onArtifact,
+      handlePendingToolCall,
+      mcpTools,
+      activeProjectPath,
+      activeProjectContext,
+    ],
   );
 
   const sendMessage = useCallback(
-    async (message: string, attachments?: InlineAttachment[], taskOverride?: string) => {
+    async (
+      message: string,
+      attachments?: InlineAttachment[],
+      taskOverride?: string,
+    ) => {
       const trimmed = message.trim();
       const hasAttachments = attachments && attachments.length > 0;
       if ((!trimmed && !hasAttachments) || isLoading) return;
@@ -1052,7 +1210,8 @@ export function useAgentChat(
         ...(imageUrls && imageUrls.length > 0 && { imageUrls }),
       };
       setChunks((prev) => [...prev, userChunk]);
-      const taskText = (taskOverride ?? trimmed) || "この画像について説明してください";
+      const taskText =
+        (taskOverride ?? trimmed) || "この画像について説明してください";
       lastMessageRef.current = { message, task: taskText, attachments };
       // Backend requires a non-empty task; use default for image-only sends
       await startTask(taskText, undefined, attachments);
@@ -1134,6 +1293,11 @@ export function useAgentChat(
       if (!client) return;
       try {
         await client.deleteSession(id);
+        const mapping = loadSessionProjectMap();
+        if (mapping[id]) {
+          delete mapping[id];
+          saveSessionProjectMap(mapping);
+        }
         setSessions((prev) => prev.filter((r) => r.id !== id));
         if (sessionId === id) newChat();
       } catch (e) {
@@ -1145,7 +1309,9 @@ export function useAgentChat(
 
   const togglePin = useCallback((roomId: string) => {
     setPinnedRooms((prev) => {
-      const next = prev.includes(roomId) ? prev.filter((id) => id !== roomId) : [...prev, roomId];
+      const next = prev.includes(roomId)
+        ? prev.filter((id) => id !== roomId)
+        : [...prev, roomId];
       savePinnedRooms(next);
       return next;
     });

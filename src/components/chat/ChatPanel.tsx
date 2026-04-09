@@ -1,8 +1,13 @@
 import { useState } from "react";
 import { AlertCircle, RefreshCw, X, Square } from "lucide-react";
 import type { useAgentChat } from "../../hooks/useAgentChat";
-import type { Artifact, FileAttachment, InlineAttachment } from "../../lib/types";
+import type {
+  Artifact,
+  FileAttachment,
+  InlineAttachment,
+} from "../../lib/types";
 import type { SendKeyMode } from "../../hooks/useSendKey";
+import type { ProjectContext } from "../../lib/tauri-bridge";
 import { FileDropZone } from "../file/FileDropZone";
 import { MessageList } from "./MessageList";
 import { ChatInput } from "./ChatInput";
@@ -23,13 +28,30 @@ type Props = {
   }>;
   isPreparingFiles?: boolean;
   onOpenArtifact: (artifact: Artifact) => void;
-  onOpenCanvas?: (title: string, content: string, contentType: "html" | "jsx") => void;
+  onOpenCanvas?: (
+    title: string,
+    content: string,
+    contentType: "html" | "jsx",
+  ) => void;
   isSearchOpen: boolean;
   onSearchClose: () => void;
   sendKey?: SendKeyMode;
   isOffline?: boolean;
   onOpenTools?: () => void;
+  projectContext?: ProjectContext | null;
 };
+
+function formatWorkspaceLabel(projectContext: ProjectContext): string {
+  const root = projectContext.root_path.replace(/\/+$/, "");
+  const workspace = projectContext.workspace_path;
+  if (workspace === root) {
+    return "選択中の project フォルダ";
+  }
+  if (workspace.startsWith(`${root}/`)) {
+    return workspace.slice(root.length + 1);
+  }
+  return workspace;
+}
 
 export function ChatPanel({
   chat,
@@ -48,6 +70,7 @@ export function ChatPanel({
   sendKey,
   isOffline = false,
   onOpenTools,
+  projectContext,
 }: Props) {
   const [searchQuery] = useState("");
   const hasNetworkIssue = isOffline || chat.error?.kind === "network";
@@ -70,7 +93,9 @@ export function ChatPanel({
     <FileDropZone onFilesDropped={onFilesAdd}>
       <div className="flex flex-col h-full bg-white dark:bg-slate-950 transition-colors duration-150">
         {/* Chat search bar */}
-        {isSearchOpen && <ChatSearch chunks={chat.chunks} onClose={onSearchClose} />}
+        {isSearchOpen && (
+          <ChatSearch chunks={chat.chunks} onClose={onSearchClose} />
+        )}
 
         {/* Error banner with retry/dismiss */}
         {hasNetworkIssue && (
@@ -83,7 +108,8 @@ export function ChatPanel({
                   : (chat.error?.message ?? "Agent API に接続できません。")}
               </div>
               <div className="text-[11px] text-amber-700 dark:text-amber-400">
-                オフラインでも `ファイル検索` `整理` `重複検出` `容量分析` は利用できます。
+                オフラインでも `ファイル検索` `整理` `重複検出` `容量分析`
+                は利用できます。
               </div>
             </div>
             {onOpenTools && (
@@ -143,6 +169,18 @@ export function ChatPanel({
         {fileError && (
           <div className="mx-4 mt-3 px-4 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-xs text-amber-700 dark:text-amber-400">
             {fileError}
+          </div>
+        )}
+
+        {projectContext && (
+          <div className="mx-4 mt-3 px-4 py-2.5 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-300">
+            <span className="font-medium text-slate-700 dark:text-slate-200">
+              {projectContext.name}
+            </span>
+            {` を project として使用中。`}
+            {projectContext.is_initialized
+              ? ` 既定の作業場所: ${formatWorkspaceLabel(projectContext)}`
+              : "project context は未初期化です。サイドバーから初期化すると custom instructions を使えます。"}
           </div>
         )}
 

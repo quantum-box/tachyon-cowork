@@ -228,9 +228,13 @@ pub async fn host_execute_command(
         .active_project_root()
         .await
         .ok_or("No active project selected")?;
+    let default_working_dir = project_manager
+        .active_project_working_dir()
+        .await?
+        .unwrap_or_else(|| project_root.clone());
     let cwd = match working_dir {
         Some(dir) => path_validator::resolve_project_path(&project_root, &dir, true)?,
-        None => project_root,
+        None => default_working_dir,
     };
 
     // Validate any path-like arguments
