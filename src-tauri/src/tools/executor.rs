@@ -1,5 +1,6 @@
 use base64::Engine;
 use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
 
 use crate::commands;
 use crate::project::ProjectManager;
@@ -16,6 +17,37 @@ pub struct ToolResult {
     pub tool_id: String,
     pub result: serde_json::Value,
     pub error: Option<String>,
+}
+
+fn resolve_generate_file_output_path(
+    project_root: &Path,
+    working_dir: &Path,
+    raw: &str,
+) -> Result<String, String> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Err("output_path must not be empty".to_string());
+    }
+
+    // The sandbox mounts its workspace at `/workspace`, but host writes must target
+    // a real path inside the active project. Remap those requests into the project's
+    // preferred working directory to keep the tool resilient.
+    let normalized = if let Ok(relative) = Path::new(trimmed).strip_prefix("/workspace") {
+        let relative = if relative.as_os_str().is_empty() {
+            PathBuf::from("output")
+        } else {
+            relative.to_path_buf()
+        };
+        working_dir.join(relative)
+    } else if Path::new(trimmed).is_absolute() {
+        PathBuf::from(trimmed)
+    } else {
+        working_dir.join(trimmed)
+    };
+
+    let validated =
+        path_validator::resolve_project_path(project_root, &normalized.to_string_lossy(), false)?;
+    Ok(validated.to_string_lossy().to_string())
 }
 
 #[tauri::command]
@@ -374,8 +406,20 @@ pub async fn execute_tool(
             }
         }
         "generate_file" => {
-            let request: crate::sandbox::executor::GenerateFileRequest =
+            let mut request: crate::sandbox::executor::GenerateFileRequest =
                 serde_json::from_value(tool_call.arguments.clone()).map_err(|e| e.to_string())?;
+            if let Some(path) = request.output_path.as_ref() {
+                let project_root = project_root.as_ref().ok_or("No active project selected")?;
+                let working_dir = project_manager
+                    .active_project_working_dir()
+                    .await?
+                    .unwrap_or_else(|| project_root.clone());
+                request.output_path = Some(resolve_generate_file_output_path(
+                    project_root,
+                    &working_dir,
+                    path,
+                )?);
+            }
             match crate::sandbox::executor::generate_file(&request).await {
                 Ok(result) => {
                     let b64 = base64::engine::general_purpose::STANDARD.encode(&result.file_bytes);

@@ -139,20 +139,12 @@ pub async fn generate_file(request: &GenerateFileRequest) -> Result<GenerateFile
 
     let sb = SandboxManager::create_file_sandbox(&sandbox_name, &workspace_dir).await?;
 
-    // Write the data as JSON for the Python script to consume
     let data_json = serde_json::to_string(&request.data).map_err(|e| e.to_string())?;
-    sb.fs()
-        .write("/workspace/data.json", &data_json)
-        .await
-        .map_err(|e| format!("Failed to write data: {}", e))?;
+    let embedded_data_json = serde_json::to_string(&data_json).map_err(|e| e.to_string())?;
 
     // Generate the appropriate Python script
-    let (script, output_filename) = generate_python_script(&request.file_type, &request.data)?;
-
-    sb.fs()
-        .write("/workspace/generate.py", &script)
-        .await
-        .map_err(|e| format!("Failed to write script: {}", e))?;
+    let (script, output_filename) =
+        generate_python_script(&request.file_type, &request.data, &embedded_data_json)?;
 
     // Install required packages if not using custom image (fallback mode)
     let pip_packages = match request.file_type.as_str() {
@@ -163,7 +155,7 @@ pub async fn generate_file(request: &GenerateFileRequest) -> Result<GenerateFile
     };
     if !pip_packages.is_empty() {
         let check_cmd = format!(
-            "python3 -c \"import {}\" 2>/dev/null || pip install --quiet {}",
+            "cd /tmp && (python3 -c \"import {}\" 2>/dev/null || pip install --quiet {})",
             match request.file_type.as_str() {
                 "pdf" => "reportlab",
                 "docx" => "docx",
@@ -177,7 +169,8 @@ pub async fn generate_file(request: &GenerateFileRequest) -> Result<GenerateFile
 
     // Execute the generation script
     let timeout = Duration::from_secs(120);
-    let exec_result = tokio::time::timeout(timeout, sb.shell("python3 /workspace/generate.py"))
+    let command = format!("cd /tmp && python3 -c {}", shell_escape(&script));
+    let exec_result = tokio::time::timeout(timeout, sb.shell(&command))
         .await
         .map_err(|_| "File generation timed out".to_string())?
         .map_err(|e| format!("Generation failed: {}", e))?;
@@ -200,6 +193,10 @@ pub async fn generate_file(request: &GenerateFileRequest) -> Result<GenerateFile
 
     // Save to user-specified path if requested
     let saved_path = if let Some(ref path) = request.output_path {
+        if let Some(parent) = std::path::Path::new(path).parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("Failed to create output directory: {}", e))?;
+        }
         std::fs::write(path, &file_bytes).map_err(|e| e.to_string())?;
         Some(path.clone())
     } else {
@@ -210,9 +207,6 @@ pub async fn generate_file(request: &GenerateFileRequest) -> Result<GenerateFile
     let workspace_files = workspace::list_files(&sandbox_name).unwrap_or_default();
 
     // Clean up temp files from workspace (keep the output)
-    let _ = std::fs::remove_file(std::path::Path::new(&workspace_dir).join("data.json"));
-    let _ = std::fs::remove_file(std::path::Path::new(&workspace_dir).join("generate.py"));
-
     Ok(GenerateFileResult {
         file_bytes,
         file_name: output_filename,
@@ -225,25 +219,35 @@ pub async fn generate_file(request: &GenerateFileRequest) -> Result<GenerateFile
 fn generate_python_script(
     file_type: &str,
     data: &serde_json::Value,
+    embedded_data_json: &str,
 ) -> Result<(String, String), String> {
     match file_type {
-        "pdf" => Ok((generate_pdf_script(data), "output.pdf".to_string())),
-        "docx" => Ok((generate_docx_script(data), "output.docx".to_string())),
-        "pptx" => Ok((generate_pptx_script(data), "output.pptx".to_string())),
+        "pdf" => Ok((
+            generate_pdf_script(data, embedded_data_json),
+            "output.pdf".to_string(),
+        )),
+        "docx" => Ok((
+            generate_docx_script(data, embedded_data_json),
+            "output.docx".to_string(),
+        )),
+        "pptx" => Ok((
+            generate_pptx_script(data, embedded_data_json),
+            "output.pptx".to_string(),
+        )),
         _ => Err(format!("Unsupported file type: {}", file_type)),
     }
 }
 
-fn generate_pdf_script(_data: &serde_json::Value) -> String {
-    r#"
+fn generate_pdf_script(_data: &serde_json::Value, embedded_data_json: &str) -> String {
+    format!(
+        r#"
 import json
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.units import inch
 
-with open('/workspace/data.json', 'r') as f:
-    data = json.load(f)
+data = json.loads({embedded_data_json})
 
 doc = SimpleDocTemplate('/workspace/output.pdf', pagesize=A4)
 styles = getSampleStyleSheet()
@@ -273,17 +277,17 @@ if 'sections' in data:
 doc.build(story)
 print('PDF generated successfully')
 "#
-    .to_string()
+    )
 }
 
-fn generate_docx_script(_data: &serde_json::Value) -> String {
-    r#"
+fn generate_docx_script(_data: &serde_json::Value, embedded_data_json: &str) -> String {
+    format!(
+        r#"
 import json
 from docx import Document
 from docx.shared import Pt, Inches
 
-with open('/workspace/data.json', 'r') as f:
-    data = json.load(f)
+data = json.loads({embedded_data_json})
 
 doc = Document()
 
@@ -323,18 +327,18 @@ if 'tables' in data:
 doc.save('/workspace/output.docx')
 print('DOCX generated successfully')
 "#
-    .to_string()
+    )
 }
 
-fn generate_pptx_script(_data: &serde_json::Value) -> String {
-    r#"
+fn generate_pptx_script(_data: &serde_json::Value, embedded_data_json: &str) -> String {
+    format!(
+        r#"
 import json
 from pptx import Presentation
 from pptx.util import Inches, Pt
 from pptx.enum.text import PP_ALIGN
 
-with open('/workspace/data.json', 'r') as f:
-    data = json.load(f)
+data = json.loads({embedded_data_json})
 
 prs = Presentation()
 
@@ -391,7 +395,7 @@ if 'slides' in data:
 prs.save('/workspace/output.pptx')
 print('PPTX generated successfully')
 "#
-    .to_string()
+    )
 }
 
 fn shell_escape(s: &str) -> String {

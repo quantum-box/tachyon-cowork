@@ -71,6 +71,7 @@ export type AgentExecuteRequest = {
   max_requests?: number;
   tool_access?: ToolAccess;
   use_json_tool_calls?: boolean;
+  custom_instructions?: string;
   client_tools?: ClientToolDefinition[];
   attachments?: InlineAttachment[];
 };
@@ -101,6 +102,7 @@ export type SessionSummary = {
   id: string;
   name: string;
   created_at: string;
+  project_path?: string;
 };
 
 /** Auth config */

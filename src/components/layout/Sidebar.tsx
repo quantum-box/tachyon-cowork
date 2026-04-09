@@ -10,9 +10,6 @@ import {
   PinOff,
   PanelLeftClose,
   PanelLeftOpen,
-  Clock3,
-  Check,
-  X,
 } from "lucide-react";
 import type { SessionSummary } from "../../lib/types";
 import type { ProjectEntry } from "../../lib/tauri-bridge";
@@ -28,14 +25,14 @@ type Props = {
   onLogout: () => void;
   onToggleTools: () => void;
   showTools: boolean;
+  showWorkFolders: boolean;
   onOpenSettings: () => void;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
   activeProject?: ProjectEntry | null;
   recentProjects: ProjectEntry[];
   onPickProject: () => void;
-  onSelectProject: (path: string) => void;
-  onRemoveProject: (path: string) => void;
+  onOpenWorkFolderList: (path?: string) => void;
   isProjectLoading?: boolean;
 };
 
@@ -50,17 +47,18 @@ export function Sidebar({
   onLogout,
   onToggleTools,
   showTools,
+  showWorkFolders,
   onOpenSettings,
   isCollapsed = false,
   onToggleCollapse,
   activeProject,
   recentProjects,
   onPickProject,
-  onSelectProject,
-  onRemoveProject,
+  onOpenWorkFolderList,
   isProjectLoading = false,
 }: Props) {
   const [search, setSearch] = useState("");
+  const recentWorkFolders = recentProjects.slice(0, 3);
 
   const filtered = search
     ? sessions.filter((r) =>
@@ -147,68 +145,42 @@ export function Sidebar({
           />
         </div>
 
-        <div className="mt-3 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 p-3">
-          <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <div className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-slate-500">
-                Project
-              </div>
-              <div className="truncate text-xs font-medium text-gray-800 dark:text-gray-200">
-                {activeProject?.name ?? "未選択"}
-              </div>
-            </div>
-            <button
-              onClick={onPickProject}
-              className="shrink-0 rounded-lg border border-gray-200 dark:border-slate-600 px-2 py-1 text-[11px] text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
-            >
-              {isProjectLoading ? "..." : "選択"}
-            </button>
+        <div className="mt-3">
+          <div className="px-1 pb-1 text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-slate-500">
+            作業ディレクトリ
           </div>
-          <div className="mt-1 truncate text-[11px] text-gray-500 dark:text-slate-400">
-            {activeProject?.path ?? "ディレクトリを選択してください"}
-          </div>
-          {recentProjects.length > 0 && (
-            <div className="mt-3">
-              <div className="mb-1 flex items-center gap-1 text-[10px] uppercase tracking-wider text-gray-400 dark:text-slate-500">
-                <Clock3 size={10} />
-                Recent
-              </div>
-              <div className="space-y-1">
-                {recentProjects.map((project) => {
-                  const isActiveProject = activeProject?.path === project.path;
-                  return (
-                    <div
-                      key={project.path}
-                      className={`group flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs ${
-                        isActiveProject
-                          ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300"
-                          : "text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700"
-                      }`}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => onSelectProject(project.path)}
-                        className="min-w-0 flex-1 truncate text-left"
-                        title={project.path}
-                      >
-                        {project.name}
-                      </button>
-                      {isActiveProject && <Check size={12} />}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onRemoveProject(project.path);
-                        }}
-                        className="opacity-0 transition-opacity group-hover:opacity-100 text-gray-400 hover:text-red-500 dark:text-slate-500 dark:hover:text-red-400"
-                        title="一覧から削除"
-                      >
-                        <X size={12} />
-                      </button>
+          <WorkFolderItem
+            label="作業ディレクトリ一覧"
+            subtitle={activeProject?.name ?? "未選択でもチャットは開始できます"}
+            isActive={showWorkFolders}
+            isLoading={isProjectLoading}
+            onOpen={onOpenWorkFolderList}
+            onPick={!activeProject ? onPickProject : undefined}
+          />
+          {recentWorkFolders.length > 0 && (
+            <div className="mt-2 space-y-1">
+              {recentWorkFolders.map((project) => {
+                const isCurrent = activeProject?.path === project.path;
+                return (
+                  <button
+                    key={project.path}
+                    type="button"
+                    onClick={() => onOpenWorkFolderList(project.path)}
+                    className={`w-full rounded-lg px-3 py-2 text-left transition-colors ${
+                      isCurrent
+                        ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300"
+                        : "text-gray-600 hover:bg-gray-100 dark:text-slate-400 dark:hover:bg-slate-800"
+                    }`}
+                  >
+                    <div className="truncate text-xs font-medium">
+                      {project.name}
                     </div>
-                  );
-                })}
-              </div>
+                    <div className="truncate text-[11px] text-gray-400 dark:text-slate-500">
+                      {project.path}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
@@ -356,7 +328,55 @@ function ChatRoomItem({
   );
 }
 
-function groupByDate(rooms: SessionSummary[]): Record<string, SessionSummary[]> {
+function WorkFolderItem({
+  label,
+  subtitle,
+  isActive,
+  isLoading,
+  onOpen,
+  onPick,
+}: {
+  label: string;
+  subtitle: string;
+  isActive: boolean;
+  isLoading: boolean;
+  onOpen: () => void;
+  onPick?: () => void;
+}) {
+  return (
+    <div
+      className={`group flex items-center gap-2 rounded-lg px-3 py-2 transition-colors duration-150 ${
+        isActive
+          ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300"
+          : "bg-white text-gray-700 hover:bg-gray-100 dark:bg-slate-800 dark:text-gray-300 dark:hover:bg-slate-700"
+      }`}
+    >
+      <button
+        type="button"
+        onClick={onOpen}
+        className="min-w-0 flex-1 text-left"
+      >
+        <div className="truncate text-xs font-medium">{label}</div>
+        <div className="truncate text-[11px] text-gray-500 dark:text-slate-400">
+          {subtitle}
+        </div>
+      </button>
+      {onPick && (
+        <button
+          type="button"
+          onClick={onPick}
+          className="shrink-0 rounded-md border border-gray-200 px-2 py-1 text-[11px] text-gray-600 transition-colors hover:bg-gray-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+        >
+          {isLoading ? "..." : "選ぶ"}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function groupByDate(
+  rooms: SessionSummary[],
+): Record<string, SessionSummary[]> {
   const groups: Record<string, SessionSummary[]> = {};
   const now = new Date();
   const today = now.toDateString();

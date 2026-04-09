@@ -21,7 +21,9 @@ export async function readLocalFile(path: string): Promise<Uint8Array> {
 }
 
 /** Execute a client-side tool via the Tauri backend. Throws on web. */
-export async function executeClientTool(toolCall: ToolCall): Promise<ToolResult> {
+export async function executeClientTool(
+  toolCall: ToolCall,
+): Promise<ToolResult> {
   if (!isTauri()) {
     throw new Error("client-side tools are only available in Tauri");
   }
@@ -31,7 +33,12 @@ export async function executeClientTool(toolCall: ToolCall): Promise<ToolResult>
 // ── MCP Types ──────────────────────────────────────────────────────
 
 export type McpTransportConfig =
-  | { type: "stdio"; command: string; args: string[]; env: Record<string, string> }
+  | {
+      type: "stdio";
+      command: string;
+      args: string[];
+      env: Record<string, string>;
+    }
   | { type: "sse"; url: string; headers: Record<string, string> };
 
 export type McpServerConfig = {
@@ -70,7 +77,11 @@ export type BuiltinAppInfo = {
   id: string;
   name: string;
   description: string;
-  tools: { name: string; description: string; input_schema: Record<string, unknown> }[];
+  tools: {
+    name: string;
+    description: string;
+    input_schema: Record<string, unknown>;
+  }[];
 };
 
 export type ProjectEntry = {
@@ -84,13 +95,33 @@ export type ProjectState = {
   recent_projects: ProjectEntry[];
 };
 
+export type ProjectContextFile = {
+  key: string;
+  path: string;
+  exists: boolean;
+};
+
+export type ProjectContext = {
+  root_path: string;
+  name: string;
+  is_initialized: boolean;
+  config_path: string;
+  workspace_path: string;
+  context_dir: string;
+  summary?: string | null;
+  prompt_context: string;
+  files: ProjectContextFile[];
+};
+
 // ── MCP Bridge Functions ───────────────────────────────────────────
 
 export async function mcpGetConfig(): Promise<McpConfig> {
   return invoke<McpConfig>("mcp_get_config");
 }
 
-export async function mcpAddServer(server: McpServerConfig): Promise<McpConfig> {
+export async function mcpAddServer(
+  server: McpServerConfig,
+): Promise<McpConfig> {
   return invoke<McpConfig>("mcp_add_server", { server });
 }
 
@@ -98,7 +129,10 @@ export async function mcpRemoveServer(serverId: string): Promise<McpConfig> {
   return invoke<McpConfig>("mcp_remove_server", { serverId });
 }
 
-export async function mcpToggleServer(serverId: string, enabled: boolean): Promise<void> {
+export async function mcpToggleServer(
+  serverId: string,
+  enabled: boolean,
+): Promise<void> {
   return invoke<void>("mcp_toggle_server", { serverId, enabled });
 }
 
@@ -110,7 +144,10 @@ export async function mcpGetServerStatuses(): Promise<McpServerStatus[]> {
   return invoke<McpServerStatus[]>("mcp_get_server_statuses");
 }
 
-export async function mcpToggleBuiltinApp(appId: string, enabled: boolean): Promise<void> {
+export async function mcpToggleBuiltinApp(
+  appId: string,
+  enabled: boolean,
+): Promise<void> {
   return invoke<void>("mcp_toggle_builtin_app", { appId, enabled });
 }
 
@@ -130,6 +167,20 @@ export async function projectRemoveRecent(path: string): Promise<ProjectState> {
   return invoke<ProjectState>("project_remove_recent", { path });
 }
 
+export async function projectGetActiveContext(): Promise<ProjectContext | null> {
+  return invoke<ProjectContext | null>("project_get_active_context");
+}
+
+export async function projectInitializeActive(): Promise<ProjectContext> {
+  return invoke<ProjectContext>("project_initialize_active");
+}
+
+export async function projectUpdateActiveSummary(
+  summary: string,
+): Promise<ProjectContext> {
+  return invoke<ProjectContext>("project_update_active_summary", { summary });
+}
+
 /** Read a file from a sandbox workspace. Returns raw bytes. */
 export async function readWorkspaceFile(
   workspaceId: string,
@@ -138,7 +189,10 @@ export async function readWorkspaceFile(
   if (!isTauri()) {
     throw new Error("readWorkspaceFile is only available in Tauri");
   }
-  const bytes = await invoke<number[]>("read_workspace_file", { workspaceId, filename });
+  const bytes = await invoke<number[]>("read_workspace_file", {
+    workspaceId,
+    filename,
+  });
   return new Uint8Array(bytes);
 }
 
@@ -161,7 +215,8 @@ export async function saveFile(
       filters: options?.filters,
     });
     if (path) {
-      const bytes = typeof data === "string" ? new TextEncoder().encode(data) : data;
+      const bytes =
+        typeof data === "string" ? new TextEncoder().encode(data) : data;
       await writeFile(path, bytes);
     }
     return;
@@ -238,14 +293,18 @@ function guessMimeType(name: string): string {
 }
 
 /** Open a file picker and return a FileList. */
-export async function pickFiles(options?: PickFilesOptions): Promise<FileList | null> {
+export async function pickFiles(
+  options?: PickFilesOptions,
+): Promise<FileList | null> {
   if (isTauri()) {
     const { open } = await import("@tauri-apps/plugin-dialog");
     const { readFile } = await import("@tauri-apps/plugin-fs");
 
     const selected = await open({
       multiple: options?.multiple ?? true,
-      filters: options?.accept ? [{ name: "Files", extensions: options.accept }] : undefined,
+      filters: options?.accept
+        ? [{ name: "Files", extensions: options.accept }]
+        : undefined,
     });
     if (!selected) return null;
 

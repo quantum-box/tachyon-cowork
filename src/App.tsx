@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AgentChatClient } from "./lib/api-client";
-import { type AuthState, buildAuthState, clearAuth, loadAuth, saveAuth } from "./lib/auth";
+import {
+  type AuthState,
+  buildAuthState,
+  clearAuth,
+  loadAuth,
+  saveAuth,
+} from "./lib/auth";
 import { TokenManager } from "./lib/token-manager";
 import {
   exchangeCodeForTokens,
@@ -17,6 +23,7 @@ import { useSendKey } from "./hooks/useSendKey";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useMcpTools } from "./hooks/useMcpTools";
 import { useProjectState } from "./hooks/useProjectState";
+import { useProjectContext } from "./hooks/useProjectContext";
 import { Sidebar } from "./components/layout/Sidebar";
 import { ChatPanel } from "./components/chat/ChatPanel";
 import { ArtifactPanel } from "./components/artifact/ArtifactPanel";
@@ -24,15 +31,29 @@ import { CanvasView } from "./components/canvas/CanvasView";
 import { LoginScreen } from "./components/layout/LoginScreen";
 import { ToolsPanel } from "./components/layout/ToolsPanel";
 import { SettingsPanel } from "./components/layout/SettingsPanel";
+import { WorkFolderListPanel } from "./components/layout/WorkFolderListPanel";
+import { WorkFolderPanel } from "./components/layout/WorkFolderPanel";
+import type { SessionSummary } from "./lib/types";
 import { open } from "@tauri-apps/plugin-dialog";
-import { isTauri } from "./lib/tauri-bridge";
+import {
+  isTauri,
+  type ProjectContext,
+  type ProjectEntry,
+} from "./lib/tauri-bridge";
+import {
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+  useParams,
+} from "react-router-dom";
 
 export default function App() {
   const [auth, setAuth] = useState<AuthState | null>(loadAuth);
   const [oauthError, setOauthError] = useState<string | null>(null);
   const [isExchangingToken, setIsExchangingToken] = useState(false);
   const [offlineMode, setOfflineMode] = useState(false);
-  const [showTools, setShowTools] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -42,6 +63,10 @@ export default function App() {
 
   const { theme, setTheme } = useTheme();
   const { sendKey, setSendKey } = useSendKey();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const showTools = location.pathname === "/tools";
+  const showWorkFolders = location.pathname.startsWith("/work-folders");
 
   useEffect(() => {
     const syncNetworkState = () => setIsOnline(navigator.onLine);
@@ -74,7 +99,8 @@ export default function App() {
         const config = getOAuth2Config();
         const payload = decodeJwtPayload(tokens.access_token);
         const newAuth = buildAuthState({
-          apiBaseUrl: import.meta.env.VITE_API_BASE_URL ?? "https://api.n1.tachy.one",
+          apiBaseUrl:
+            import.meta.env.VITE_API_BASE_URL ?? "https://api.n1.tachy.one",
           accessToken: tokens.access_token,
           tenantId: import.meta.env.VITE_DEFAULT_TENANT_ID ?? "",
           userId: payload?.sub,
@@ -86,7 +112,9 @@ export default function App() {
       })
       .catch((err) => {
         console.error("OAuth2 token exchange failed:", err);
-        setOauthError(err instanceof Error ? err.message : "Token exchange failed");
+        setOauthError(
+          err instanceof Error ? err.message : "Token exchange failed",
+        );
       })
       .finally(() => {
         setIsExchangingToken(false);
@@ -158,6 +186,12 @@ export default function App() {
 
   const fileHandler = useFileHandler();
   const artifactState = useArtifact();
+
+  useEffect(() => {
+    artifactState.closeCanvas();
+    artifactState.closePanel();
+  }, [location.pathname, artifactState]);
+
   const {
     activeProject,
     recentProjects,
@@ -165,6 +199,13 @@ export default function App() {
     removeProject,
     isLoading: isProjectLoading,
   } = useProjectState();
+  const {
+    context: projectContext,
+    isLoading: isProjectContextLoading,
+    isInitializing: isProjectInitializing,
+    error: projectContextError,
+    saveSummary: saveProjectSummary,
+  } = useProjectContext(activeProject?.path);
   const { mcpTools, refreshMcpTools } = useMcpTools(activeProject?.path);
 
   const handleArtifactFromSSE = useCallback(
@@ -176,7 +217,11 @@ export default function App() {
   );
 
   const handleCanvasToolCall = useCallback(
-    (args: { title: string; content: string; content_type: "html" | "jsx" }) => {
+    (args: {
+      title: string;
+      content: string;
+      content_type: "html" | "jsx";
+    }) => {
       artifactState.openCanvas(args.title, args.content, args.content_type);
     },
     [artifactState],
@@ -188,6 +233,7 @@ export default function App() {
     handleCanvasToolCall,
     mcpTools,
     activeProject?.path,
+    projectContext,
   );
 
   const handleLogout = useCallback(() => {
@@ -212,12 +258,38 @@ export default function App() {
   );
 
   const handleToggleTools = useCallback(() => {
-    setShowTools((prev) => !prev);
-  }, []);
+    navigate(showTools ? "/" : "/tools");
+  }, [navigate, showTools]);
+
+  const openWorkFolderPage = useCallback(
+    (path?: string | null) => {
+      if (path) {
+        navigate(`/work-folders/${encodeURIComponent(path)}`);
+        return;
+      }
+      navigate("/work-folders");
+    },
+    [navigate],
+  );
 
   const handleBackToChat = useCallback(() => {
-    setShowTools(false);
-  }, []);
+    navigate("/");
+  }, [navigate]);
+
+  const handleStartChatFromWorkFolder = useCallback(() => {
+    chat.newChat();
+    artifactState.closeCanvas();
+    navigate("/");
+  }, [artifactState, chat, navigate]);
+
+  const handleOpenSessionFromWorkFolder = useCallback(
+    (sessionId: string) => {
+      chat.selectSession(sessionId);
+      artifactState.closeCanvas();
+      navigate("/");
+    },
+    [artifactState, chat, navigate],
+  );
 
   const handlePickProject = useCallback(async () => {
     if (!isTauri()) return;
@@ -225,8 +297,11 @@ export default function App() {
     if (selected && typeof selected === "string") {
       await activateProject(selected);
       await refreshMcpTools();
+      if (location.pathname.startsWith("/work-folders")) {
+        openWorkFolderPage(selected);
+      }
     }
-  }, [activateProject, refreshMcpTools]);
+  }, [activateProject, refreshMcpTools, location.pathname, openWorkFolderPage]);
 
   const handleSelectProject = useCallback(
     async (path: string) => {
@@ -242,6 +317,13 @@ export default function App() {
       await refreshMcpTools();
     },
     [removeProject, refreshMcpTools],
+  );
+
+  const handleSaveProjectSummary = useCallback(
+    async (summary: string) => {
+      await saveProjectSummary(summary);
+    },
+    [saveProjectSummary],
   );
 
   // Keyboard shortcuts
@@ -308,52 +390,101 @@ export default function App() {
           onNewChat={() => {
             chat.newChat();
             artifactState.closeCanvas();
+            navigate("/");
           }}
           onSelectSession={(id: string) => {
             chat.selectSession(id);
             artifactState.closeCanvas();
+            navigate("/");
           }}
           onDeleteRoom={chat.deleteRoom}
           onTogglePin={chat.togglePin}
           onLogout={handleLogout}
           onToggleTools={handleToggleTools}
           showTools={showTools}
+          showWorkFolders={showWorkFolders}
           onOpenSettings={() => setSettingsOpen(true)}
           isCollapsed={sidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed((prev) => !prev)}
           activeProject={activeProject}
           recentProjects={recentProjects}
           onPickProject={handlePickProject}
-          onSelectProject={handleSelectProject}
-          onRemoveProject={handleRemoveProject}
+          onOpenWorkFolderList={openWorkFolderPage}
           isProjectLoading={isProjectLoading}
         />
       </div>
 
       {/* Main area */}
       <div className="flex-1 min-w-0">
-        {showTools ? (
-          <ToolsPanel onBack={handleBackToChat} projectDirectory={activeProject?.path} />
-        ) : (
-          <ChatPanel
-            chat={chat}
-            files={fileHandler.files}
-            fileError={fileHandler.fileError}
-            onFilesAdd={fileHandler.addFiles}
-            onFileRemove={fileHandler.removeFile}
-            onClearFiles={fileHandler.clearFiles}
-            toInlineAttachments={fileHandler.toInlineAttachments}
-            onPrepareMessage={fileHandler.prepareMessage}
-            isPreparingFiles={fileHandler.isPreparing}
-            onOpenArtifact={handleOpenArtifact}
-            onOpenCanvas={artifactState.openCanvas}
-            isSearchOpen={searchOpen}
-            onSearchClose={() => setSearchOpen(false)}
-            sendKey={sendKey}
-            isOffline={!isOnline}
-            onOpenTools={() => setShowTools(true)}
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <ChatPanel
+                chat={chat}
+                files={fileHandler.files}
+                fileError={fileHandler.fileError}
+                onFilesAdd={fileHandler.addFiles}
+                onFileRemove={fileHandler.removeFile}
+                onClearFiles={fileHandler.clearFiles}
+                toInlineAttachments={fileHandler.toInlineAttachments}
+                onPrepareMessage={fileHandler.prepareMessage}
+                isPreparingFiles={fileHandler.isPreparing}
+                onOpenArtifact={handleOpenArtifact}
+                onOpenCanvas={artifactState.openCanvas}
+                isSearchOpen={searchOpen}
+                onSearchClose={() => setSearchOpen(false)}
+                sendKey={sendKey}
+                isOffline={!isOnline}
+                onOpenTools={() => navigate("/tools")}
+                projectContext={projectContext}
+              />
+            }
           />
-        )}
+          <Route
+            path="/tools"
+            element={
+              <ToolsPanel
+                onBack={handleBackToChat}
+                projectDirectory={activeProject?.path}
+              />
+            }
+          />
+          <Route
+            path="/work-folders"
+            element={
+              <WorkFolderListPanel
+                onBack={handleBackToChat}
+                onPickProject={handlePickProject}
+                recentProjects={recentProjects}
+                activeProject={activeProject}
+                isLoading={isProjectLoading}
+                onOpenProject={openWorkFolderPage}
+                onRemoveProject={handleRemoveProject}
+              />
+            }
+          />
+          <Route
+            path="/work-folders/:folderPath"
+            element={
+              <WorkFolderRoute
+                onBack={handleBackToChat}
+                onStartChat={handleStartChatFromWorkFolder}
+                onPickProject={handlePickProject}
+                activeProject={activeProject}
+                projectContext={projectContext}
+                sessions={chat.sessions}
+                isLoading={isProjectContextLoading}
+                isSaving={isProjectInitializing}
+                error={projectContextError}
+                onSaveSummary={handleSaveProjectSummary}
+                onActivateProject={handleSelectProject}
+                onOpenSession={handleOpenSessionFromWorkFolder}
+              />
+            }
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
       </div>
 
       {/* Canvas panel (right side) - takes priority over artifact panel */}
@@ -391,5 +522,52 @@ export default function App() {
         onSendKeyChange={setSendKey}
       />
     </div>
+  );
+}
+
+type WorkFolderRouteProps = {
+  onBack: () => void;
+  onStartChat: () => void;
+  onPickProject: () => void;
+  activeProject?: ProjectEntry | null;
+  projectContext?: ProjectContext | null;
+  sessions: SessionSummary[];
+  isLoading: boolean;
+  isSaving: boolean;
+  error?: string | null;
+  onSaveSummary: (summary: string) => void;
+  onActivateProject: (path: string) => Promise<void>;
+  onOpenSession: (sessionId: string) => void;
+};
+
+function WorkFolderRoute({
+  activeProject,
+  onActivateProject,
+  ...props
+}: WorkFolderRouteProps) {
+  const { folderPath } = useParams();
+  const decodedPath = useMemo(
+    () => (folderPath ? decodeURIComponent(folderPath) : null),
+    [folderPath],
+  );
+  const filteredSessions = useMemo(() => {
+    if (!decodedPath) return [];
+    return props.sessions.filter(
+      (session) => session.project_path === decodedPath,
+    );
+  }, [decodedPath, props.sessions]);
+
+  useEffect(() => {
+    if (!decodedPath) return;
+    if (activeProject?.path === decodedPath) return;
+    onActivateProject(decodedPath);
+  }, [decodedPath, activeProject?.path, onActivateProject]);
+
+  return (
+    <WorkFolderPanel
+      {...props}
+      activeProject={activeProject}
+      sessions={filteredSessions}
+    />
   );
 }

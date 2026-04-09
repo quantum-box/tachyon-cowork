@@ -8,6 +8,7 @@ src-tauri/target/
 # IDE
 .vscode/
 .idea/
+.claude/
 *.swp
 *.swo
 
@@ -22,6 +23,9 @@ Thumbs.db
 
 # Tauri
 src-tauri/gen/
+
+# Local tooling artifacts
+.playwright-mcp/
 
 # TS build info
 dist-node/
