@@ -3,6 +3,8 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
 const isTauri = !!process.env.TAURI_ENV_PLATFORM;
+const platform = process.env.VITE_PLATFORM ?? (isTauri ? "tauri" : "web");
+const isWeb = platform === "web" && !isTauri;
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
@@ -38,6 +40,13 @@ export default defineConfig(({ mode }) => {
       target: isTauri ? "esnext" : "modules",
       minify: !process.env.TAURI_ENV_DEBUG ? "esbuild" : false,
       sourcemap: !!process.env.TAURI_ENV_DEBUG,
+      // On web builds, treat Tauri packages as external so dynamic imports
+      // become no-ops (they are never reached because isTauri() === false).
+      rollupOptions: isWeb
+        ? {
+            external: (id: string) => id.startsWith("@tauri-apps/"),
+          }
+        : {},
     },
   };
 });

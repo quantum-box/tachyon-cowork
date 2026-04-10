@@ -1,5 +1,3 @@
-import { open } from "@tauri-apps/plugin-shell";
-import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { type AuthState, buildAuthState } from "../../lib/auth";
 import { decodeJwtPayload } from "../../lib/jwt";
@@ -278,7 +276,12 @@ export function LoginScreen({
         redirectUri,
         scopes: cognitoScopes,
       });
-      await open(loginUrl);
+      if (isTauri()) {
+        const { open } = await import("@tauri-apps/plugin-shell");
+        await open(loginUrl);
+      } else {
+        window.open(loginUrl, "_self");
+      }
     } catch (e) {
       clearPendingOAuthState();
       setError(e instanceof Error ? e.message : "ブラウザログインの開始に失敗しました。");
@@ -363,6 +366,9 @@ export function LoginScreen({
     let unlisten: (() => void) | undefined;
 
     void (async () => {
+      const { getCurrent, onOpenUrl } = await import(
+        "@tauri-apps/plugin-deep-link"
+      );
       const currentUrls = await getCurrent();
       if (!isDisposed && currentUrls?.length) {
         await handleDeepLinkUrls(currentUrls);

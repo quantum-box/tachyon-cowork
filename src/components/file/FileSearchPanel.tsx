@@ -1,6 +1,4 @@
 import { useState, useCallback, useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { open } from "@tauri-apps/plugin-dialog";
 import {
   Search,
   FolderOpen,
@@ -68,6 +66,7 @@ export function FileSearchPanel({ defaultDirectory }: { defaultDirectory?: strin
   }, [defaultDirectory]);
 
   const handleBrowse = useCallback(async () => {
+    const { open } = await import("@tauri-apps/plugin-dialog");
     const selected = await open({ directory: true, multiple: false });
     if (selected && typeof selected === "string") {
       setDirectory(selected);
@@ -90,6 +89,7 @@ export function FileSearchPanel({ defaultDirectory }: { defaultDirectory?: strin
         (f) => f.extensions,
       );
 
+      const { invoke } = await import("@tauri-apps/api/core");
       const files = await invoke<FileInfo[]>("search_files", {
         directory,
         pattern: searchText || null,
@@ -110,6 +110,7 @@ export function FileSearchPanel({ defaultDirectory }: { defaultDirectory?: strin
 
   const handleShowInFolder = useCallback(async (path: string) => {
     try {
+      const { invoke } = await import("@tauri-apps/api/core");
       await invoke("show_in_folder", { path });
     } catch (err) {
       console.error("show_in_folder error:", err);

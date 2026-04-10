@@ -1,4 +1,3 @@
-import { invoke } from "@tauri-apps/api/core";
 import type {
   DocxData,
   ExcelData,
@@ -178,6 +177,7 @@ export async function buildAttachmentAwareMessage(
 
     if (isTauri() && file.path && isOfficeFile(file)) {
       try {
+        const { invoke } = await import("@tauri-apps/api/core");
         let extracted = "";
         switch (ext) {
           case "csv":

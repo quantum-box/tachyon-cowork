@@ -1,5 +1,6 @@
 # Cloudflare Worker with Static Assets for web deployment
 # Deployed to cowork.txcloud.app via txcloud-proxy KV routing
+# Build: VITE_PLATFORM=web npm run build
 name = "cowork"
 compatibility_date = "2024-09-23"
 

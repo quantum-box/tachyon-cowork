@@ -1,14 +1,21 @@
 /**
  * Platform abstraction for Tauri / Web file operations.
+ *
+ * All Tauri imports are lazy (dynamic) so that this module can be loaded
+ * in a plain browser without the @tauri-apps packages being present.
  */
-
-import { invoke } from "@tauri-apps/api/core";
 
 import type { ToolCall, ToolResult } from "./types";
 
 /** Detect whether we are running inside a Tauri webview. */
 export function isTauri(): boolean {
   return typeof window !== "undefined" && "__TAURI__" in window;
+}
+
+/** Lazy wrapper around `@tauri-apps/api/core` invoke. */
+async function tauriInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<T>(cmd, args);
 }
 
 /** Read a local file via the Tauri FS plugin. Throws on web. */
@@ -27,7 +34,7 @@ export async function executeClientTool(
   if (!isTauri()) {
     throw new Error("client-side tools are only available in Tauri");
   }
-  return invoke<ToolResult>("execute_tool", { toolCall });
+  return tauriInvoke<ToolResult>("execute_tool", { toolCall });
 }
 
 // ── MCP Types ──────────────────────────────────────────────────────
@@ -116,69 +123,69 @@ export type ProjectContext = {
 // ── MCP Bridge Functions ───────────────────────────────────────────
 
 export async function mcpGetConfig(): Promise<McpConfig> {
-  return invoke<McpConfig>("mcp_get_config");
+  return tauriInvoke<McpConfig>("mcp_get_config");
 }
 
 export async function mcpAddServer(
   server: McpServerConfig,
 ): Promise<McpConfig> {
-  return invoke<McpConfig>("mcp_add_server", { server });
+  return tauriInvoke<McpConfig>("mcp_add_server", { server });
 }
 
 export async function mcpRemoveServer(serverId: string): Promise<McpConfig> {
-  return invoke<McpConfig>("mcp_remove_server", { serverId });
+  return tauriInvoke<McpConfig>("mcp_remove_server", { serverId });
 }
 
 export async function mcpToggleServer(
   serverId: string,
   enabled: boolean,
 ): Promise<void> {
-  return invoke<void>("mcp_toggle_server", { serverId, enabled });
+  return tauriInvoke<void>("mcp_toggle_server", { serverId, enabled });
 }
 
 export async function mcpGetTools(): Promise<McpToolInfo[]> {
-  return invoke<McpToolInfo[]>("mcp_get_tools");
+  return tauriInvoke<McpToolInfo[]>("mcp_get_tools");
 }
 
 export async function mcpGetServerStatuses(): Promise<McpServerStatus[]> {
-  return invoke<McpServerStatus[]>("mcp_get_server_statuses");
+  return tauriInvoke<McpServerStatus[]>("mcp_get_server_statuses");
 }
 
 export async function mcpToggleBuiltinApp(
   appId: string,
   enabled: boolean,
 ): Promise<void> {
-  return invoke<void>("mcp_toggle_builtin_app", { appId, enabled });
+  return tauriInvoke<void>("mcp_toggle_builtin_app", { appId, enabled });
 }
 
 export async function mcpGetBuiltinApps(): Promise<BuiltinAppInfo[]> {
-  return invoke<BuiltinAppInfo[]>("mcp_get_builtin_apps");
+  return tauriInvoke<BuiltinAppInfo[]>("mcp_get_builtin_apps");
 }
 
 export async function projectGetState(): Promise<ProjectState> {
-  return invoke<ProjectState>("project_get_state");
+  return tauriInvoke<ProjectState>("project_get_state");
 }
 
 export async function projectSetActive(path: string): Promise<ProjectState> {
-  return invoke<ProjectState>("project_set_active", { path });
+  return tauriInvoke<ProjectState>("project_set_active", { path });
 }
 
 export async function projectRemoveRecent(path: string): Promise<ProjectState> {
-  return invoke<ProjectState>("project_remove_recent", { path });
+  return tauriInvoke<ProjectState>("project_remove_recent", { path });
 }
 
 export async function projectGetActiveContext(): Promise<ProjectContext | null> {
-  return invoke<ProjectContext | null>("project_get_active_context");
+  return tauriInvoke<ProjectContext | null>("project_get_active_context");
 }
 
 export async function projectInitializeActive(): Promise<ProjectContext> {
-  return invoke<ProjectContext>("project_initialize_active");
+  return tauriInvoke<ProjectContext>("project_initialize_active");
 }
 
 export async function projectUpdateActiveSummary(
   summary: string,
 ): Promise<ProjectContext> {
-  return invoke<ProjectContext>("project_update_active_summary", { summary });
+  return tauriInvoke<ProjectContext>("project_update_active_summary", { summary });
 }
 
 /** Read a file from a sandbox workspace. Returns raw bytes. */
@@ -189,7 +196,7 @@ export async function readWorkspaceFile(
   if (!isTauri()) {
     throw new Error("readWorkspaceFile is only available in Tauri");
   }
-  const bytes = await invoke<number[]>("read_workspace_file", {
+  const bytes = await tauriInvoke<number[]>("read_workspace_file", {
     workspaceId,
     filename,
   });
