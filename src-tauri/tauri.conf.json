@@ -31,6 +31,12 @@
       "desktop": {
         "schemes": ["tachyon-cowork"]
       }
+    },
+    "updater": {
+      "endpoints": [
+        "https://github.com/quantum-box/tachyon-cowork/releases/latest/download/latest.json"
+      ],
+      "pubkey": "REPLACE_WITH_TAURI_SIGNING_PUBLIC_KEY"
     }
   },
   "bundle": {

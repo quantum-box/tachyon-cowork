@@ -10,9 +10,23 @@ import {
   PinOff,
   PanelLeftClose,
   PanelLeftOpen,
+  MessageCircle,
 } from "lucide-react";
 import type { SessionSummary } from "../../lib/types";
-import type { ProjectEntry } from "../../lib/tauri-bridge";
+import { isTauri, type ProjectEntry } from "../../lib/tauri-bridge";
+import { UpdateChecker } from "./UpdateChecker";
+
+const FEEDBACK_URL = "https://github.com/quantum-box/tachyon-cowork/issues/new?labels=feedback&template=feedback.md&title=%5BFeedback%5D+";
+
+async function openFeedbackUrl() {
+  const url = FEEDBACK_URL;
+  if (isTauri()) {
+    const { open } = await import("@tauri-apps/plugin-shell");
+    await open(url);
+  } else {
+    window.open(url, "_blank");
+  }
+}
 
 type Props = {
   sessions: SessionSummary[];
@@ -91,6 +105,13 @@ export function Sidebar({
           <MessageSquarePlus size={18} />
         </button>
         <div className="flex-1" />
+        <button
+          onClick={openFeedbackUrl}
+          className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-800 text-gray-500 dark:text-slate-400 transition-colors"
+          title="フィードバック"
+        >
+          <MessageCircle size={16} />
+        </button>
         <button
           onClick={onOpenSettings}
           className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-800 text-gray-500 dark:text-slate-400 transition-colors"
@@ -252,8 +273,18 @@ export function Sidebar({
         )}
       </div>
 
+      {/* Update notification */}
+      <UpdateChecker />
+
       {/* Footer */}
       <div className="p-3 border-t border-gray-200 dark:border-slate-700 flex items-center gap-2">
+        <button
+          onClick={openFeedbackUrl}
+          className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-800 text-gray-500 dark:text-slate-400 transition-colors duration-150"
+          title="フィードバック"
+        >
+          <MessageCircle size={16} />
+        </button>
         <button
           onClick={onOpenSettings}
           className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-800 text-gray-500 dark:text-slate-400 transition-colors duration-150"
