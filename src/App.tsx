@@ -34,7 +34,6 @@ import { SettingsPanel } from "./components/layout/SettingsPanel";
 import { WorkFolderListPanel } from "./components/layout/WorkFolderListPanel";
 import { WorkFolderPanel } from "./components/layout/WorkFolderPanel";
 import type { SessionSummary } from "./lib/types";
-import { open } from "@tauri-apps/plugin-dialog";
 import {
   isTauri,
   type ProjectContext,
@@ -293,6 +292,7 @@ export default function App() {
 
   const handlePickProject = useCallback(async () => {
     if (!isTauri()) return;
+    const { open } = await import("@tauri-apps/plugin-dialog");
     const selected = await open({ directory: true, multiple: false });
     if (selected && typeof selected === "string") {
       await activateProject(selected);

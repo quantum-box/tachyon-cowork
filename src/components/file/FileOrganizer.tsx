@@ -1,6 +1,4 @@
 import { useState, useCallback, useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { open } from "@tauri-apps/plugin-dialog";
 import {
   FolderOpen,
   ArrowRight,
@@ -69,6 +67,7 @@ export function FileOrganizer({ defaultDirectory }: { defaultDirectory?: string 
   }, [defaultDirectory]);
 
   const handleBrowse = useCallback(async () => {
+    const { open } = await import("@tauri-apps/plugin-dialog");
     const selected = await open({ directory: true, multiple: false });
     if (selected && typeof selected === "string") {
       setDirectory(selected);
@@ -85,6 +84,7 @@ export function FileOrganizer({ defaultDirectory }: { defaultDirectory?: string 
     setResults(null);
     setError(null);
     try {
+      const { invoke } = await import("@tauri-apps/api/core");
       const p = await invoke<OrganizePlan>("organize_files", {
         directory,
         strategy,
@@ -104,6 +104,7 @@ export function FileOrganizer({ defaultDirectory }: { defaultDirectory?: string 
     setIsExecuting(true);
     setError(null);
     try {
+      const { invoke } = await import("@tauri-apps/api/core");
       const res = await invoke<OperationResult[]>("execute_organize_plan", {
         operations: plan.operations,
       });

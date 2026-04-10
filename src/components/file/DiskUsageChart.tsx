@@ -1,6 +1,4 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { open } from "@tauri-apps/plugin-dialog";
 import { FolderOpen, HardDrive, Loader2 } from "lucide-react";
 import { formatFileSize } from "../../lib/format";
 
@@ -40,6 +38,7 @@ export function DiskUsageChart({ defaultDirectory }: { defaultDirectory?: string
   }, [defaultDirectory]);
 
   const handleBrowse = useCallback(async () => {
+    const { open } = await import("@tauri-apps/plugin-dialog");
     const sel = await open({ directory: true, multiple: false });
     if (sel && typeof sel === "string") {
       setDirectory(sel);
@@ -53,6 +52,7 @@ export function DiskUsageChart({ defaultDirectory }: { defaultDirectory?: string
     setIsLoading(true);
     setAnalyzed(true);
     try {
+      const { invoke } = await import("@tauri-apps/api/core");
       const data = await invoke<DiskUsage>("get_disk_usage", { directory });
       setUsage(data);
     } catch (err) {

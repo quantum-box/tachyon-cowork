@@ -1,6 +1,4 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { open } from "@tauri-apps/plugin-dialog";
 import {
   FolderOpen,
   Copy,
@@ -34,6 +32,7 @@ export function DuplicateDetector({ defaultDirectory }: { defaultDirectory?: str
   }, [defaultDirectory]);
 
   const handleBrowse = useCallback(async () => {
+    const { open } = await import("@tauri-apps/plugin-dialog");
     const sel = await open({ directory: true, multiple: false });
     if (sel && typeof sel === "string") {
       setDirectory(sel);
@@ -53,6 +52,7 @@ export function DuplicateDetector({ defaultDirectory }: { defaultDirectory?: str
     setDeleteComplete(false);
     setError(null);
     try {
+      const { invoke } = await import("@tauri-apps/api/core");
       const dups = await invoke<DuplicateGroup[]>("find_duplicates", {
         directory,
         recursive,
@@ -84,6 +84,7 @@ export function DuplicateDetector({ defaultDirectory }: { defaultDirectory?: str
     setIsDeleting(true);
     setError(null);
     try {
+      const { invoke } = await import("@tauri-apps/api/core");
       for (const path of selected) {
         await invoke("move_to_trash", { path });
       }
@@ -120,6 +121,7 @@ export function DuplicateDetector({ defaultDirectory }: { defaultDirectory?: str
 
   const handleShowInFolder = useCallback(async (path: string) => {
     try {
+      const { invoke } = await import("@tauri-apps/api/core");
       await invoke("show_in_folder", { path });
     } catch (err) {
       console.error("show_in_folder error:", err);
