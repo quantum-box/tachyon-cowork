@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { AlertCircle, RefreshCw, X, Square } from "lucide-react";
+import { AlertCircle, RefreshCw, X, Square, Menu } from "lucide-react";
 import type { useAgentChat } from "../../hooks/useAgentChat";
 import type {
   Artifact,
@@ -39,6 +39,7 @@ type Props = {
   isOffline?: boolean;
   onOpenTools?: () => void;
   projectContext?: ProjectContext | null;
+  onToggleSidebar?: () => void;
 };
 
 function formatWorkspaceLabel(projectContext: ProjectContext): string {
@@ -71,6 +72,7 @@ export function ChatPanel({
   isOffline = false,
   onOpenTools,
   projectContext,
+  onToggleSidebar,
 }: Props) {
   const [searchQuery] = useState("");
   const hasNetworkIssue = isOffline || chat.error?.kind === "network";
@@ -92,6 +94,23 @@ export function ChatPanel({
   return (
     <FileDropZone onFilesDropped={onFilesAdd}>
       <div className="flex flex-col h-full bg-white dark:bg-slate-950 transition-colors duration-150">
+        {/* Mobile header */}
+        {onToggleSidebar && (
+          <div className="md:hidden flex items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-slate-700">
+            <button
+              type="button"
+              onClick={onToggleSidebar}
+              className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-600 dark:text-slate-400 transition-colors"
+              aria-label="メニューを開く"
+            >
+              <Menu size={20} />
+            </button>
+            <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+              Tachyon Cowork
+            </span>
+          </div>
+        )}
+
         {/* Chat search bar */}
         {isSearchOpen && (
           <ChatSearch chunks={chat.chunks} onClose={onSearchClose} />

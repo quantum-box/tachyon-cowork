@@ -198,7 +198,7 @@ function EmptyState({ onSendMessage }: { onSendMessage?: (message: string) => vo
       </p>
 
       {/* Feature cards grid */}
-      <div className="grid grid-cols-2 gap-3 w-full max-w-lg">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-lg">
         {FEATURE_CARDS.map((card) => (
           <button
             key={card.title}
