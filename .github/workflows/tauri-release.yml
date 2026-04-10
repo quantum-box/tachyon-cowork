@@ -97,9 +97,14 @@ jobs:
             src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg
             src-tauri/target/${{ matrix.target }}/release/bundle/macos/*.app
             src-tauri/target/${{ matrix.target }}/release/bundle/nsis/*.exe
+            src-tauri/target/${{ matrix.target }}/release/bundle/nsis/*.exe.sig
             src-tauri/target/${{ matrix.target }}/release/bundle/msi/*.msi
+            src-tauri/target/${{ matrix.target }}/release/bundle/msi/*.msi.sig
             src-tauri/target/${{ matrix.target }}/release/bundle/appimage/*.AppImage
+            src-tauri/target/${{ matrix.target }}/release/bundle/appimage/*.AppImage.sig
             src-tauri/target/${{ matrix.target }}/release/bundle/deb/*.deb
+            src-tauri/target/${{ matrix.target }}/release/bundle/macos/*.app.tar.gz
+            src-tauri/target/${{ matrix.target }}/release/bundle/macos/*.app.tar.gz.sig
           if-no-files-found: ignore
 
   release:
@@ -123,9 +128,14 @@ jobs:
           find artifacts -type f \( \
             -name "*.dmg" -o \
             -name "*.exe" -o \
+            -name "*.exe.sig" -o \
             -name "*.msi" -o \
+            -name "*.msi.sig" -o \
             -name "*.AppImage" -o \
-            -name "*.deb" \
+            -name "*.AppImage.sig" -o \
+            -name "*.deb" -o \
+            -name "*.app.tar.gz" -o \
+            -name "*.app.tar.gz.sig" \
           \) -exec cp {} release/ \;
           echo "Release files:"
           ls -la release/
@@ -135,6 +145,69 @@ jobs:
           cd release
           sha256sum * > checksums-sha256.txt || true
           cat checksums-sha256.txt
+
+      - name: Generate updater latest.json
+        run: |
+          TAG="${GITHUB_REF_NAME:-${{ github.event.inputs.version }}}"
+          VERSION="${TAG#v}"
+          DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          BASE_URL="https://github.com/quantum-box/tachyon-cowork/releases/download/${TAG}"
+
+          # Read signature files
+          read_sig() {
+            local file="release/$1"
+            if [ -f "$file" ]; then
+              cat "$file"
+            else
+              echo ""
+            fi
+          }
+
+          # Find actual filenames
+          MACOS_AARCH64_TAR=$(ls release/*aarch64*.app.tar.gz 2>/dev/null | head -1 | xargs -r basename)
+          MACOS_X86_TAR=$(ls release/*x86_64*.app.tar.gz 2>/dev/null | head -1 | xargs -r basename)
+          # For macOS, if we don't have arch-specific names, use the generic one
+          if [ -z "$MACOS_AARCH64_TAR" ] && [ -z "$MACOS_X86_TAR" ]; then
+            MACOS_TAR=$(ls release/*.app.tar.gz 2>/dev/null | head -1 | xargs -r basename)
+            MACOS_AARCH64_TAR="$MACOS_TAR"
+            MACOS_X86_TAR="$MACOS_TAR"
+          fi
+          WINDOWS_MSI=$(ls release/*.msi 2>/dev/null | head -1 | xargs -r basename)
+          WINDOWS_EXE=$(ls release/*.exe 2>/dev/null | grep -v '.sig$' | head -1 | xargs -r basename)
+          LINUX_APPIMAGE=$(ls release/*.AppImage 2>/dev/null | grep -v '.sig$' | head -1 | xargs -r basename)
+
+          # Build platforms JSON
+          PLATFORMS="{}"
+
+          if [ -n "$MACOS_AARCH64_TAR" ]; then
+            SIG=$(read_sig "${MACOS_AARCH64_TAR}.sig")
+            PLATFORMS=$(echo "$PLATFORMS" | jq --arg url "${BASE_URL}/${MACOS_AARCH64_TAR}" --arg sig "$SIG" '. + {"darwin-aarch64": {"url": $url, "signature": $sig}}')
+          fi
+
+          if [ -n "$MACOS_X86_TAR" ]; then
+            SIG=$(read_sig "${MACOS_X86_TAR}.sig")
+            PLATFORMS=$(echo "$PLATFORMS" | jq --arg url "${BASE_URL}/${MACOS_X86_TAR}" --arg sig "$SIG" '. + {"darwin-x86_64": {"url": $url, "signature": $sig}}')
+          fi
+
+          if [ -n "$WINDOWS_MSI" ]; then
+            SIG=$(read_sig "${WINDOWS_MSI}.sig")
+            PLATFORMS=$(echo "$PLATFORMS" | jq --arg url "${BASE_URL}/${WINDOWS_MSI}" --arg sig "$SIG" '. + {"windows-x86_64": {"url": $url, "signature": $sig}}')
+          fi
+
+          if [ -n "$LINUX_APPIMAGE" ]; then
+            SIG=$(read_sig "${LINUX_APPIMAGE}.sig")
+            PLATFORMS=$(echo "$PLATFORMS" | jq --arg url "${BASE_URL}/${LINUX_APPIMAGE}" --arg sig "$SIG" '. + {"linux-x86_64": {"url": $url, "signature": $sig}}')
+          fi
+
+          jq -n \
+            --arg version "$VERSION" \
+            --arg date "$DATE" \
+            --argjson platforms "$PLATFORMS" \
+            '{version: $version, pub_date: $date, platforms: $platforms}' \
+            > release/latest.json
+
+          echo "Generated latest.json:"
+          cat release/latest.json
 
       - name: Set version
         id: version
