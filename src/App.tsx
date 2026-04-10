@@ -372,7 +372,7 @@ export default function App() {
         oauthError={oauthError}
         isExchangingToken={isExchangingToken}
         isOffline={!isOnline}
-        onEnterOfflineMode={() => setOfflineMode(true)}
+        onEnterOfflineMode={isTauri() ? () => setOfflineMode(true) : undefined}
       />
     );
   }
@@ -400,7 +400,7 @@ export default function App() {
           onDeleteRoom={chat.deleteRoom}
           onTogglePin={chat.togglePin}
           onLogout={handleLogout}
-          onToggleTools={handleToggleTools}
+          onToggleTools={isTauri() ? handleToggleTools : undefined}
           showTools={showTools}
           showWorkFolders={showWorkFolders}
           onOpenSettings={() => setSettingsOpen(true)}
@@ -408,7 +408,7 @@ export default function App() {
           onToggleCollapse={() => setSidebarCollapsed((prev) => !prev)}
           activeProject={activeProject}
           recentProjects={recentProjects}
-          onPickProject={handlePickProject}
+          onPickProject={isTauri() ? handlePickProject : undefined}
           onOpenWorkFolderList={openWorkFolderPage}
           isProjectLoading={isProjectLoading}
         />
@@ -441,15 +441,17 @@ export default function App() {
               />
             }
           />
-          <Route
-            path="/tools"
-            element={
-              <ToolsPanel
-                onBack={handleBackToChat}
-                projectDirectory={activeProject?.path}
-              />
-            }
-          />
+          {isTauri() && (
+            <Route
+              path="/tools"
+              element={
+                <ToolsPanel
+                  onBack={handleBackToChat}
+                  projectDirectory={activeProject?.path}
+                />
+              }
+            />
+          )}
           <Route
             path="/work-folders"
             element={

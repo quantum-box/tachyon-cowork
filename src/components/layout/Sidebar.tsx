@@ -23,7 +23,7 @@ type Props = {
   onDeleteRoom: (id: string) => void;
   onTogglePin: (id: string) => void;
   onLogout: () => void;
-  onToggleTools: () => void;
+  onToggleTools?: () => void;
   showTools: boolean;
   showWorkFolders: boolean;
   onOpenSettings: () => void;
@@ -31,7 +31,7 @@ type Props = {
   onToggleCollapse?: () => void;
   activeProject?: ProjectEntry | null;
   recentProjects: ProjectEntry[];
-  onPickProject: () => void;
+  onPickProject?: () => void;
   onOpenWorkFolderList: (path?: string) => void;
   isProjectLoading?: boolean;
 };
@@ -187,19 +187,21 @@ export function Sidebar({
       </div>
 
       {/* File Tools button */}
-      <div className="px-3 pt-3">
-        <button
-          onClick={onToggleTools}
-          className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
-            showTools
-              ? "bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-700"
-              : "bg-white dark:bg-slate-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-slate-600 hover:bg-gray-100 dark:hover:bg-slate-700"
-          }`}
-        >
-          <FolderOpen size={14} />
-          ファイルツール
-        </button>
-      </div>
+      {onToggleTools && (
+        <div className="px-3 pt-3">
+          <button
+            onClick={onToggleTools}
+            className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+              showTools
+                ? "bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-700"
+                : "bg-white dark:bg-slate-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-slate-600 hover:bg-gray-100 dark:hover:bg-slate-700"
+            }`}
+          >
+            <FolderOpen size={14} />
+            ファイルツール
+          </button>
+        </div>
+      )}
 
       {/* Chat list */}
       <div className="flex-1 overflow-y-auto py-2">
