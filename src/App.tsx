@@ -377,11 +377,44 @@ export default function App() {
     );
   }
 
+  // Auto-collapse sidebar on mobile
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== "undefined" ? window.innerWidth < 768 : false,
+  );
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    const handler = (e: MediaQueryListEvent) => {
+      setIsMobile(e.matches);
+      if (e.matches) setSidebarCollapsed(true);
+    };
+    setIsMobile(mq.matches);
+    if (mq.matches) setSidebarCollapsed(true);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
+  // Close sidebar on mobile when navigating
+  const handleMobileSidebarClose = useCallback(() => {
+    if (isMobile) setSidebarCollapsed(true);
+  }, [isMobile]);
+
   return (
     <div className="flex h-screen bg-white dark:bg-slate-950 transition-colors duration-150">
-      {/* Sidebar */}
+      {/* Sidebar - overlay on mobile, inline on desktop */}
+      {isMobile && !sidebarCollapsed && (
+        <div
+          className="fixed inset-0 bg-black/40 z-[60] transition-opacity duration-200"
+          onClick={() => setSidebarCollapsed(true)}
+        />
+      )}
       <div
-        className={`shrink-0 ${sidebarCollapsed ? "w-12" : "w-[260px]"} transition-all duration-200`}
+        className={`
+          ${isMobile
+            ? `fixed inset-y-0 left-0 z-[70] transition-transform duration-200 ${sidebarCollapsed ? "-translate-x-full" : "translate-x-0"} w-[280px]`
+            : `shrink-0 ${sidebarCollapsed ? "w-12" : "w-[260px]"} transition-all duration-200`
+          }
+        `}
       >
         <Sidebar
           sessions={chat.sessions}
@@ -391,11 +424,13 @@ export default function App() {
             chat.newChat();
             artifactState.closeCanvas();
             navigate("/");
+            handleMobileSidebarClose();
           }}
           onSelectSession={(id: string) => {
             chat.selectSession(id);
             artifactState.closeCanvas();
             navigate("/");
+            handleMobileSidebarClose();
           }}
           onDeleteRoom={chat.deleteRoom}
           onTogglePin={chat.togglePin}
@@ -404,12 +439,15 @@ export default function App() {
           showTools={showTools}
           showWorkFolders={showWorkFolders}
           onOpenSettings={() => setSettingsOpen(true)}
-          isCollapsed={sidebarCollapsed}
+          isCollapsed={isMobile ? false : sidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed((prev) => !prev)}
           activeProject={activeProject}
           recentProjects={recentProjects}
           onPickProject={isTauri() ? handlePickProject : undefined}
-          onOpenWorkFolderList={openWorkFolderPage}
+          onOpenWorkFolderList={(path) => {
+            openWorkFolderPage(path);
+            handleMobileSidebarClose();
+          }}
           isProjectLoading={isProjectLoading}
         />
       </div>
@@ -438,6 +476,7 @@ export default function App() {
                 isOffline={!isOnline}
                 onOpenTools={() => navigate("/tools")}
                 projectContext={projectContext}
+                onToggleSidebar={isMobile ? () => setSidebarCollapsed((prev) => !prev) : undefined}
               />
             }
           />
