@@ -35,9 +35,17 @@ Tachyon Cowork (frontend) — `tachyon-cowork/.env`:
 
 Agent API backend — `tachyon-apps/.env`:
 
-- `OPENAI_API_KEY`
-- `ANTHROPIC_API_KEY` ← **confirm with PdM whether required for 4/15 Golden Path**
+- `OPENAI_API_KEY` (required — Whisper transcription + gpt-4o summarization + auto-name)
+- `ANTHROPIC_API_KEY` **not required for the 4/15 Golden Path** (PdM-confirmed 2026-04-13). Leave blank.
 - `COGNITO_JWK_URL`, `COGNITO_CLIENT_ID`, `COGNITO_CLIENT_SECRET`
+- **Exhibition-only overrides** — add the following so auto-generated session / chatroom names use OpenAI instead of the Anthropic default (requires tachyon-apps PR #2293 merged):
+
+  ```
+  SESSION_NAME_GENERATION_MODEL=openai/gpt-4o-mini
+  CHATROOM_NAME_GENERATION_MODEL=openai/gpt-4o-mini
+  ```
+
+  Without these overrides the feature silently degrades to first-message truncation — functional but visitor-visible as generic placeholder names.
 
 Sanitize rule: never copy `.env` from production; use the exhibition-issued keys.
 
