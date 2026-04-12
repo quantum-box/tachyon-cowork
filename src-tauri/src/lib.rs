@@ -14,7 +14,8 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
-        .plugin(tauri_plugin_updater::Builder::new().build())
+        // Updater disabled for exhibition build (no signing key configured)
+        // .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(mcp::manager::McpManager::new())
         .manage(project::ProjectManager::new())
         .setup(|app| {
