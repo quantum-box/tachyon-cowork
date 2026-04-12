@@ -60,6 +60,11 @@ export default function App() {
     typeof navigator === "undefined" ? true : navigator.onLine,
   );
 
+  // Mobile detection (must be top-level, before any conditional returns)
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== "undefined" ? window.innerWidth < 768 : false,
+  );
+
   const { theme, setTheme } = useTheme();
   const { sendKey, setSendKey } = useSendKey();
   const navigate = useNavigate();
@@ -75,6 +80,19 @@ export default function App() {
       window.removeEventListener("online", syncNetworkState);
       window.removeEventListener("offline", syncNetworkState);
     };
+  }, []);
+
+  // Auto-collapse sidebar on mobile
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    const handler = (e: MediaQueryListEvent) => {
+      setIsMobile(e.matches);
+      if (e.matches) setSidebarCollapsed(true);
+    };
+    setIsMobile(mq.matches);
+    if (mq.matches) setSidebarCollapsed(true);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
   }, []);
 
   // ── OAuth2 Callback Handler ──────────────────────────────────────
@@ -326,6 +344,11 @@ export default function App() {
     [saveProjectSummary],
   );
 
+  // Close sidebar on mobile when navigating
+  const handleMobileSidebarClose = useCallback(() => {
+    if (isMobile) setSidebarCollapsed(true);
+  }, [isMobile]);
+
   // Keyboard shortcuts
   useKeyboardShortcuts(
     useMemo(
@@ -376,28 +399,6 @@ export default function App() {
       />
     );
   }
-
-  // Auto-collapse sidebar on mobile
-  const [isMobile, setIsMobile] = useState(() =>
-    typeof window !== "undefined" ? window.innerWidth < 768 : false,
-  );
-
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 767px)");
-    const handler = (e: MediaQueryListEvent) => {
-      setIsMobile(e.matches);
-      if (e.matches) setSidebarCollapsed(true);
-    };
-    setIsMobile(mq.matches);
-    if (mq.matches) setSidebarCollapsed(true);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
-
-  // Close sidebar on mobile when navigating
-  const handleMobileSidebarClose = useCallback(() => {
-    if (isMobile) setSidebarCollapsed(true);
-  }, [isMobile]);
 
   return (
     <div className="flex h-screen bg-white dark:bg-slate-950 transition-colors duration-150">
