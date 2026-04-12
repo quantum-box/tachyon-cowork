@@ -41,6 +41,20 @@ Agent API backend — `tachyon-apps/.env`:
 
 Sanitize rule: never copy `.env` from production; use the exhibition-issued keys.
 
+## 1b. Unsigned build — explicit risks
+
+CEO has approved unsigned operation for 2026-04-15; these residual risks remain and must be understood by the operator:
+
+| Risk | Impact | Mitigation on the day |
+|---|---|---|
+| First-run OS warning (Gatekeeper / SmartScreen) | Visitors see a security prompt mid-demo | Perform §3 bypass **before the exhibition opens**; never live-demo the first install |
+| No notarization (macOS) | macOS may re-quarantine after Sequoia updates or file re-download | Keep the `.dmg` locally; do not re-download on the day. Re-run `xattr -cr` if re-copied |
+| No EV cert (Windows) | SmartScreen "Unknown publisher" warning on every fresh user profile | Use a single pre-configured Windows user profile; don't switch accounts on the day |
+| Updater is disabled (P0-2 hotfix) | No in-app updates during exhibition | Lock the installed build; any hotfix must be a manual re-install, not OTA |
+| No code-signing integrity guarantee | If the `.dmg`/`.msi` is tampered with, nothing detects it | Build on a trusted engineer PC, transfer directly to exhibition PC (USB or SFTP); do not download via untrusted channels |
+| Anti-virus may quarantine `.msi` | Windows may silently block execution | Disable AV scan for the install folder before first run |
+| Browser download warnings | Chrome/Edge may block the `.dmg`/`.msi` download | Use `scp`/USB to transfer; avoid browser download for the installer |
+
 ## 2. Build (unsigned)
 
 From `tachyon-cowork/` on the exhibition PC:
