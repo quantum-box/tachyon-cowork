@@ -126,6 +126,47 @@ If the build fails on Linux with `glib-2.0 not found`, install: `sudo apt-get in
 | UC1 (パワポ作成) | Chat: 「調査結果をスライドにまとめて」 → `file_manager` tool emits `.pptx` | If `msb` unavailable, skip UC1 |
 | UC3 (画像分類) | Drag-and-drop image into chat | Works offline; good fallback if network flaky |
 
+## 5a. Post-deploy smoke: verify OpenAI auto-name override
+
+Run this **once** on the exhibition PC after the runbook's §1a `.env` overrides are in place and the backend has picked them up (Agent API restart). Goal: confirm that `SESSION_NAME_GENERATION_MODEL=openai/gpt-4o-mini` is actually taking effect — otherwise auto-named sessions silently fall back to truncated first-message strings and visitors see generic placeholders.
+
+Two equivalent checks — do at least one:
+
+### Option 1 — UI smoke (1 min)
+
+1. Launch the app → Cognito login (exhibition test user).
+2. Create a new project; send a chat message like「明日の取締役会の議題を3つ提案して」.
+3. Wait ~5 s, then look at the left-nav session title.
+4. **PASS** = a natural-language title (e.g. 「取締役会議題の提案」). **FAIL** = the verbatim first ~20 chars of the message followed by `…`.
+
+### Option 2 — curl smoke (requires API access)
+
+Using the exhibition test user's access token and the Agent API base URL (from `VITE_API_BASE_URL`):
+
+```bash
+TOKEN="<cognito access token>"
+API="<VITE_API_BASE_URL>"
+
+# Create a session with a known prompt
+SID=$(curl -s -X POST "$API/v1/sessions" \
+  -H "authorization: Bearer $TOKEN" \
+  -H "content-type: application/json" \
+  -d '{"initial_message":"Quarterly review agenda draft"}' | jq -r .id)
+
+# Trigger auto-name (or wait for the server-side post-message hook)
+# then re-read the session
+curl -s "$API/v1/sessions/$SID" \
+  -H "authorization: Bearer $TOKEN" | jq -r .name
+```
+
+**PASS** = a short summary title different from the raw initial message. **FAIL** = the initial message itself (truncated).
+
+### If FAIL
+
+- Confirm `tachyon-apps/.env` contains both overrides and that the Agent API process was restarted after the edit (`docker compose restart tachyon-api` or equivalent).
+- Confirm the deployed backend is at merge commit `76c7418` or later (tachyon-apps PR #2293).
+- As a workaround, the demo is still functional — only the session title is affected.
+
 ## 6. Fallback & troubleshooting
 
 | Symptom | Action |
@@ -145,6 +186,7 @@ If the build fails on Linux with `glib-2.0 not found`, install: `sudo apt-get in
 - [ ] Gatekeeper / SmartScreen bypass performed and persists after PC reboot
 - [ ] Cognito login with exhibition test user succeeds
 - [ ] Golden Path 1 loop completes end-to-end (recording → minutes)
+- [ ] §5a smoke: OpenAI auto-name override verified (session title is LLM-generated, not truncated raw message)
 - [ ] UC2 tested (web search)
 - [ ] UC1 tested or explicitly skipped (record decision)
 - [ ] Spare USB mic on-hand
