@@ -95,7 +95,8 @@ pub fn app_info() -> BuiltinAppInfo {
             },
             BuiltinToolDef {
                 name: "extract_action_items".to_string(),
-                description: "議事録やテキストからアクションアイテムを抽出する（Claude API使用）".to_string(),
+                description: "議事録やテキストからアクションアイテムを抽出する（Claude API使用）"
+                    .to_string(),
                 input_schema: json!({
                     "type": "object",
                     "properties": {
@@ -236,14 +237,14 @@ fn stop_recording() -> Result<serde_json::Value, String> {
         return Err("No audio data was captured".to_string());
     }
 
-    let duration_seconds = samples.len() as f64 / (state.sample_rate as f64 * state.channels as f64);
+    let duration_seconds =
+        samples.len() as f64 / (state.sample_rate as f64 * state.channels as f64);
 
     // Write WAV file to temp directory
     let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
     let filename = format!("meeting_{}.wav", timestamp);
     let dir = std::env::temp_dir().join("tachyon_recordings");
-    std::fs::create_dir_all(&dir)
-        .map_err(|e| format!("Failed to create recordings dir: {}", e))?;
+    std::fs::create_dir_all(&dir).map_err(|e| format!("Failed to create recordings dir: {}", e))?;
     let path = dir.join(&filename);
 
     let spec = hound::WavSpec {
@@ -441,7 +442,9 @@ async fn extract_action_items(args: serde_json::Value) -> Result<serde_json::Val
         } else {
             trimmed
         };
-        serde_json::from_str(json_str).unwrap_or(json!([{"action": raw, "assignee": null, "deadline": null, "priority": "medium"}]))
+        serde_json::from_str(json_str).unwrap_or(
+            json!([{"action": raw, "assignee": null, "deadline": null, "priority": "medium"}]),
+        )
     });
 
     Ok(json!({

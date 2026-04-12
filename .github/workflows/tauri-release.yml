@@ -78,12 +78,29 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # Apple code signing / notarization — optional.
+          # When these secrets are unset, tauri-action produces an unsigned build
+          # and the ad-hoc codesign step below takes over. Adding the secrets in
+          # repo settings automatically activates Developer ID signing + notarization
+          # on the next run (no workflow edit required).
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           args: --target ${{ matrix.target }}
 
-      - name: Ad-hoc codesign macOS app
+      - name: Ad-hoc codesign macOS app (unsigned fallback)
         if: contains(matrix.target, 'apple-darwin')
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
         run: |
+          if [ -n "$APPLE_CERTIFICATE" ]; then
+            echo "Developer ID certificate detected — tauri-action already signed the app. Skipping ad-hoc signing."
+            exit 0
+          fi
           APP_PATH=$(find src-tauri/target/${{ matrix.target }}/release/bundle/macos -name "*.app" -maxdepth 1 | head -1)
           if [ -n "$APP_PATH" ]; then
             codesign --force --deep -s - "$APP_PATH"
