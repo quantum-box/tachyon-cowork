@@ -112,7 +112,9 @@ If the build fails on Linux with `glib-2.0 not found`, install: `sudo apt-get in
 ## 5. Golden Path walk-through (on exhibition PC)
 
 1. Launch `TachyonCowork`.
-2. Cognito login — use the exhibition test user (credentials on the printed card).
+2. Cognito login — use the exhibition test user:
+   - **ID**: `info`
+   - **Password**: `Exhibition2026!`
 3. Create a new project named **展示会デモ**.
 4. Start recording → speak ~30 s of Japanese → stop recording.
 5. Wait for the transcript / minutes panel to populate automatically (Agent API pipeline).
@@ -126,7 +128,26 @@ If the build fails on Linux with `glib-2.0 not found`, install: `sudo apt-get in
 | UC1 (パワポ作成) | Chat: 「調査結果をスライドにまとめて」 → `file_manager` tool emits `.pptx` | If `msb` unavailable, skip UC1 |
 | UC3 (画像分類) | Drag-and-drop image into chat | Works offline; good fallback if network flaky |
 
-## 5a. Post-deploy smoke: verify OpenAI auto-name override
+### 5a. Credentials card (print and bring to the venue)
+
+Print the following card and hand it to the exhibition operator:
+
+```
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃        Tachyon Cowork  展示会用アカウント       ┃
+┃                                              ┃
+┃  ログインID:   info                           ┃
+┃  パスワード:   Exhibition2026!                 ┃
+┃                                              ┃
+┃  Cognito Domain:  https://auth-pool.n1.tachy.one
+┃  テナントID:      tn_01hjryxysgey07h5jz5wagqj0m
+┃  権限:            owner                       ┃
+┃                                              ┃
+┃  ※ 本カードは展示会終了後に破棄してください      ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+```
+
+## 5b. Post-deploy smoke: verify OpenAI auto-name override
 
 Run this **once** on the exhibition PC after the runbook's §1a `.env` overrides are in place and the backend has picked them up (Agent API restart). Goal: confirm that `SESSION_NAME_GENERATION_MODEL=openai/gpt-4o-mini` is actually taking effect — otherwise auto-named sessions silently fall back to truncated first-message strings and visitors see generic placeholders.
 
@@ -190,4 +211,4 @@ curl -s "$API/v1/sessions/$SID" \
 - [ ] UC2 tested (web search)
 - [ ] UC1 tested or explicitly skipped (record decision)
 - [ ] Spare USB mic on-hand
-- [ ] Printed credential card prepared
+- [ ] Printed credential card prepared (§5a: ID `info` / PW `Exhibition2026!`)
