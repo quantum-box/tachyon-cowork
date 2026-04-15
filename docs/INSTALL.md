@@ -113,7 +113,7 @@ sudo dpkg -i tachyon-cowork_*.deb
 
 ### 3. Work Folder の設定（任意）
 
-作業ディレクトリを「Work Folder」として登録すると、プロジェクトのコンテキストを AI に共有できる。
+作業ディレクトリを Workspace として登録すると、その workspace 固有の指示を `AGENTS.md` 経由で AI に共有できる。
 サイドバーの「フォルダを開く」からディレクトリを選択。
 
 ---

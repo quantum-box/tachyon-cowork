@@ -43,10 +43,12 @@ pub async fn project_initialize_active(
 }
 
 #[tauri::command]
-pub async fn project_update_active_summary(
+pub async fn project_update_active_custom_instructions(
     state: tauri::State<'_, ProjectManager>,
     app: AppHandle,
-    summary: String,
+    custom_instructions: String,
 ) -> Result<crate::project::ProjectContext, String> {
-    state.update_active_project_summary(&app, summary).await
+    state
+        .update_active_project_custom_instructions(&app, custom_instructions)
+        .await
 }

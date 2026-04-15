@@ -7,6 +7,31 @@ import type {
 } from "./types";
 import type { TokenManager } from "./token-manager";
 
+export class ApiRequestError extends Error {
+  status: number;
+  body: string;
+
+  constructor(status: number, statusText: string, body = "") {
+    super(
+      `Request failed: ${status} ${statusText}${body ? ` - ${body}` : ""}`,
+    );
+    this.name = "ApiRequestError";
+    this.status = status;
+    this.body = body;
+  }
+}
+
+export function isUnauthorizedApiError(error: unknown): boolean {
+  if (error instanceof ApiRequestError) {
+    return error.status === 401;
+  }
+
+  return (
+    error instanceof Error &&
+    (error.message.includes("401") || error.message.includes("Unauthorized"))
+  );
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -150,8 +175,12 @@ export class AgentChatClient {
       },
     });
 
-    // On 401, try one refresh + retry
-    if (response.status === 401 && this.tokenManager) {
+    // On 401, try one refresh + retry only when refresh is actually possible.
+    if (
+      response.status === 401 &&
+      this.tokenManager &&
+      this.tokenManager.canRefreshToken()
+    ) {
       const freshToken = await this.tokenManager.forceRefreshToken();
       this.config = { ...this.config, accessToken: freshToken };
       const retryHeaders = this.getHeaders();
@@ -164,8 +193,10 @@ export class AgentChatClient {
           this.tokenManager.handleUnauthorizedError();
         }
         const body = await retryResponse.text().catch(() => "");
-        throw new Error(
-          `Request failed: ${retryResponse.status} ${retryResponse.statusText}${body ? ` - ${body}` : ""}`,
+        throw new ApiRequestError(
+          retryResponse.status,
+          retryResponse.statusText,
+          body,
         );
       }
       return (await retryResponse.json()) as T;
@@ -176,9 +207,7 @@ export class AgentChatClient {
         this.tokenManager.handleUnauthorizedError();
       }
       const body = await response.text().catch(() => "");
-      throw new Error(
-        `Request failed: ${response.status} ${response.statusText}${body ? ` - ${body}` : ""}`,
-      );
+      throw new ApiRequestError(response.status, response.statusText, body);
     }
     return (await response.json()) as T;
   }
@@ -223,7 +252,11 @@ export class AgentChatClient {
       headers,
     });
     if (!response.ok) {
-      throw new Error(`Failed to delete session: ${response.status}`);
+      if (response.status === 401 && this.tokenManager) {
+        this.tokenManager.handleUnauthorizedError();
+      }
+      const body = await response.text().catch(() => "");
+      throw new ApiRequestError(response.status, response.statusText, body);
     }
   }
 
@@ -244,9 +277,14 @@ export class AgentChatClient {
       body: JSON.stringify(args),
     });
     if (!response.ok) {
+      if (response.status === 401 && this.tokenManager) {
+        this.tokenManager.handleUnauthorizedError();
+      }
       const body = await response.text().catch(() => "");
-      throw new Error(
-        `Agent execute failed: ${response.status}${body ? ` - ${body}` : ""}`,
+      throw new ApiRequestError(
+        response.status,
+        response.statusText,
+        body || "Agent execute failed",
       );
     }
     return response;
@@ -267,10 +305,11 @@ export class AgentChatClient {
     );
     if (response.ok) return;
 
+    if (response.status === 401 && this.tokenManager) {
+      this.tokenManager.handleUnauthorizedError();
+    }
     const body = await response.text().catch(() => "");
-    throw new Error(
-      `Tool result submit failed: ${response.status}${body ? ` - ${body}` : ""}`,
-    );
+    throw new ApiRequestError(response.status, response.statusText, body);
   }
 
   async getMessages(sessionId: string): Promise<AgentChunk[]> {
@@ -297,10 +336,11 @@ export class AgentChatClient {
     const headers = await this.getFreshHeaders();
     const response = await fetch(url, { method: "DELETE", headers });
     if (!response.ok) {
+      if (response.status === 401 && this.tokenManager) {
+        this.tokenManager.handleUnauthorizedError();
+      }
       const body = await response.text().catch(() => "");
-      throw new Error(
-        `Failed to delete message: ${response.status}${body ? ` - ${body}` : ""}`,
-      );
+      throw new ApiRequestError(response.status, response.statusText, body);
     }
   }
 

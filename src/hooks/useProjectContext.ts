@@ -2,15 +2,14 @@ import { useCallback, useEffect, useState } from "react";
 import {
   isTauri,
   projectGetActiveContext,
-  projectInitializeActive,
-  projectUpdateActiveSummary,
+  projectUpdateActiveCustomInstructions,
   type ProjectContext,
 } from "../lib/tauri-bridge";
 
 export function useProjectContext(activeProjectPath?: string | null) {
   const [context, setContext] = useState<ProjectContext | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const refreshContext = useCallback(async () => {
@@ -36,46 +35,27 @@ export function useProjectContext(activeProjectPath?: string | null) {
     }
   }, [activeProjectPath]);
 
-  const initializeContext = useCallback(async () => {
-    if (!isTauri() || !activeProjectPath) return null;
-
-    setIsInitializing(true);
-    try {
-      const next = await projectInitializeActive();
-      setContext(next);
-      setError(null);
-      return next;
-    } catch (err) {
-      console.error("Failed to initialize project context:", err);
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Failed to initialize project context",
-      );
-      return null;
-    } finally {
-      setIsInitializing(false);
-    }
-  }, [activeProjectPath]);
-
-  const saveSummary = useCallback(
-    async (summary: string) => {
+  const saveCustomInstructions = useCallback(
+    async (customInstructions: string) => {
       if (!isTauri() || !activeProjectPath) return null;
 
-      setIsInitializing(true);
+      setIsSaving(true);
       try {
-        const next = await projectUpdateActiveSummary(summary);
+        const next =
+          await projectUpdateActiveCustomInstructions(customInstructions);
         setContext(next);
         setError(null);
         return next;
       } catch (err) {
-        console.error("Failed to save work guidance:", err);
+        console.error("Failed to save workspace custom instructions:", err);
         setError(
-          err instanceof Error ? err.message : "Failed to save work guidance",
+          err instanceof Error
+            ? err.message
+            : "Failed to save workspace custom instructions",
         );
         return null;
       } finally {
-        setIsInitializing(false);
+        setIsSaving(false);
       }
     },
     [activeProjectPath],
@@ -85,25 +65,12 @@ export function useProjectContext(activeProjectPath?: string | null) {
     refreshContext();
   }, [refreshContext]);
 
-  useEffect(() => {
-    if (
-      !activeProjectPath ||
-      !context ||
-      context.is_initialized ||
-      isInitializing
-    ) {
-      return;
-    }
-    initializeContext();
-  }, [activeProjectPath, context, initializeContext, isInitializing]);
-
   return {
     context,
     isLoading,
-    isInitializing,
+    isSaving,
     error,
     refreshContext,
-    initializeContext,
-    saveSummary,
+    saveCustomInstructions,
   };
 }

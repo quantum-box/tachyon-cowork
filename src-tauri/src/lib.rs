@@ -61,7 +61,7 @@ pub fn run() {
             commands::project::project_remove_recent,
             commands::project::project_get_active_context,
             commands::project::project_initialize_active,
-            commands::project::project_update_active_summary,
+            commands::project::project_update_active_custom_instructions,
             tools::executor::execute_tool,
             commands::file_manage::search_files,
             commands::file_manage::list_directory,

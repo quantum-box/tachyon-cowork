@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AgentChatClient } from "./lib/api-client";
+import { AgentChatClient, isUnauthorizedApiError } from "./lib/api-client";
 import {
   DEFAULT_API_BASE_URL,
   type AuthState,
@@ -27,6 +27,7 @@ import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useMcpTools } from "./hooks/useMcpTools";
 import { useProjectState } from "./hooks/useProjectState";
 import { useProjectContext } from "./hooks/useProjectContext";
+import { useGlobalCustomInstructions } from "./hooks/useGlobalCustomInstructions";
 import { Sidebar } from "./components/layout/Sidebar";
 import { ChatPanel } from "./components/chat/ChatPanel";
 import { ArtifactPanel } from "./components/artifact/ArtifactPanel";
@@ -77,6 +78,8 @@ export default function App() {
 
   const { theme, setTheme } = useTheme();
   const { sendKey, setSendKey } = useSendKey();
+  const { globalCustomInstructions, setGlobalCustomInstructions } =
+    useGlobalCustomInstructions();
   const navigate = useNavigate();
   const location = useLocation();
   const showTools = location.pathname === "/tools";
@@ -278,9 +281,9 @@ export default function App() {
   const {
     context: projectContext,
     isLoading: isProjectContextLoading,
-    isInitializing: isProjectInitializing,
+    isSaving: isProjectContextSaving,
     error: projectContextError,
-    saveSummary: saveProjectSummary,
+    saveCustomInstructions: saveProjectCustomInstructions,
   } = useProjectContext(activeProject?.path);
   const { mcpTools, refreshMcpTools } = useMcpTools(activeProject?.path);
 
@@ -308,6 +311,7 @@ export default function App() {
     handleArtifactFromSSE,
     handleCanvasToolCall,
     mcpTools,
+    globalCustomInstructions,
     activeProject?.path,
     projectContext,
   );
@@ -334,6 +338,9 @@ export default function App() {
         }
       })
       .catch((error) => {
+        if (isUnauthorizedApiError(error)) {
+          return;
+        }
         console.warn(
           "Failed to load available models, using fallback list.",
           error,
@@ -451,11 +458,11 @@ export default function App() {
     [removeProject, refreshMcpTools],
   );
 
-  const handleSaveProjectSummary = useCallback(
-    async (summary: string) => {
-      await saveProjectSummary(summary);
+  const handleSaveProjectCustomInstructions = useCallback(
+    async (customInstructions: string) => {
+      await saveProjectCustomInstructions(customInstructions);
     },
-    [saveProjectSummary],
+    [saveProjectCustomInstructions],
   );
 
   // Close sidebar on mobile when navigating
@@ -644,9 +651,11 @@ export default function App() {
                   projectContext={projectContext}
                   sessions={chat.sessions}
                   isLoading={isProjectContextLoading}
-                  isSaving={isProjectInitializing}
+                  isSaving={isProjectContextSaving}
                   error={projectContextError}
-                  onSaveSummary={handleSaveProjectSummary}
+                  onSaveCustomInstructions={
+                    handleSaveProjectCustomInstructions
+                  }
                   onActivateProject={handleSelectProject}
                   onOpenSession={handleOpenSessionFromWorkFolder}
                 />
@@ -691,6 +700,8 @@ export default function App() {
         onMcpConfigChanged={refreshMcpTools}
         sendKey={sendKey}
         onSendKeyChange={setSendKey}
+        globalCustomInstructions={globalCustomInstructions}
+        onGlobalCustomInstructionsChange={setGlobalCustomInstructions}
       />
     </div>
   );
@@ -706,7 +717,7 @@ type WorkFolderRouteProps = {
   isLoading: boolean;
   isSaving: boolean;
   error?: string | null;
-  onSaveSummary: (summary: string) => void;
+  onSaveCustomInstructions: (customInstructions: string) => void;
   onActivateProject: (path: string) => Promise<void>;
   onOpenSession: (sessionId: string) => void;
 };

@@ -159,6 +159,18 @@ describe("buildAuthState", () => {
     expect(localStorage.getItem("tachyon-cowork-auth")).toBeNull();
   });
 
+  it("clears obvious fake manual auth state", () => {
+    saveAuth({
+      accessToken: "fake",
+      apiBaseUrl: "http://localhost:9999",
+      tenantId: "test",
+      userId: "test",
+    });
+
+    expect(loadAuth()).toBeNull();
+    expect(localStorage.getItem("tachyon-cowork-auth")).toBeNull();
+  });
+
   it("normalizes the production API base URL", () => {
     const auth = buildAuthState({
       apiBaseUrl: "https://api.n1.tachy.one/v1",

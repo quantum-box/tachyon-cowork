@@ -80,10 +80,12 @@ export function Sidebar({
 }: Props) {
   const isMacDesktop = isTauriMacOS();
   const [search, setSearch] = useState("");
-  const workFolderList = [
-    ...(activeProject ? [activeProject] : []),
-    ...recentProjects.filter((project) => project.path !== activeProject?.path),
-  ].slice(0, 3);
+  const workFolderList =
+    recentProjects.length > 0
+      ? recentProjects.slice(0, 3)
+      : activeProject
+        ? [activeProject]
+        : [];
 
   const filtered = search
     ? sessions.filter((r) =>

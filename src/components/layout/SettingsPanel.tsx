@@ -20,6 +20,8 @@ type Props = {
   onMcpConfigChanged?: () => void;
   sendKey: SendKeyMode;
   onSendKeyChange: (mode: SendKeyMode) => void;
+  globalCustomInstructions: string;
+  onGlobalCustomInstructionsChange: (value: string) => void;
 };
 
 function getShortcuts(sendKey: SendKeyMode) {
@@ -52,6 +54,8 @@ export function SettingsPanel({
   onMcpConfigChanged,
   sendKey,
   onSendKeyChange,
+  globalCustomInstructions,
+  onGlobalCustomInstructionsChange,
 }: Props) {
   if (!isOpen) return null;
 
@@ -66,7 +70,7 @@ export function SettingsPanel({
       />
 
       {/* Panel */}
-      <div className="surface-panel relative mx-4 w-full max-w-md overflow-hidden rounded-[28px] animate-fade-in">
+      <div className="surface-panel relative mx-4 w-full max-w-lg overflow-hidden rounded-[28px] animate-fade-in">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-stone-200/80 px-6 py-4 dark:border-stone-800/80">
           <h2 className="text-base font-semibold text-stone-900 dark:text-stone-100">
@@ -112,6 +116,30 @@ export function SettingsPanel({
                 </option>
               ))}
             </select>
+          </section>
+
+          <section>
+            <div className="flex items-center gap-2 mb-3">
+              <Bot size={14} className="text-stone-500 dark:text-stone-400" />
+              <h3 className="text-sm font-medium text-stone-800 dark:text-stone-200">
+                Global Custom Instructions
+              </h3>
+            </div>
+            <p className="mb-3 text-xs text-stone-500 dark:text-stone-400">
+              ここに書いた内容は、すべての Workspace に共通で適用されます。Workspace
+              側の `AGENTS.md` に書いた内容がある場合は、そちらを優先します。
+            </p>
+            <textarea
+              value={globalCustomInstructions}
+              onChange={(e) =>
+                onGlobalCustomInstructionsChange(e.target.value)
+              }
+              placeholder="常に守ってほしい指示、話し方、出力ルールを書く"
+              className="notion-input min-h-[144px] w-full resize-y rounded-[22px] px-4 py-3 text-sm text-stone-700 outline-none dark:text-stone-200"
+            />
+            <div className="mt-2 text-[11px] text-stone-400 dark:text-stone-500">
+              変更は自動保存されます
+            </div>
           </section>
 
           {/* Send Key Mode */}

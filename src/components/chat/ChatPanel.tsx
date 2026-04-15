@@ -46,7 +46,7 @@ function formatWorkspaceLabel(projectContext: ProjectContext): string {
   const root = projectContext.root_path.replace(/\/+$/, "");
   const workspace = projectContext.workspace_path;
   if (workspace === root) {
-    return "選択中の project フォルダ";
+    return "作業ディレクトリ直下";
   }
   if (workspace.startsWith(`${root}/`)) {
     return workspace.slice(root.length + 1);
@@ -224,14 +224,14 @@ export function ChatPanel({
           </div>
         )}
 
-        {projectContext && !projectContext.is_initialized && (
+        {projectContext && !projectContext.has_agents_file && (
           <div className="notion-callout mx-4 mt-4 rounded-2xl px-4 py-3 text-xs text-stone-600 dark:text-stone-300">
             <span className="font-medium text-slate-700 dark:text-slate-200">
               {projectContext.name}
             </span>
-            {` を project として使用中。`}
-            project context は未初期化です。サイドバーから初期化すると custom
-            instructions を使えます。
+            {` を Workspace として使用中です。`}
+            Workspace Custom Instructions はまだありません。作業ディレクトリ画面から
+            `AGENTS.md` を保存すると、この Workspace 固有の指示を使えます。
           </div>
         )}
 

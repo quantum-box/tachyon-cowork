@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AgentChatClient } from "../lib/api-client";
+import { AgentChatClient, isUnauthorizedApiError } from "../lib/api-client";
 import type {
   AgentChunk,
   AgentExecuteRequest,
@@ -415,6 +415,7 @@ function buildClientTools(
 }
 
 function buildAgentCustomInstructions(
+  globalCustomInstructions: string,
   activeProjectPath?: string | null,
   activeProjectContext?: ProjectContext | null,
 ): string {
@@ -429,11 +430,14 @@ function buildAgentCustomInstructions(
     activeProjectPath
       ? "Work directly in the selected project directory by default. Do not create or prefer a separate scratch workspace unless the user explicitly asks for one."
       : null,
-    activeProjectContext?.is_initialized
-      ? "This project has project-specific custom instructions. Follow them unless the user overrides them."
+    globalCustomInstructions.trim()
+      ? `Global custom instructions:\n${globalCustomInstructions.trim()}`
       : null,
     activeProjectContext?.prompt_context?.trim()
-      ? activeProjectContext.prompt_context.trim()
+      ? "Workspace custom instructions from AGENTS.md take priority over the global instructions when they conflict."
+      : null,
+    activeProjectContext?.prompt_context?.trim()
+      ? `Workspace custom instructions from AGENTS.md:\n${activeProjectContext.prompt_context.trim()}`
       : null,
   ].filter(Boolean);
 
@@ -731,6 +735,7 @@ export function useAgentChat(
   onArtifact?: (artifact: Artifact) => void,
   onCanvasToolCall?: (args: CanvasToolCallArgs) => void,
   mcpTools?: ClientToolDefinition[],
+  globalCustomInstructions = "",
   activeProjectPath?: string | null,
   activeProjectContext?: ProjectContext | null,
 ) {
@@ -831,6 +836,9 @@ export function useAgentChat(
           is_finished: true,
         });
       } catch (error) {
+        if (isUnauthorizedApiError(error)) {
+          throw error;
+        }
         console.error("Failed to submit tool result:", {
           sessionId: currentSessionId,
           toolId: chunk.tool_id,
@@ -876,6 +884,9 @@ export function useAgentChat(
           setError(toChatError(e));
           setIsLoading(false);
         }
+        if (isUnauthorizedApiError(e)) {
+          return;
+        }
         console.error("Failed to fetch session messages:", e);
       });
     return () => {
@@ -895,6 +906,11 @@ export function useAgentChat(
         return items[0]?.id ?? null;
       });
     } catch (e) {
+      if (isUnauthorizedApiError(e)) {
+        setSessions([]);
+        setSessionId(null);
+        return;
+      }
       console.error("Failed to fetch sessions:", e);
     }
   }, [client]);
@@ -1046,6 +1062,7 @@ export function useAgentChat(
       const executeWithRetry = async (attempt: number): Promise<void> => {
         try {
           const customInstructions = buildAgentCustomInstructions(
+            globalCustomInstructions,
             activeProjectPath,
             activeProjectContext,
           );
@@ -1188,6 +1205,7 @@ export function useAgentChat(
       onArtifact,
       handlePendingToolCall,
       mcpTools,
+      globalCustomInstructions,
       activeProjectPath,
       activeProjectContext,
     ],

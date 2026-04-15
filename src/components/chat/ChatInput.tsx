@@ -149,7 +149,7 @@ export function ChatInput({
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
               placeholder={placeholder ?? "メッセージを入力..."}
-              disabled={isLoading || isDisabled}
+              disabled={isDisabled}
               rows={1}
               className="min-h-[46px] flex-1 resize-none rounded-2xl bg-transparent px-3 py-2.5 text-[15px] leading-6 text-stone-900 outline-none ring-0 placeholder:text-stone-400 disabled:opacity-50 dark:text-stone-100 dark:placeholder:text-stone-500"
             />

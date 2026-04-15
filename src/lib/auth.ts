@@ -2,6 +2,13 @@ import { getTokenExpiresAt } from "./jwt";
 
 const STORAGE_KEY = "tachyon-cowork-auth";
 const PLACEHOLDER_HOSTS = new Set(["example.com", "api.example.com"]);
+const PLACEHOLDER_VALUES = new Set([
+  "dev-token",
+  "dev-tenant",
+  "dev-user",
+  "fake",
+  "test",
+]);
 export const DEFAULT_API_BASE_URL = "https://api.n1.tachy.one";
 
 export type AuthState = {
@@ -22,9 +29,9 @@ export function isPlaceholderAuthState(
   if (!value) return false;
 
   if (
-    value.accessToken === "dev-token" ||
-    value.tenantId === "dev-tenant" ||
-    value.userId === "dev-user"
+    (value.accessToken && PLACEHOLDER_VALUES.has(value.accessToken)) ||
+    (value.tenantId && PLACEHOLDER_VALUES.has(value.tenantId)) ||
+    (value.userId && PLACEHOLDER_VALUES.has(value.userId))
   ) {
     return true;
   }

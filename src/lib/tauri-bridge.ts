@@ -148,22 +148,16 @@ export type ProjectState = {
   recent_projects: ProjectEntry[];
 };
 
-export type ProjectContextFile = {
-  key: string;
-  path: string;
-  exists: boolean;
-};
-
 export type ProjectContext = {
   root_path: string;
   name: string;
-  is_initialized: boolean;
-  config_path: string;
   workspace_path: string;
-  context_dir: string;
-  summary?: string | null;
+  agents_path: string;
+  agent_dir: string;
+  has_agents_file: boolean;
+  has_agent_dir: boolean;
+  custom_instructions?: string | null;
   prompt_context: string;
-  files: ProjectContextFile[];
 };
 
 // ── MCP Bridge Functions ───────────────────────────────────────────
@@ -228,12 +222,16 @@ export async function projectInitializeActive(): Promise<ProjectContext> {
   return tauriInvoke<ProjectContext>("project_initialize_active");
 }
 
-export async function projectUpdateActiveSummary(
-  summary: string,
+export async function projectUpdateActiveCustomInstructions(
+  customInstructions: string,
 ): Promise<ProjectContext> {
-  return tauriInvoke<ProjectContext>("project_update_active_summary", {
-    summary,
-  });
+  return tauriInvoke<ProjectContext>(
+    "project_update_active_custom_instructions",
+    {
+      customInstructions,
+      custom_instructions: customInstructions,
+    },
+  );
 }
 
 /** Read a file from a sandbox workspace. Returns raw bytes. */

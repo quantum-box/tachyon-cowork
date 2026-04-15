@@ -224,36 +224,29 @@ sudo dpkg -i tachyon-cowork_*.deb
 ### 何がうれしいか
 
 - 案件ごとに参照するファイル範囲を切り替えられる
-- そのフォルダでやりたいことを要約として保存できる
-- project ごとの context を `.tachyon/` 配下に持てる
+- `AGENTS.md` で workspace ごとの custom instructions を持てる
+- 将来の agent 資産を `.agent/` 配下にまとめられる
 - 作業ディレクトリごとのチャット履歴を追いやすい
 
 ### 初回の流れ
 
 1. アプリから作業ディレクトリを開く
-2. 必要なら project context を初期化する
-3. そのフォルダでやりたいことを要約として保存する
+2. 必要なら設定画面で Global Custom Instructions を書く
+3. Workspace ごとの指示は `AGENTS.md` と同期して保存する
 4. そのまま新しいチャットを始める
 
-### project context の構成
+### Workspace の agent 関連ファイル
 
-初期化すると、対象ディレクトリ配下に次のような構成が作られます。
+workspace では、agent 向けの情報を次のように扱います。
 
 ```text
-.tachyon/
-  project.json
-  context/
-    instructions.md
-    glossary.md
-    decisions.md
-    todo.md
+AGENTS.md
+.agent/
 ```
 
-- `project.json` — project 名、summary、context の場所などを保持
-- `context/instructions.md` — その project で守るべきルールや完了条件
-- `context/glossary.md` — 用語集
-- `context/decisions.md` — 判断理由や設計メモ
-- `context/todo.md` — いま進めていること、次のアクション、詰まりどころ
+- `AGENTS.md` — その workspace 固有の custom instructions
+- `.agent/` — 将来の skills / prompts / templates など agent 資産置き場
+- 生成ファイルや通常のドキュメントは `.agent/` ではなく、通常の workspace 配下に置く
 
 ## `projects/` ディレクトリ
 

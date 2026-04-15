@@ -13,7 +13,7 @@ type Props = {
   isLoading?: boolean;
   isSaving?: boolean;
   error?: string | null;
-  onSaveSummary: (summary: string) => void;
+  onSaveCustomInstructions: (customInstructions: string) => void;
   onOpenSession: (sessionId: string) => void;
 };
 
@@ -27,14 +27,14 @@ export function WorkFolderPanel({
   isLoading = false,
   isSaving = false,
   error,
-  onSaveSummary,
+  onSaveCustomInstructions,
   onOpenSession,
 }: Props) {
-  const [summary, setSummary] = useState("");
+  const [customInstructions, setCustomInstructions] = useState("");
 
   useEffect(() => {
-    setSummary(projectContext?.summary ?? "");
-  }, [projectContext?.summary]);
+    setCustomInstructions(projectContext?.custom_instructions ?? "");
+  }, [projectContext?.custom_instructions]);
 
   return (
     <div className="flex h-full flex-col bg-transparent transition-colors duration-150">
@@ -57,7 +57,7 @@ export function WorkFolderPanel({
               作業ディレクトリ
             </h2>
             <p className="mt-0.5 text-[11px] text-stone-500 dark:text-stone-400">
-              この作業ディレクトリの設定です
+              Workspace のファイルと agent 設定です
             </p>
           </div>
           <button
@@ -84,15 +84,67 @@ export function WorkFolderPanel({
                 <div className="mt-1 break-all text-xs text-stone-500 dark:text-stone-400">
                   {activeProject?.path ?? "作業ディレクトリを選択してください"}
                 </div>
-                <div className="mt-2 text-xs text-stone-500 dark:text-stone-400">
-                  {projectContext?.workspace_path
-                    ? "選択したフォルダ直下で作業します"
-                    : isLoading
-                      ? "このフォルダ向けの準備中..."
-                      : "このフォルダに合わせて会話とファイル作業を進めます"}
+                <div className="mt-3 space-y-2 text-xs text-stone-500 dark:text-stone-400">
+                  <div>
+                    {projectContext?.workspace_path
+                      ? "この Workspace を基準に会話とファイル作業を進めます"
+                      : isLoading
+                        ? "この Workspace を読み込み中..."
+                        : "この Workspace に合わせて会話とファイル作業を進めます"}
+                  </div>
+                  <div className="rounded-2xl bg-stone-50/80 px-3 py-3 dark:bg-stone-950/40">
+                    <div className="font-medium text-stone-700 dark:text-stone-200">
+                      Custom Instructions
+                    </div>
+                    <div className="mt-1 break-all">
+                      {projectContext?.agents_path ??
+                        "保存すると AGENTS.md を作成します"}
+                    </div>
+                  </div>
+                  <div className="rounded-2xl bg-stone-50/80 px-3 py-3 dark:bg-stone-950/40">
+                    <div className="font-medium text-stone-700 dark:text-stone-200">
+                      Agent Assets
+                    </div>
+                    <div className="mt-1 break-all">
+                      {projectContext?.agent_dir ??
+                        "将来の skill / prompt 資産は .agent/ に置きます"}
+                    </div>
+                    <div className="mt-1 text-[11px] text-stone-400 dark:text-stone-500">
+                      {projectContext?.has_agent_dir
+                        ? ".agent/ は利用可能です"
+                        : "まだ .agent/ は作成されていません"}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
+          </section>
+
+          <section>
+            <div className="mb-3 flex items-center gap-2">
+              <PencilLine
+                size={15}
+                className="text-stone-500 dark:text-stone-400"
+              />
+              <h3 className="text-sm font-medium text-stone-800 dark:text-stone-100">
+                Workspace Custom Instructions
+              </h3>
+            </div>
+            <p className="mb-3 text-xs text-stone-500 dark:text-stone-400">
+              この内容は workspace 直下の `AGENTS.md` と同期します。Global
+              の指示より、この Workspace の指示が優先されます。
+            </p>
+            <textarea
+              value={customInstructions}
+              onChange={(e) => setCustomInstructions(e.target.value)}
+              placeholder="この Workspace 固有のルール、完了条件、禁止事項、期待する進め方を書く"
+              className="notion-input min-h-[160px] w-full resize-y rounded-[22px] px-4 py-3 text-sm text-stone-700 outline-none dark:text-stone-200"
+            />
+            {error && (
+              <div className="mt-2 text-xs text-red-600 dark:text-red-400">
+                {error}
+              </div>
+            )}
           </section>
 
           <section>
@@ -129,33 +181,6 @@ export function WorkFolderPanel({
               </div>
             )}
           </section>
-
-          <section>
-            <div className="mb-3 flex items-center gap-2">
-              <PencilLine
-                size={15}
-                className="text-stone-500 dark:text-stone-400"
-              />
-              <h3 className="text-sm font-medium text-stone-800 dark:text-stone-100">
-                このフォルダでやりたいこと
-              </h3>
-            </div>
-            <p className="mb-3 text-xs text-stone-500 dark:text-stone-400">
-              例:
-              提案書を作る、営業資料を直す、議事録をまとめる、ファイル整理を進める
-            </p>
-            <textarea
-              value={summary}
-              onChange={(e) => setSummary(e.target.value)}
-              placeholder="この作業ディレクトリで主に手伝ってほしいことを書く"
-              className="notion-input min-h-[160px] w-full resize-y rounded-[22px] px-4 py-3 text-sm text-stone-700 outline-none dark:text-stone-200"
-            />
-            {error && (
-              <div className="mt-2 text-xs text-red-600 dark:text-red-400">
-                {error}
-              </div>
-            )}
-          </section>
         </div>
       </div>
 
@@ -171,7 +196,7 @@ export function WorkFolderPanel({
           </button>
           <button
             type="button"
-            onClick={() => onSaveSummary(summary)}
+            onClick={() => onSaveCustomInstructions(customInstructions)}
             disabled={isSaving || !activeProject}
             className="notion-button notion-button-primary px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
           >

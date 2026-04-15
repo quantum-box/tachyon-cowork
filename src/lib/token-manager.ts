@@ -36,6 +36,7 @@ export class TokenManager {
   private timerId: ReturnType<typeof setTimeout> | null = null;
   private refreshPromise: Promise<AuthState> | null = null;
   private lastRefreshAttempt = 0;
+  private unauthorizedHandled = false;
 
   constructor(auth: AuthState, callbacks: TokenManagerCallbacks) {
     this.auth = auth;
@@ -47,7 +48,12 @@ export class TokenManager {
   updateAuth(auth: AuthState): void {
     this.auth = auth;
     this.refreshPromise = null;
+    this.unauthorizedHandled = false;
     this.scheduleRefresh();
+  }
+
+  canRefreshToken(): boolean {
+    return !!this.auth.refreshToken;
   }
 
   /** Returns the current access token, refreshing first if needed. */
@@ -91,6 +97,8 @@ export class TokenManager {
 
   /** Clear auth when the API reports the current session is no longer valid. */
   handleUnauthorizedError(): void {
+    if (this.unauthorizedHandled) return;
+    this.unauthorizedHandled = true;
     this.callbacks.onAuthError();
   }
 
@@ -190,6 +198,7 @@ export class TokenManager {
       };
 
       this.auth = newAuth;
+      this.unauthorizedHandled = false;
       saveAuth(newAuth);
       this.callbacks.onTokenRefreshed(newAuth);
       this.scheduleRefresh();
