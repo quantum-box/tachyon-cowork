@@ -1,7 +1,16 @@
 import { useCallback, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { X, Download, Copy, Check, ChevronLeft, ChevronRight, History, Maximize2 } from "lucide-react";
+import {
+  X,
+  Download,
+  Copy,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  History,
+  Maximize2,
+} from "lucide-react";
 import { useState } from "react";
 import type { Artifact } from "../../lib/types";
 import { CodeBlock } from "./CodeBlock";
@@ -17,7 +26,11 @@ type ArtifactPanelProps = {
   onClose: () => void;
   onDownload: (artifact: Artifact) => void;
   onSwitchVersion?: (version: number) => void;
-  onOpenCanvas?: (title: string, content: string, contentType: "html" | "jsx") => void;
+  onOpenCanvas?: (
+    title: string,
+    content: string,
+    contentType: "html" | "jsx",
+  ) => void;
 };
 
 function CsvTable({ content }: { content: string }) {
@@ -81,11 +94,7 @@ function MarkdownContent({ content }: { content: string }) {
             const isInline = !className;
 
             if (isInline) {
-              return (
-                <code {...props}>
-                  {children}
-                </code>
-              );
+              return <code {...props}>{children}</code>;
             }
 
             const codeString = String(children).replace(/\n$/, "");
@@ -95,7 +104,9 @@ function MarkdownContent({ content }: { content: string }) {
               return <MermaidDiagram chart={codeString} />;
             }
 
-            return <CodeBlock code={codeString} language={language} showDownload />;
+            return (
+              <CodeBlock code={codeString} language={language} showDownload />
+            );
           },
           pre({ children }) {
             return <>{children}</>;
@@ -117,12 +128,16 @@ function MarkdownContent({ content }: { content: string }) {
           table({ children, ...props }) {
             return (
               <div className="overflow-x-auto my-3 rounded-lg border border-gray-200 dark:border-slate-600">
-                <table className="w-full" {...props}>{children}</table>
+                <table className="w-full" {...props}>
+                  {children}
+                </table>
               </div>
             );
           },
           hr() {
-            return <hr className="my-4 border-gray-200 dark:border-slate-700" />;
+            return (
+              <hr className="my-4 border-gray-200 dark:border-slate-700" />
+            );
           },
         }}
       >
@@ -217,7 +232,9 @@ function VersionSelector({
         v{current} / {versions.length}
       </span>
       <button
-        onClick={() => onSwitchVersion?.(Math.min(versions.length, current + 1))}
+        onClick={() =>
+          onSwitchVersion?.(Math.min(versions.length, current + 1))
+        }
         disabled={current >= versions.length}
         className="p-0.5 rounded hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors disabled:opacity-30"
       >
@@ -250,20 +267,22 @@ export function ArtifactPanel({
 
   return (
     <div
-      className={`shrink-0 h-full border-l border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-950 flex flex-col transition-all duration-300 ease-in-out overflow-hidden ${
-        isOpen ? "w-[480px]" : "w-0 border-l-0"
+      className={`shrink-0 h-full flex flex-col overflow-hidden transition-all duration-300 ease-in-out ${
+        isOpen
+          ? "surface-panel w-[460px] rounded-[28px] opacity-100"
+          : "pointer-events-none w-0 opacity-0"
       }`}
     >
       {artifact && (
         <>
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-gray-200 dark:border-slate-700 px-4 py-3">
+          <div className="flex items-center justify-between border-b border-stone-200/80 px-4 py-3 dark:border-stone-800/80">
             <div className="flex-1 min-w-0 mr-2">
-              <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">
+              <h3 className="truncate text-sm font-semibold text-stone-800 dark:text-stone-100">
                 {artifact.title}
               </h3>
               {artifact.type !== "image" && (
-                <span className="text-[10px] text-gray-400 dark:text-slate-500 uppercase tracking-wider">
+                <span className="notion-label">
                   {artifact.type}
                   {artifact.language ? ` · ${artifact.language}` : ""}
                 </span>
@@ -278,19 +297,19 @@ export function ArtifactPanel({
                     artifact.type as "html" | "jsx",
                   )
                 }
-                className="rounded-lg p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+                className="notion-icon-button p-1.5"
                 aria-label="キャンバスで開く"
                 title="キャンバスで開く"
               >
-                <Maximize2 size={16} className="text-gray-500 dark:text-slate-400" />
+                <Maximize2 size={16} />
               </button>
             )}
             <button
               onClick={onClose}
-              className="rounded-lg p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+              className="notion-icon-button p-1.5"
               aria-label="パネルを閉じる"
             >
-              <X size={16} className="text-gray-500 dark:text-slate-400" />
+              <X size={16} />
             </button>
           </div>
 
@@ -300,18 +319,18 @@ export function ArtifactPanel({
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-between border-t border-gray-200 dark:border-slate-700 px-4 py-3">
+          <div className="flex items-center justify-between border-t border-stone-200/80 px-4 py-3 dark:border-stone-800/80">
             <div className="flex items-center gap-2">
               <button
                 onClick={() => onDownload(artifact)}
-                className="flex items-center gap-1.5 rounded-lg bg-indigo-600 dark:bg-indigo-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 dark:hover:bg-indigo-600 transition-colors"
+                className="notion-button notion-button-primary px-3 py-1.5 text-xs font-medium"
               >
                 <Download size={14} />
                 ダウンロード
               </button>
               <button
                 onClick={handleCopy}
-                className="flex items-center gap-1.5 rounded-lg border border-gray-300 dark:border-slate-600 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
+                className="notion-button px-3 py-1.5 text-xs font-medium"
               >
                 {copied ? (
                   <>

@@ -18,7 +18,11 @@ import {
   PanelRightOpen,
 } from "lucide-react";
 import type { AgentChunk, Artifact } from "../../lib/types";
-import { chunkToArtifact, isFileWriteTool, fileWriteToArtifact } from "../../hooks/useArtifact";
+import {
+  chunkToArtifact,
+  isFileWriteTool,
+  fileWriteToArtifact,
+} from "../../hooks/useArtifact";
 import { CodeBlock } from "../artifact/CodeBlock";
 import { MermaidDiagram } from "../artifact/MermaidDiagram";
 
@@ -26,11 +30,21 @@ type Props = {
   chunk: AgentChunk;
   onOpenArtifact?: (artifact: Artifact) => void;
   onOptionSelect?: (option: string) => void;
-  onOpenCanvas?: (title: string, content: string, contentType: "html" | "jsx") => void;
+  onOpenCanvas?: (
+    title: string,
+    content: string,
+    contentType: "html" | "jsx",
+  ) => void;
   searchQuery?: string;
 };
 
-export function MessageBubble({ chunk, onOpenArtifact, onOptionSelect, onOpenCanvas, searchQuery }: Props) {
+export function MessageBubble({
+  chunk,
+  onOpenArtifact,
+  onOptionSelect,
+  onOpenCanvas,
+  searchQuery,
+}: Props) {
   switch (chunk.type) {
     case "user":
       return (
@@ -60,7 +74,13 @@ export function MessageBubble({ chunk, onOpenArtifact, onOptionSelect, onOpenCan
     case "tool_call":
     case "tool_call_args":
     case "tool_call_pending":
-      return <ToolCallMessage chunk={chunk} onOpenCanvas={onOpenCanvas} onOpenArtifact={onOpenArtifact} />;
+      return (
+        <ToolCallMessage
+          chunk={chunk}
+          onOpenCanvas={onOpenCanvas}
+          onOpenArtifact={onOpenArtifact}
+        />
+      );
     case "tool_result":
       return <ToolResultMessage chunk={chunk} />;
     case "usage":
@@ -68,9 +88,9 @@ export function MessageBubble({ chunk, onOpenArtifact, onOptionSelect, onOpenCan
     case "tool_job_started":
       return (
         <div className="flex justify-start mb-2">
-          <div className="text-xs px-3 py-1.5 rounded-full bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
-            Tool Job: {chunk.provider || "unknown"} (
-            {chunk.job_id?.slice(0, 8)}...)
+          <div className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/25 dark:text-amber-400">
+            Tool Job: {chunk.provider || "unknown"} ({chunk.job_id?.slice(0, 8)}
+            ...)
           </div>
         </div>
       );
@@ -79,7 +99,7 @@ export function MessageBubble({ chunk, onOpenArtifact, onOptionSelect, onOpenCan
     case "ask":
       return (
         <div className="flex justify-start mb-3">
-          <div className="max-w-[80%] rounded-2xl rounded-bl-md px-4 py-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 text-sm text-gray-900 dark:text-gray-100">
+          <div className="max-w-[80%] rounded-[22px] border border-amber-200/80 bg-amber-50/90 px-4 py-3 text-sm text-stone-900 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-stone-100">
             <p className="font-medium mb-2">{chunk.text}</p>
             {chunk.options && (
               <div className="flex flex-wrap gap-2">
@@ -88,7 +108,7 @@ export function MessageBubble({ chunk, onOpenArtifact, onOptionSelect, onOpenCan
                     key={opt}
                     type="button"
                     onClick={() => onOptionSelect?.(opt)}
-                    className="px-2 py-1 text-xs rounded-lg bg-yellow-100 dark:bg-yellow-800/40 text-yellow-800 dark:text-yellow-300 hover:bg-yellow-200 dark:hover:bg-yellow-700/50 transition-colors cursor-pointer"
+                    className="rounded-xl border border-amber-200 bg-white/70 px-2.5 py-1 text-xs text-amber-800 transition-colors cursor-pointer hover:bg-white dark:border-amber-900/60 dark:bg-amber-900/20 dark:text-amber-200 dark:hover:bg-amber-900/35"
                   >
                     {opt}
                   </button>
@@ -118,7 +138,7 @@ function UserMessage({
   return (
     <>
       <div className="flex justify-end mb-4 gap-2">
-        <div className="max-w-[75%] rounded-2xl rounded-br-sm px-4 py-3 bg-indigo-600 dark:bg-indigo-700 text-white text-sm leading-relaxed">
+        <div className="max-w-[75%] rounded-[22px] rounded-br-md border border-stone-300/80 bg-stone-200/80 px-4 py-3 text-sm leading-relaxed text-stone-800 shadow-[0_8px_20px_rgba(15,23,42,0.04)] dark:border-stone-700 dark:bg-stone-800/90 dark:text-stone-100">
           {/* Image thumbnails */}
           {hasImages && (
             <div className="flex flex-wrap gap-2 mb-2">
@@ -127,7 +147,7 @@ function UserMessage({
                   key={i}
                   type="button"
                   onClick={() => setLightboxUrl(url)}
-                  className="group relative rounded-lg overflow-hidden ring-1 ring-white/20 hover:ring-white/50 transition-all"
+                  className="group relative overflow-hidden rounded-xl ring-1 ring-stone-300/70 transition-all hover:ring-stone-400 dark:ring-stone-700 dark:hover:ring-stone-500"
                 >
                   <img
                     src={url}
@@ -148,8 +168,8 @@ function UserMessage({
             {searchQuery ? highlightInText(text, searchQuery) : text}
           </div>
         </div>
-        <div className="shrink-0 w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center">
-          <User size={16} className="text-indigo-600 dark:text-indigo-400" />
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-stone-200 bg-white text-stone-500 shadow-sm dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300">
+          <User size={16} />
         </div>
       </div>
 
@@ -250,8 +270,8 @@ function AssistantMessage({
   );
 
   return (
-    <div className="mb-6 group/msg">
-      <div className="max-w-3xl text-sm leading-relaxed prose prose-sm max-w-none prose-p:my-1 prose-pre:bg-transparent prose-pre:p-0 prose-code:text-indigo-600 dark:prose-code:text-indigo-400 prose-code:before:content-[''] prose-code:after:content-[''] text-gray-900 dark:text-gray-100 prose-headings:text-gray-900 dark:prose-headings:text-gray-100 prose-strong:text-gray-900 dark:prose-strong:text-gray-100 prose-a:text-indigo-600 dark:prose-a:text-indigo-400">
+    <div className="group/msg mb-8">
+      <div className="max-w-none text-[15px] leading-7 prose prose-sm prose-p:my-1 prose-pre:bg-transparent prose-pre:p-0 prose-code:text-sky-700 dark:prose-code:text-sky-300 prose-code:before:content-[''] prose-code:after:content-[''] text-stone-800 dark:text-stone-100 prose-headings:text-stone-900 dark:prose-headings:text-stone-100 prose-strong:text-stone-900 dark:prose-strong:text-stone-100 prose-a:text-sky-700 dark:prose-a:text-sky-300">
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           rehypePlugins={[rehypeRaw]}
@@ -265,7 +285,7 @@ function AssistantMessage({
               if (isInline) {
                 return (
                   <code
-                    className="px-1.5 py-0.5 rounded bg-gray-200 dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 text-xs font-mono"
+                    className="rounded-md bg-stone-100 px-1.5 py-0.5 text-xs font-mono text-sky-700 dark:bg-stone-800 dark:text-sky-300"
                     {...props}
                   >
                     {children}
@@ -286,8 +306,8 @@ function AssistantMessage({
             },
             table({ children }) {
               return (
-                <div className="my-3 overflow-x-auto rounded-lg border border-gray-200 dark:border-slate-700">
-                  <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700 text-xs">
+                <div className="my-3 overflow-x-auto rounded-xl border border-stone-200/80 dark:border-stone-700/80">
+                  <table className="min-w-full divide-y divide-stone-200 text-xs dark:divide-stone-700">
                     {children}
                   </table>
                 </div>
@@ -295,28 +315,28 @@ function AssistantMessage({
             },
             thead({ children }) {
               return (
-                <thead className="bg-gray-50 dark:bg-slate-800/80">
+                <thead className="bg-stone-50/80 dark:bg-stone-900/70">
                   {children}
                 </thead>
               );
             },
             th({ children }) {
               return (
-                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                <th className="whitespace-nowrap px-3 py-2 text-left text-xs font-semibold text-stone-700 dark:text-stone-300">
                   {children}
                 </th>
               );
             },
             td({ children }) {
               return (
-                <td className="px-3 py-2 text-gray-700 dark:text-gray-300 border-t border-gray-100 dark:border-slate-800">
+                <td className="border-t border-stone-100 px-3 py-2 text-stone-700 dark:border-stone-800 dark:text-stone-300">
                   {children}
                 </td>
               );
             },
             blockquote({ children }) {
               return (
-                <blockquote className="my-2 border-l-3 border-indigo-300 dark:border-indigo-600 pl-3 text-gray-600 dark:text-slate-400 italic">
+                <blockquote className="my-2 border-l-[3px] border-stone-300 pl-3 italic text-stone-500 dark:border-stone-700 dark:text-stone-400">
                   {children}
                 </blockquote>
               );
@@ -327,7 +347,7 @@ function AssistantMessage({
                   href={href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-indigo-600 dark:text-indigo-400 hover:underline"
+                  className="text-sky-700 hover:underline dark:text-sky-300"
                 >
                   {children}
                 </a>
@@ -335,21 +355,21 @@ function AssistantMessage({
             },
             ul({ children }) {
               return (
-                <ul className="my-1.5 ml-4 list-disc space-y-0.5 marker:text-gray-400 dark:marker:text-slate-500">
+                <ul className="my-1.5 ml-4 list-disc space-y-0.5 marker:text-stone-400 dark:marker:text-stone-500">
                   {children}
                 </ul>
               );
             },
             ol({ children }) {
               return (
-                <ol className="my-1.5 ml-4 list-decimal space-y-0.5 marker:text-gray-400 dark:marker:text-slate-500">
+                <ol className="my-1.5 ml-4 list-decimal space-y-0.5 marker:text-stone-400 dark:marker:text-stone-500">
                   {children}
                 </ol>
               );
             },
             hr() {
               return (
-                <hr className="my-4 border-gray-200 dark:border-slate-700" />
+                <hr className="my-4 border-stone-200 dark:border-stone-800" />
               );
             },
           }}
@@ -363,7 +383,7 @@ function AssistantMessage({
           <button
             type="button"
             onClick={handleCopy}
-            className="flex items-center gap-1 px-2 py-1 rounded-md text-xs text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+            className="notion-button px-2.5 py-1 text-xs"
           >
             {copied ? (
               <>
@@ -384,12 +404,12 @@ function AssistantMessage({
               key={i}
               type="button"
               onClick={() => handleOpenCodeBlock(block, i)}
-              className="flex items-center gap-1.5 rounded-lg border border-indigo-200 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/30 px-2.5 py-1 text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"
+              className="rounded-xl border border-stone-200 bg-white/80 px-2.5 py-1 text-xs font-medium text-stone-700 transition-colors hover:bg-white hover:text-stone-900 dark:border-stone-700 dark:bg-stone-900/70 dark:text-stone-200 dark:hover:bg-stone-900"
             >
               <Code size={12} />
               Artifactで開く
               {codeBlocks.length > 1 && (
-                <span className="text-indigo-400 dark:text-indigo-500">
+                <span className="text-stone-400 dark:text-stone-500">
                   ({block.language})
                 </span>
               )}
@@ -416,7 +436,7 @@ function ThinkingMessage({
       <div className="max-w-[75%]">
         <button
           onClick={() => setExpanded(!expanded)}
-          className="flex items-center gap-1.5 text-xs text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors"
+          className="flex items-center gap-1.5 text-xs text-stone-500 transition-colors hover:text-stone-700 dark:text-stone-400 dark:hover:text-stone-200"
         >
           {isFinished ? (
             <CheckCircle size={12} />
@@ -427,7 +447,7 @@ function ThinkingMessage({
           Thinking...
         </button>
         {expanded && text && (
-          <div className="mt-1 px-3 py-2 rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 text-xs text-purple-800 dark:text-purple-200 whitespace-pre-wrap max-h-48 overflow-y-auto">
+          <div className="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap rounded-2xl border border-stone-200/80 bg-white/70 px-3 py-2 text-xs text-stone-600 dark:border-stone-700 dark:bg-stone-900/70 dark:text-stone-300">
             {text}
           </div>
         )}
@@ -436,7 +456,19 @@ function ThinkingMessage({
   );
 }
 
-function ToolCallMessage({ chunk, onOpenCanvas, onOpenArtifact }: { chunk: AgentChunk; onOpenCanvas?: (title: string, content: string, contentType: "html" | "jsx") => void; onOpenArtifact?: (artifact: Artifact) => void }) {
+function ToolCallMessage({
+  chunk,
+  onOpenCanvas,
+  onOpenArtifact,
+}: {
+  chunk: AgentChunk;
+  onOpenCanvas?: (
+    title: string,
+    content: string,
+    contentType: "html" | "jsx",
+  ) => void;
+  onOpenArtifact?: (artifact: Artifact) => void;
+}) {
   const [expanded, setExpanded] = useState(false);
   const isPending = chunk.type === "tool_call_pending" && !chunk.is_finished;
   const isCanvas = chunk.tool_name === "canvas";
@@ -444,7 +476,11 @@ function ToolCallMessage({ chunk, onOpenCanvas, onOpenArtifact }: { chunk: Agent
 
   const handleOpenCanvas = useCallback(() => {
     if (!onOpenCanvas || !chunk.args) return;
-    const args = chunk.args as { title?: string; content?: string; content_type?: "html" | "jsx" };
+    const args = chunk.args as {
+      title?: string;
+      content?: string;
+      content_type?: "html" | "jsx";
+    };
     onOpenCanvas(
       args.title || "Canvas",
       args.content || "",
@@ -460,7 +496,13 @@ function ToolCallMessage({ chunk, onOpenCanvas, onOpenArtifact }: { chunk: Agent
       chunk.created_at,
     );
     if (artifact) onOpenArtifact(artifact);
-  }, [onOpenArtifact, chunk.tool_id, chunk.id, chunk.tool_arguments, chunk.created_at]);
+  }, [
+    onOpenArtifact,
+    chunk.tool_id,
+    chunk.id,
+    chunk.tool_arguments,
+    chunk.created_at,
+  ]);
 
   return (
     <div className="flex justify-start mb-2 gap-2">
@@ -469,7 +511,7 @@ function ToolCallMessage({ chunk, onOpenCanvas, onOpenArtifact }: { chunk: Agent
         <div className="flex items-center gap-2">
           <button
             onClick={() => setExpanded(!expanded)}
-            className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors"
+            className="flex items-center gap-1.5 text-xs text-stone-500 transition-colors hover:text-stone-700 dark:text-stone-400 dark:hover:text-stone-200"
           >
             {isPending ? (
               <Loader2 size={12} className="animate-spin" />
@@ -482,24 +524,27 @@ function ToolCallMessage({ chunk, onOpenCanvas, onOpenArtifact }: { chunk: Agent
           {isCanvas && !isPending && onOpenCanvas && chunk.args && (
             <button
               onClick={handleOpenCanvas}
-              className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-700 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"
+              className="rounded-xl border border-stone-200 bg-white/80 px-2 py-1 text-xs text-stone-700 transition-colors hover:bg-white dark:border-stone-700 dark:bg-stone-900/70 dark:text-stone-200 dark:hover:bg-stone-900"
             >
               <PanelRightOpen size={12} />
               Canvasを開く
             </button>
           )}
-          {isFileWrite && !isPending && onOpenArtifact && chunk.tool_arguments && (
-            <button
-              onClick={handleOpenFileArtifact}
-              className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-md bg-violet-50 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 border border-violet-200 dark:border-violet-700 hover:bg-violet-100 dark:hover:bg-violet-900/50 transition-colors"
-            >
-              <PanelRightOpen size={12} />
-              Artifactで開く
-            </button>
-          )}
+          {isFileWrite &&
+            !isPending &&
+            onOpenArtifact &&
+            chunk.tool_arguments && (
+              <button
+                onClick={handleOpenFileArtifact}
+                className="rounded-xl border border-stone-200 bg-white/80 px-2 py-1 text-xs text-stone-700 transition-colors hover:bg-white dark:border-stone-700 dark:bg-stone-900/70 dark:text-stone-200 dark:hover:bg-stone-900"
+              >
+                <PanelRightOpen size={12} />
+                Artifactで開く
+              </button>
+            )}
         </div>
         {expanded && chunk.tool_arguments && (
-          <pre className="mt-1 px-3 py-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800 text-xs text-gray-800 dark:text-gray-200 overflow-x-auto max-h-48 overflow-y-auto">
+          <pre className="mt-2 max-h-48 overflow-x-auto overflow-y-auto rounded-2xl border border-stone-200/80 bg-white/70 px-3 py-2 text-xs text-stone-700 dark:border-stone-700 dark:bg-stone-900/70 dark:text-stone-200">
             {chunk.tool_arguments}
           </pre>
         )}
@@ -518,14 +563,14 @@ function ToolResultMessage({ chunk }: { chunk: AgentChunk }) {
       <div className="max-w-[75%]">
         <button
           onClick={() => setExpanded(!expanded)}
-          className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-slate-400 hover:text-gray-600 dark:hover:text-slate-300 transition-colors"
+          className="flex items-center gap-1.5 text-xs text-stone-500 transition-colors hover:text-stone-700 dark:text-stone-400 dark:hover:text-stone-200"
         >
           <CheckCircle size={12} />
           {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
           Tool Result
         </button>
         {expanded && text && (
-          <pre className="mt-1 px-3 py-2 rounded-lg bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-xs text-gray-800 dark:text-gray-200 overflow-x-auto max-h-48 overflow-y-auto">
+          <pre className="mt-2 max-h-48 overflow-x-auto overflow-y-auto rounded-2xl border border-stone-200/80 bg-white/70 px-3 py-2 text-xs text-stone-700 dark:border-stone-700 dark:bg-stone-900/70 dark:text-stone-200">
             {text}
           </pre>
         )}
@@ -555,19 +600,21 @@ function ArtifactMessage({
 
   return (
     <div className="flex justify-start mb-3 gap-2">
-      <div className="w-8 h-8 shrink-0 rounded-full bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
-        <FileDown size={16} className="text-violet-600 dark:text-violet-400" />
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-stone-200 bg-white text-stone-500 shadow-sm dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300">
+        <FileDown size={16} />
       </div>
       <button
         onClick={handleOpen}
-        className="max-w-[75%] rounded-2xl rounded-bl-sm px-4 py-3 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 text-left hover:bg-violet-100 dark:hover:bg-violet-900/30 transition-colors cursor-pointer"
+        className="max-w-[75%] cursor-pointer rounded-[22px] rounded-bl-md border border-stone-200 bg-white/80 px-4 py-3 text-left transition-colors hover:bg-white dark:border-stone-700 dark:bg-stone-900/70 dark:hover:bg-stone-900"
       >
-        <p className="text-sm font-medium text-violet-800 dark:text-violet-200 truncate">
+        <p className="truncate text-sm font-medium text-stone-800 dark:text-stone-100">
           {chunk.filename || "\u30D5\u30A1\u30A4\u30EB"}
         </p>
-        <p className="text-xs text-violet-500 dark:text-violet-400 mt-0.5">
+        <p className="mt-0.5 text-xs text-stone-500 dark:text-stone-400">
           {chunk.content_type}
-          {chunk.size_bytes ? ` \u00B7 ${formatFileSize(chunk.size_bytes)}` : ""}
+          {chunk.size_bytes
+            ? ` \u00B7 ${formatFileSize(chunk.size_bytes)}`
+            : ""}
         </p>
       </button>
     </div>
@@ -581,10 +628,7 @@ function highlightInText(text: string, query: string): ReactNode {
   const parts = text.split(new RegExp(`(${escaped})`, "gi"));
   return parts.map((part, i) =>
     part.toLowerCase() === query.toLowerCase() ? (
-      <mark
-        key={i}
-        className="bg-yellow-200/60 text-inherit rounded-sm"
-      >
+      <mark key={i} className="bg-yellow-200/60 text-inherit rounded-sm">
         {part}
       </mark>
     ) : (

@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AgentChatClient } from "./lib/api-client";
 import {
+  DEFAULT_API_BASE_URL,
   type AuthState,
   buildAuthState,
   clearAuth,
+  isPlaceholderAuthState,
   loadAuth,
+  normalizeApiBaseUrl,
   saveAuth,
 } from "./lib/auth";
 import { TokenManager } from "./lib/token-manager";
@@ -33,12 +36,16 @@ import { ToolsPanel } from "./components/layout/ToolsPanel";
 import { SettingsPanel } from "./components/layout/SettingsPanel";
 import { WorkFolderListPanel } from "./components/layout/WorkFolderListPanel";
 import { WorkFolderPanel } from "./components/layout/WorkFolderPanel";
-import type { SessionSummary } from "./lib/types";
+import type { ModelInfo, SessionSummary } from "./lib/types";
 import {
+  clearTauriRuntimeAuth,
   isTauri,
+  isTauriMacOS,
   type ProjectContext,
   type ProjectEntry,
+  setTauriRuntimeAuth,
 } from "./lib/tauri-bridge";
+import { hasModelOption, resolveModelOptions } from "./lib/models";
 import {
   Navigate,
   Route,
@@ -56,6 +63,9 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [availableModels, setAvailableModels] = useState<ModelInfo[] | null>(
+    null,
+  );
   const [isOnline, setIsOnline] = useState(() =>
     typeof navigator === "undefined" ? true : navigator.onLine,
   );
@@ -71,6 +81,38 @@ export default function App() {
   const location = useLocation();
   const showTools = location.pathname === "/tools";
   const showWorkFolders = location.pathname.startsWith("/work-folders");
+  const isMacDesktop = isTauriMacOS();
+  const desktopShellClass =
+    isMacDesktop && !isMobile
+      ? "relative flex h-screen overflow-hidden pb-2 pr-2 pl-0 pt-1.5 md:pb-3 md:pr-3"
+      : "relative flex h-screen overflow-hidden p-2 md:p-3";
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("tauri-macos", isMacDesktop);
+    return () => {
+      document.documentElement.classList.remove("tauri-macos");
+    };
+  }, [isMacDesktop]);
+
+  useEffect(() => {
+    if (!auth || !isPlaceholderAuthState(auth)) return;
+    clearAuth();
+    setAuth(null);
+  }, [auth]);
+
+  useEffect(() => {
+    if (!auth) return;
+
+    const normalizedApiBaseUrl = normalizeApiBaseUrl(auth.apiBaseUrl);
+    if (normalizedApiBaseUrl === auth.apiBaseUrl) return;
+
+    const normalizedAuth = {
+      ...auth,
+      apiBaseUrl: normalizedApiBaseUrl,
+    };
+    saveAuth(normalizedAuth);
+    setAuth(normalizedAuth);
+  }, [auth]);
 
   useEffect(() => {
     const syncNetworkState = () => setIsOnline(navigator.onLine);
@@ -116,8 +158,7 @@ export default function App() {
         const config = getOAuth2Config();
         const payload = decodeJwtPayload(tokens.access_token);
         const newAuth = buildAuthState({
-          apiBaseUrl:
-            import.meta.env.VITE_API_BASE_URL ?? "https://api.n1.tachy.one",
+          apiBaseUrl: import.meta.env.VITE_API_BASE_URL ?? DEFAULT_API_BASE_URL,
           accessToken: tokens.access_token,
           tenantId: import.meta.env.VITE_DEFAULT_TENANT_ID ?? "",
           userId: payload?.sub,
@@ -201,13 +242,31 @@ export default function App() {
     return c;
   }, [auth]);
 
+  useEffect(() => {
+    if (!isTauri()) return;
+
+    void (async () => {
+      try {
+        if (auth) {
+          await setTauriRuntimeAuth(auth);
+        } else {
+          await clearTauriRuntimeAuth();
+        }
+      } catch (error) {
+        console.warn("Failed to sync runtime auth to Tauri backend.", error);
+      }
+    })();
+  }, [auth]);
+
   const fileHandler = useFileHandler();
   const artifactState = useArtifact();
+  const { addArtifact, openArtifact, closePanel, closeCanvas, openCanvas } =
+    artifactState;
 
   useEffect(() => {
-    artifactState.closeCanvas();
-    artifactState.closePanel();
-  }, [location.pathname, artifactState]);
+    closeCanvas();
+    closePanel();
+  }, [location.pathname, closeCanvas, closePanel]);
 
   const {
     activeProject,
@@ -226,11 +285,11 @@ export default function App() {
   const { mcpTools, refreshMcpTools } = useMcpTools(activeProject?.path);
 
   const handleArtifactFromSSE = useCallback(
-    (artifact: Parameters<typeof artifactState.addArtifact>[0]) => {
-      artifactState.addArtifact(artifact);
-      artifactState.openArtifact(artifact);
+    (artifact: Parameters<typeof addArtifact>[0]) => {
+      addArtifact(artifact);
+      openArtifact(artifact);
     },
-    [artifactState],
+    [addArtifact, openArtifact],
   );
 
   const handleCanvasToolCall = useCallback(
@@ -239,9 +298,9 @@ export default function App() {
       content: string;
       content_type: "html" | "jsx";
     }) => {
-      artifactState.openCanvas(args.title, args.content, args.content_type);
+      openCanvas(args.title, args.content, args.content_type);
     },
-    [artifactState],
+    [openCanvas],
   );
 
   const chat = useAgentChat(
@@ -252,6 +311,48 @@ export default function App() {
     activeProject?.path,
     projectContext,
   );
+  const modelOptions = useMemo(
+    () => resolveModelOptions(availableModels),
+    [availableModels],
+  );
+  const hasSideSurface =
+    artifactState.canvas.isOpen || artifactState.isPanelOpen;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!client) {
+      setAvailableModels(null);
+      return;
+    }
+
+    client
+      .getModels()
+      .then((models) => {
+        if (!cancelled) {
+          setAvailableModels(models);
+        }
+      })
+      .catch((error) => {
+        console.warn(
+          "Failed to load available models, using fallback list.",
+          error,
+        );
+        if (!cancelled) {
+          setAvailableModels(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [client]);
+
+  useEffect(() => {
+    if (!modelOptions.length) return;
+    if (hasModelOption(modelOptions, chat.selectedModel)) return;
+    chat.setSelectedModel(modelOptions[0].id);
+  }, [modelOptions, chat.selectedModel, chat.setSelectedModel]);
 
   const handleLogout = useCallback(() => {
     tokenManagerRef.current?.dispose();
@@ -267,11 +368,11 @@ export default function App() {
   }, []);
 
   const handleOpenArtifact = useCallback(
-    (artifact: Parameters<typeof artifactState.openArtifact>[0]) => {
-      artifactState.addArtifact(artifact);
-      artifactState.openArtifact(artifact);
+    (artifact: Parameters<typeof openArtifact>[0]) => {
+      addArtifact(artifact);
+      openArtifact(artifact);
     },
-    [artifactState],
+    [addArtifact, openArtifact],
   );
 
   const handleToggleTools = useCallback(() => {
@@ -295,17 +396,17 @@ export default function App() {
 
   const handleStartChatFromWorkFolder = useCallback(() => {
     chat.newChat();
-    artifactState.closeCanvas();
+    closeCanvas();
     navigate("/");
-  }, [artifactState, chat, navigate]);
+  }, [chat, closeCanvas, navigate]);
 
   const handleOpenSessionFromWorkFolder = useCallback(
     (sessionId: string) => {
       chat.selectSession(sessionId);
-      artifactState.closeCanvas();
+      closeCanvas();
       navigate("/");
     },
-    [artifactState, chat, navigate],
+    [chat, closeCanvas, navigate],
   );
 
   const handlePickProject = useCallback(async () => {
@@ -327,6 +428,19 @@ export default function App() {
       await refreshMcpTools();
     },
     [activateProject, refreshMcpTools],
+  );
+
+  const handleSidebarProjectSwitch = useCallback(
+    async (path: string) => {
+      await handleSelectProject(path);
+      if (location.pathname.startsWith("/work-folders")) {
+        openWorkFolderPage(path);
+      }
+      if (isMobile) {
+        setSidebarCollapsed(true);
+      }
+    },
+    [handleSelectProject, location.pathname, openWorkFolderPage, isMobile],
   );
 
   const handleRemoveProject = useCallback(
@@ -378,13 +492,15 @@ export default function App() {
   if (!auth) {
     if (offlineMode) {
       return (
-        <div className="h-screen bg-white dark:bg-slate-950 transition-colors duration-150">
-          <ToolsPanel
-            onBack={() => setOfflineMode(false)}
-            backLabel="サインインへ戻る"
-            title="ローカルファイルツール"
-            description="オフラインでも使える機能だけを表示しています"
-          />
+        <div className="h-screen p-3 md:p-4">
+          <div className="surface-panel h-full overflow-hidden rounded-[28px]">
+            <ToolsPanel
+              onBack={() => setOfflineMode(false)}
+              backLabel="サインインへ戻る"
+              title="ローカルファイルツール"
+              description="オフラインでも使える機能だけを表示しています"
+            />
+          </div>
         </div>
       );
     }
@@ -401,7 +517,7 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-screen bg-white dark:bg-slate-950 transition-colors duration-150">
+    <div className={desktopShellClass}>
       {/* Sidebar - overlay on mobile, inline on desktop */}
       {isMobile && !sidebarCollapsed && (
         <div
@@ -411,9 +527,10 @@ export default function App() {
       )}
       <div
         className={`
-          ${isMobile
-            ? `fixed inset-y-0 left-0 z-[70] transition-transform duration-200 ${sidebarCollapsed ? "-translate-x-full" : "translate-x-0"} w-[280px]`
-            : `shrink-0 ${sidebarCollapsed ? "w-12" : "w-[260px]"} transition-all duration-200`
+          ${
+            isMobile
+              ? `fixed inset-y-3 left-3 z-[70] transition-transform duration-200 ${sidebarCollapsed ? "-translate-x-full" : "translate-x-0"} w-[292px] overflow-hidden rounded-[28px] surface-panel`
+              : `shrink-0 ${sidebarCollapsed ? (isMacDesktop ? "w-[76px]" : "w-14") : "w-[286px]"} transition-all duration-200 overflow-hidden`
           }
         `}
       >
@@ -445,6 +562,7 @@ export default function App() {
           activeProject={activeProject}
           recentProjects={recentProjects}
           onPickProject={isTauri() ? handlePickProject : undefined}
+          onSwitchProject={handleSidebarProjectSwitch}
           onOpenWorkFolderList={(path) => {
             openWorkFolderPage(path);
             handleMobileSidebarClose();
@@ -454,99 +572,109 @@ export default function App() {
       </div>
 
       {/* Main area */}
-      <div className="flex-1 min-w-0">
-        <Routes>
-          <Route
-            path="/"
-            element={
-              <ChatPanel
-                chat={chat}
-                files={fileHandler.files}
-                fileError={fileHandler.fileError}
-                onFilesAdd={fileHandler.addFiles}
-                onFileRemove={fileHandler.removeFile}
-                onClearFiles={fileHandler.clearFiles}
-                toInlineAttachments={fileHandler.toInlineAttachments}
-                onPrepareMessage={fileHandler.prepareMessage}
-                isPreparingFiles={fileHandler.isPreparing}
-                onOpenArtifact={handleOpenArtifact}
-                onOpenCanvas={artifactState.openCanvas}
-                isSearchOpen={searchOpen}
-                onSearchClose={() => setSearchOpen(false)}
-                sendKey={sendKey}
-                isOffline={!isOnline}
-                onOpenTools={() => navigate("/tools")}
-                projectContext={projectContext}
-                onToggleSidebar={isMobile ? () => setSidebarCollapsed((prev) => !prev) : undefined}
-              />
-            }
-          />
-          {isTauri() && (
+      <div
+        className={`flex h-full flex-1 min-w-0 ${isMobile ? "" : "pl-1.5"} ${hasSideSurface ? "gap-2" : ""}`}
+      >
+        <div
+          className={`flex-1 min-w-0 overflow-hidden ${isMobile ? "" : "workspace-card rounded-[28px]"}`}
+        >
+          <Routes>
             <Route
-              path="/tools"
+              path="/"
               element={
-                <ToolsPanel
-                  onBack={handleBackToChat}
-                  projectDirectory={activeProject?.path}
+                <ChatPanel
+                  chat={chat}
+                  files={fileHandler.files}
+                  fileError={fileHandler.fileError}
+                  onFilesAdd={fileHandler.addFiles}
+                  onFileRemove={fileHandler.removeFile}
+                  onClearFiles={fileHandler.clearFiles}
+                  toInlineAttachments={fileHandler.toInlineAttachments}
+                  onPrepareMessage={fileHandler.prepareMessage}
+                  isPreparingFiles={fileHandler.isPreparing}
+                  onOpenArtifact={handleOpenArtifact}
+                  onOpenCanvas={artifactState.openCanvas}
+                  isSearchOpen={searchOpen}
+                  onSearchClose={() => setSearchOpen(false)}
+                  sendKey={sendKey}
+                  isOffline={!isOnline}
+                  onOpenTools={() => navigate("/tools")}
+                  projectContext={projectContext}
+                  onToggleSidebar={
+                    isMobile
+                      ? () => setSidebarCollapsed((prev) => !prev)
+                      : undefined
+                  }
                 />
               }
             />
-          )}
-          <Route
-            path="/work-folders"
-            element={
-              <WorkFolderListPanel
-                onBack={handleBackToChat}
-                onPickProject={handlePickProject}
-                recentProjects={recentProjects}
-                activeProject={activeProject}
-                isLoading={isProjectLoading}
-                onOpenProject={openWorkFolderPage}
-                onRemoveProject={handleRemoveProject}
+            {isTauri() && (
+              <Route
+                path="/tools"
+                element={
+                  <ToolsPanel
+                    onBack={handleBackToChat}
+                    projectDirectory={activeProject?.path}
+                  />
+                }
               />
-            }
-          />
-          <Route
-            path="/work-folders/:folderPath"
-            element={
-              <WorkFolderRoute
-                onBack={handleBackToChat}
-                onStartChat={handleStartChatFromWorkFolder}
-                onPickProject={handlePickProject}
-                activeProject={activeProject}
-                projectContext={projectContext}
-                sessions={chat.sessions}
-                isLoading={isProjectContextLoading}
-                isSaving={isProjectInitializing}
-                error={projectContextError}
-                onSaveSummary={handleSaveProjectSummary}
-                onActivateProject={handleSelectProject}
-                onOpenSession={handleOpenSessionFromWorkFolder}
-              />
-            }
-          />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </div>
+            )}
+            <Route
+              path="/work-folders"
+              element={
+                <WorkFolderListPanel
+                  onBack={handleBackToChat}
+                  onPickProject={handlePickProject}
+                  recentProjects={recentProjects}
+                  activeProject={activeProject}
+                  isLoading={isProjectLoading}
+                  onOpenProject={openWorkFolderPage}
+                  onRemoveProject={handleRemoveProject}
+                />
+              }
+            />
+            <Route
+              path="/work-folders/:folderPath"
+              element={
+                <WorkFolderRoute
+                  onBack={handleBackToChat}
+                  onStartChat={handleStartChatFromWorkFolder}
+                  onPickProject={handlePickProject}
+                  activeProject={activeProject}
+                  projectContext={projectContext}
+                  sessions={chat.sessions}
+                  isLoading={isProjectContextLoading}
+                  isSaving={isProjectInitializing}
+                  error={projectContextError}
+                  onSaveSummary={handleSaveProjectSummary}
+                  onActivateProject={handleSelectProject}
+                  onOpenSession={handleOpenSessionFromWorkFolder}
+                />
+              }
+            />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </div>
 
-      {/* Canvas panel (right side) - takes priority over artifact panel */}
-      {artifactState.canvas.isOpen ? (
-        <CanvasView
-          title={artifactState.canvas.title}
-          content={artifactState.canvas.content}
-          contentType={artifactState.canvas.contentType}
-          onClose={artifactState.closeCanvas}
-        />
-      ) : (
-        <ArtifactPanel
-          artifact={artifactState.selectedArtifact}
-          isOpen={artifactState.isPanelOpen}
-          onClose={artifactState.closePanel}
-          onDownload={artifactState.downloadArtifact}
-          onSwitchVersion={artifactState.switchVersion}
-          onOpenCanvas={artifactState.openCanvas}
-        />
-      )}
+        {/* Canvas panel (right side) - takes priority over artifact panel */}
+        {artifactState.canvas.isOpen ? (
+          <CanvasView
+            title={artifactState.canvas.title}
+            content={artifactState.canvas.content}
+            contentType={artifactState.canvas.contentType}
+            onClose={artifactState.closeCanvas}
+          />
+        ) : (
+          <ArtifactPanel
+            artifact={artifactState.selectedArtifact}
+            isOpen={artifactState.isPanelOpen}
+            onClose={artifactState.closePanel}
+            onDownload={artifactState.downloadArtifact}
+            onSwitchVersion={artifactState.switchVersion}
+            onOpenCanvas={artifactState.openCanvas}
+          />
+        )}
+      </div>
 
       {/* Settings panel */}
       <SettingsPanel
@@ -555,6 +683,7 @@ export default function App() {
         theme={theme}
         onThemeChange={setTheme}
         selectedModel={chat.selectedModel}
+        modelOptions={modelOptions}
         onModelChange={chat.setSelectedModel}
         onLogout={handleLogout}
         apiBaseUrl={auth.apiBaseUrl}

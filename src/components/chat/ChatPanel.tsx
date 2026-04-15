@@ -76,6 +76,9 @@ export function ChatPanel({
 }: Props) {
   const [searchQuery] = useState("");
   const hasNetworkIssue = isOffline || chat.error?.kind === "network";
+  const workspaceLabel = projectContext
+    ? formatWorkspaceLabel(projectContext)
+    : null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -93,23 +96,53 @@ export function ChatPanel({
 
   return (
     <FileDropZone onFilesDropped={onFilesAdd}>
-      <div className="flex flex-col h-full bg-white dark:bg-slate-950 transition-colors duration-150">
-        {/* Mobile header */}
-        {onToggleSidebar && (
-          <div className="md:hidden flex items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-slate-700">
-            <button
-              type="button"
-              onClick={onToggleSidebar}
-              className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-600 dark:text-slate-400 transition-colors"
-              aria-label="メニューを開く"
-            >
-              <Menu size={20} />
-            </button>
-            <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">
-              Tachyon Cowork
-            </span>
+      <div className="flex h-full flex-col bg-transparent transition-colors duration-150">
+        <div className="border-b border-stone-200/80 bg-white/55 py-2.5 backdrop-blur-md dark:border-stone-800/80 dark:bg-stone-950/25">
+          <div className="flex w-full items-center justify-between gap-3 px-2.5 md:px-3">
+            <div className="titlebar-safe-header flex min-w-0 items-center gap-3">
+              {onToggleSidebar && (
+                <button
+                  type="button"
+                  onClick={onToggleSidebar}
+                  className="notion-icon-button p-2 md:hidden"
+                  aria-label="メニューを開く"
+                >
+                  <Menu size={18} />
+                </button>
+              )}
+              <div
+                className="titlebar-safe-start min-w-0"
+                data-tauri-drag-region
+              >
+                <div className="notion-label mb-1">Workspace</div>
+                <div className="truncate text-sm font-semibold text-stone-800 dark:text-stone-100">
+                  {projectContext?.name ?? "Tachyon Cowork"}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {workspaceLabel && (
+                <span className="notion-badge hidden px-3 py-1 text-[11px] md:inline-flex">
+                  {workspaceLabel}
+                </span>
+              )}
+              {onOpenTools && (
+                <button
+                  type="button"
+                  onClick={onOpenTools}
+                  className="notion-button hidden px-3 py-1.5 text-[11px] sm:inline-flex"
+                >
+                  ファイルツール
+                </button>
+              )}
+              {isOffline && (
+                <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300">
+                  Offline
+                </span>
+              )}
+            </div>
           </div>
-        )}
+        </div>
 
         {/* Chat search bar */}
         {isSearchOpen && (
@@ -118,7 +151,7 @@ export function ChatPanel({
 
         {/* Error banner with retry/dismiss */}
         {hasNetworkIssue && (
-          <div className="mx-4 mt-3 px-4 py-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2">
+          <div className="notion-callout mx-4 mt-4 flex items-start gap-2 rounded-2xl border border-amber-200/70 px-4 py-3 text-xs text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-300">
             <AlertCircle size={14} className="shrink-0" />
             <div className="flex-1 space-y-1">
               <div className="font-medium">
@@ -135,7 +168,7 @@ export function ChatPanel({
               <button
                 type="button"
                 onClick={onOpenTools}
-                className="shrink-0 flex items-center gap-1 px-2 py-1 rounded-md bg-amber-100 dark:bg-amber-800/30 hover:bg-amber-200 dark:hover:bg-amber-800/50 text-amber-800 dark:text-amber-200 transition-colors"
+                className="shrink-0 rounded-xl border border-amber-200 bg-amber-100 px-2.5 py-1 text-amber-800 transition-colors hover:bg-amber-200 dark:border-amber-900/60 dark:bg-amber-900/20 dark:text-amber-200 dark:hover:bg-amber-900/35"
               >
                 ファイルツール
               </button>
@@ -144,7 +177,7 @@ export function ChatPanel({
               <button
                 type="button"
                 onClick={chat.retryLastMessage}
-                className="shrink-0 flex items-center gap-1 px-2 py-1 rounded-md bg-amber-100 dark:bg-amber-800/30 hover:bg-amber-200 dark:hover:bg-amber-800/50 text-amber-800 dark:text-amber-200 transition-colors"
+                className="shrink-0 flex items-center gap-1 rounded-xl border border-amber-200 bg-amber-100 px-2.5 py-1 text-amber-800 transition-colors hover:bg-amber-200 dark:border-amber-900/60 dark:bg-amber-900/20 dark:text-amber-200 dark:hover:bg-amber-900/35"
               >
                 <RefreshCw size={12} />
                 再試行
@@ -153,7 +186,7 @@ export function ChatPanel({
             <button
               type="button"
               onClick={chat.clearError}
-              className="shrink-0 p-1 rounded-md hover:bg-amber-200 dark:hover:bg-amber-800/50 transition-colors"
+              className="shrink-0 rounded-lg p-1 hover:bg-amber-200/80 dark:hover:bg-amber-900/35 transition-colors"
               aria-label="閉じる"
             >
               <X size={12} />
@@ -162,13 +195,13 @@ export function ChatPanel({
         )}
 
         {chat.error && chat.error.kind !== "network" && (
-          <div className="mx-4 mt-3 px-4 py-2.5 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-xs text-red-700 dark:text-red-400 flex items-center gap-2">
+          <div className="notion-callout mx-4 mt-4 flex items-center gap-2 rounded-2xl border border-red-200/70 px-4 py-2.5 text-xs text-red-700 dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-400">
             <AlertCircle size={14} className="shrink-0" />
             <span className="flex-1">{chat.error.message}</span>
             <button
               type="button"
               onClick={chat.retryLastMessage}
-              className="shrink-0 flex items-center gap-1 px-2 py-1 rounded-md bg-red-100 dark:bg-red-800/30 hover:bg-red-200 dark:hover:bg-red-800/50 text-red-700 dark:text-red-300 transition-colors"
+              className="shrink-0 flex items-center gap-1 rounded-xl border border-red-200 bg-red-100 px-2.5 py-1 text-red-700 transition-colors hover:bg-red-200 dark:border-red-900/60 dark:bg-red-900/20 dark:text-red-300 dark:hover:bg-red-900/35"
             >
               <RefreshCw size={12} />
               再試行
@@ -176,7 +209,7 @@ export function ChatPanel({
             <button
               type="button"
               onClick={chat.clearError}
-              className="shrink-0 p-1 rounded-md hover:bg-red-200 dark:hover:bg-red-800/50 transition-colors"
+              className="shrink-0 rounded-lg p-1 hover:bg-red-200/80 dark:hover:bg-red-900/35 transition-colors"
               aria-label="閉じる"
             >
               <X size={12} />
@@ -186,20 +219,19 @@ export function ChatPanel({
 
         {/* File error banner */}
         {fileError && (
-          <div className="mx-4 mt-3 px-4 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-xs text-amber-700 dark:text-amber-400">
+          <div className="notion-callout mx-4 mt-4 rounded-2xl border border-amber-200/70 px-4 py-2 text-xs text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-400">
             {fileError}
           </div>
         )}
 
-        {projectContext && (
-          <div className="mx-4 mt-3 px-4 py-2.5 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-300">
+        {projectContext && !projectContext.is_initialized && (
+          <div className="notion-callout mx-4 mt-4 rounded-2xl px-4 py-3 text-xs text-stone-600 dark:text-stone-300">
             <span className="font-medium text-slate-700 dark:text-slate-200">
               {projectContext.name}
             </span>
             {` を project として使用中。`}
-            {projectContext.is_initialized
-              ? ` 既定の作業場所: ${formatWorkspaceLabel(projectContext)}`
-              : "project context は未初期化です。サイドバーから初期化すると custom instructions を使えます。"}
+            project context は未初期化です。サイドバーから初期化すると custom
+            instructions を使えます。
           </div>
         )}
 
@@ -216,11 +248,11 @@ export function ChatPanel({
 
         {/* Stop generation button */}
         {chat.isLoading && (
-          <div className="flex justify-center -mt-2 mb-1">
+          <div className="mb-1 flex justify-center -mt-2">
             <button
               type="button"
               onClick={chat.stopGeneration}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-xs text-gray-600 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors"
+              className="notion-button px-3 py-1.5 text-xs"
             >
               <Square size={10} className="fill-current" />
               生成を停止

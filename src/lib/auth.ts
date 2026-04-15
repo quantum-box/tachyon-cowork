@@ -1,6 +1,8 @@
 import { getTokenExpiresAt } from "./jwt";
 
 const STORAGE_KEY = "tachyon-cowork-auth";
+const PLACEHOLDER_HOSTS = new Set(["example.com", "api.example.com"]);
+export const DEFAULT_API_BASE_URL = "https://api.n1.tachy.one";
 
 export type AuthState = {
   accessToken: string;
@@ -13,6 +15,53 @@ export type AuthState = {
   clientId?: string;
   clientSecret?: string;
 };
+
+export function isPlaceholderAuthState(
+  value: Partial<AuthState> | null | undefined,
+): boolean {
+  if (!value) return false;
+
+  if (
+    value.accessToken === "dev-token" ||
+    value.tenantId === "dev-tenant" ||
+    value.userId === "dev-user"
+  ) {
+    return true;
+  }
+
+  if (!value.apiBaseUrl) return false;
+
+  try {
+    const host = new URL(value.apiBaseUrl).hostname;
+    return PLACEHOLDER_HOSTS.has(host);
+  } catch {
+    return false;
+  }
+}
+
+export function normalizeApiBaseUrl(apiBaseUrl: string): string {
+  const trimmed = apiBaseUrl.trim().replace(/\/+$/, "");
+  if (!trimmed) return trimmed;
+
+  if (trimmed === "/api/v1") {
+    return "/api";
+  }
+
+  try {
+    const url = new URL(trimmed);
+    if (
+      url.hostname === "api.n1.tachy.one" &&
+      (url.pathname === "/v1" || url.pathname === "/v1/")
+    ) {
+      url.pathname = "";
+      return url.toString().replace(/\/+$/, "");
+    }
+  } catch {
+    return trimmed;
+  }
+
+  return trimmed;
+}
 
 function isValidStoredAuth(value: unknown): value is AuthState {
   if (!value || typeof value !== "object") return false;
@@ -39,14 +88,32 @@ export function loadAuth(): AuthState | null {
       return null;
     }
 
-    const expiresAt = parsed.expiresAt ?? getTokenExpiresAt(parsed.accessToken) ?? undefined;
+    if (isPlaceholderAuthState(parsed)) {
+      clearAuth();
+      return null;
+    }
+
+    const expiresAt =
+      parsed.expiresAt ?? getTokenExpiresAt(parsed.accessToken) ?? undefined;
     if (expiresAt && expiresAt <= Date.now() && !parsed.refreshToken) {
       clearAuth();
       return null;
     }
 
+    const normalizedApiBaseUrl = normalizeApiBaseUrl(parsed.apiBaseUrl);
+    if (normalizedApiBaseUrl !== parsed.apiBaseUrl) {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          ...parsed,
+          apiBaseUrl: normalizedApiBaseUrl,
+        }),
+      );
+    }
+
     return {
       ...parsed,
+      apiBaseUrl: normalizedApiBaseUrl,
       expiresAt,
     };
   } catch {
@@ -56,7 +123,13 @@ export function loadAuth(): AuthState | null {
 }
 
 export function saveAuth(state: AuthState): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify({
+      ...state,
+      apiBaseUrl: normalizeApiBaseUrl(state.apiBaseUrl),
+    }),
+  );
 }
 
 export function clearAuth(): void {
@@ -76,5 +149,9 @@ export function buildAuthState(params: {
   clientSecret?: string;
 }): AuthState {
   const expiresAt = getTokenExpiresAt(params.accessToken) ?? undefined;
-  return { ...params, expiresAt };
+  return {
+    ...params,
+    apiBaseUrl: normalizeApiBaseUrl(params.apiBaseUrl),
+    expiresAt,
+  };
 }

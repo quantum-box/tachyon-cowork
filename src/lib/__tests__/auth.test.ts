@@ -1,5 +1,13 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
-import { loadAuth, saveAuth, clearAuth, buildAuthState } from "../auth";
+import {
+  buildAuthState,
+  clearAuth,
+  loadAuth,
+  normalizeApiBaseUrl,
+  saveAuth,
+} from "../auth";
+
+const TEST_API_BASE_URL = "https://api.test.local/v1";
 
 // Helper: create a minimal JWT with given payload
 function makeJwt(payload: Record<string, unknown>): string {
@@ -9,7 +17,10 @@ function makeJwt(payload: Record<string, unknown>): string {
 }
 
 function validToken(expiresInSec = 3600): string {
-  return makeJwt({ sub: "user1", exp: Math.floor(Date.now() / 1000) + expiresInSec });
+  return makeJwt({
+    sub: "user1",
+    exp: Math.floor(Date.now() / 1000) + expiresInSec,
+  });
 }
 
 function expiredToken(): string {
@@ -32,7 +43,7 @@ describe("loadAuth", () => {
   it("returns stored auth with valid token", () => {
     const auth = {
       accessToken: validToken(),
-      apiBaseUrl: "https://api.example.com",
+      apiBaseUrl: TEST_API_BASE_URL,
       tenantId: "tn_test",
     };
     saveAuth(auth);
@@ -44,7 +55,7 @@ describe("loadAuth", () => {
   it("returns null when accessToken is empty", () => {
     saveAuth({
       accessToken: "",
-      apiBaseUrl: "https://api.example.com",
+      apiBaseUrl: TEST_API_BASE_URL,
       tenantId: "tn_test",
     });
     expect(loadAuth()).toBeNull();
@@ -62,7 +73,7 @@ describe("loadAuth", () => {
   it("returns null when tenantId is missing", () => {
     saveAuth({
       accessToken: validToken(),
-      apiBaseUrl: "https://api.example.com",
+      apiBaseUrl: TEST_API_BASE_URL,
       tenantId: "",
     });
     expect(loadAuth()).toBeNull();
@@ -71,7 +82,7 @@ describe("loadAuth", () => {
   it("returns null for expired token without refresh token", () => {
     saveAuth({
       accessToken: expiredToken(),
-      apiBaseUrl: "https://api.example.com",
+      apiBaseUrl: TEST_API_BASE_URL,
       tenantId: "tn_test",
     });
     expect(loadAuth()).toBeNull();
@@ -80,7 +91,7 @@ describe("loadAuth", () => {
   it("returns auth for expired token WITH refresh token (TokenManager will refresh)", () => {
     saveAuth({
       accessToken: expiredToken(),
-      apiBaseUrl: "https://api.example.com",
+      apiBaseUrl: TEST_API_BASE_URL,
       tenantId: "tn_test",
       refreshToken: "refresh_xxx",
     });
@@ -92,7 +103,7 @@ describe("loadAuth", () => {
   it("clears localStorage when returning null for invalid auth", () => {
     saveAuth({
       accessToken: "",
-      apiBaseUrl: "https://api.example.com",
+      apiBaseUrl: TEST_API_BASE_URL,
       tenantId: "tn_test",
     });
     loadAuth();
@@ -109,7 +120,7 @@ describe("clearAuth", () => {
   it("removes auth from localStorage", () => {
     saveAuth({
       accessToken: validToken(),
-      apiBaseUrl: "https://api.example.com",
+      apiBaseUrl: TEST_API_BASE_URL,
       tenantId: "tn_test",
     });
     clearAuth();
@@ -121,7 +132,7 @@ describe("buildAuthState", () => {
   it("auto-detects expiresAt from JWT", () => {
     const exp = Math.floor(Date.now() / 1000) + 3600;
     const auth = buildAuthState({
-      apiBaseUrl: "https://api.example.com",
+      apiBaseUrl: TEST_API_BASE_URL,
       accessToken: makeJwt({ exp }),
       tenantId: "tn_test",
     });
@@ -130,10 +141,43 @@ describe("buildAuthState", () => {
 
   it("sets expiresAt to undefined for non-JWT tokens", () => {
     const auth = buildAuthState({
-      apiBaseUrl: "https://api.example.com",
+      apiBaseUrl: TEST_API_BASE_URL,
       accessToken: "opaque-token",
       tenantId: "tn_test",
     });
     expect(auth.expiresAt).toBeUndefined();
+  });
+
+  it("clears placeholder auth state", () => {
+    saveAuth({
+      accessToken: "dev-token",
+      apiBaseUrl: "https://api.example.com",
+      tenantId: "dev-tenant",
+    });
+
+    expect(loadAuth()).toBeNull();
+    expect(localStorage.getItem("tachyon-cowork-auth")).toBeNull();
+  });
+
+  it("normalizes the production API base URL", () => {
+    const auth = buildAuthState({
+      apiBaseUrl: "https://api.n1.tachy.one/v1",
+      accessToken: "opaque-token",
+      tenantId: "tn_test",
+    });
+
+    expect(auth.apiBaseUrl).toBe("https://api.n1.tachy.one");
+  });
+});
+
+describe("normalizeApiBaseUrl", () => {
+  it("rewrites the production /v1 path to the root API URL", () => {
+    expect(normalizeApiBaseUrl("https://api.n1.tachy.one/v1")).toBe(
+      "https://api.n1.tachy.one",
+    );
+  });
+
+  it("rewrites the dev proxy /api/v1 path to /api", () => {
+    expect(normalizeApiBaseUrl("/api/v1")).toBe("/api");
   });
 });

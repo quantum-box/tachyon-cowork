@@ -6,16 +6,39 @@
  */
 
 import type { ToolCall, ToolResult } from "./types";
+import { DEFAULT_API_BASE_URL, type AuthState } from "./auth";
 
 /** Detect whether we are running inside a Tauri webview. */
 export function isTauri(): boolean {
   return typeof window !== "undefined" && "__TAURI__" in window;
 }
 
+export function isTauriMacOS(): boolean {
+  return (
+    isTauri() &&
+    typeof navigator !== "undefined" &&
+    /Mac/i.test(navigator.userAgent)
+  );
+}
+
 /** Lazy wrapper around `@tauri-apps/api/core` invoke. */
-async function tauriInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+async function tauriInvoke<T>(
+  cmd: string,
+  args?: Record<string, unknown>,
+): Promise<T> {
   const { invoke } = await import("@tauri-apps/api/core");
   return invoke<T>(cmd, args);
+}
+
+function resolveRuntimeAuthApiBaseUrl(apiBaseUrl: string): string {
+  const trimmed = apiBaseUrl.trim().replace(/\/+$/, "");
+  if (!trimmed.startsWith("/")) {
+    return trimmed;
+  }
+
+  return (import.meta.env.VITE_API_BASE_URL ?? DEFAULT_API_BASE_URL)
+    .trim()
+    .replace(/\/+$/, "");
 }
 
 /** Read a local file via the Tauri FS plugin. Throws on web. */
@@ -35,6 +58,29 @@ export async function executeClientTool(
     throw new Error("client-side tools are only available in Tauri");
   }
   return tauriInvoke<ToolResult>("execute_tool", { toolCall });
+}
+
+export async function setTauriRuntimeAuth(auth: AuthState): Promise<void> {
+  if (!isTauri()) {
+    throw new Error("runtime auth sync is only available in Tauri");
+  }
+
+  await tauriInvoke<void>("chat_set_runtime_auth", {
+    auth: {
+      apiBaseUrl: resolveRuntimeAuthApiBaseUrl(auth.apiBaseUrl),
+      accessToken: auth.accessToken,
+      tenantId: auth.tenantId,
+      userId: auth.userId,
+    },
+  });
+}
+
+export async function clearTauriRuntimeAuth(): Promise<void> {
+  if (!isTauri()) {
+    throw new Error("runtime auth sync is only available in Tauri");
+  }
+
+  await tauriInvoke<void>("chat_clear_runtime_auth");
 }
 
 // ── MCP Types ──────────────────────────────────────────────────────
@@ -185,7 +231,9 @@ export async function projectInitializeActive(): Promise<ProjectContext> {
 export async function projectUpdateActiveSummary(
   summary: string,
 ): Promise<ProjectContext> {
-  return tauriInvoke<ProjectContext>("project_update_active_summary", { summary });
+  return tauriInvoke<ProjectContext>("project_update_active_summary", {
+    summary,
+  });
 }
 
 /** Read a file from a sandbox workspace. Returns raw bytes. */

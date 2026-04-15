@@ -13,10 +13,15 @@ import {
   MessageCircle,
 } from "lucide-react";
 import type { SessionSummary } from "../../lib/types";
-import { isTauri, type ProjectEntry } from "../../lib/tauri-bridge";
+import {
+  isTauri,
+  isTauriMacOS,
+  type ProjectEntry,
+} from "../../lib/tauri-bridge";
 import { UpdateChecker } from "./UpdateChecker";
 
-const FEEDBACK_URL = "https://github.com/quantum-box/tachyon-cowork/issues/new?labels=feedback&template=feedback.md&title=%5BFeedback%5D+";
+const FEEDBACK_URL =
+  "https://github.com/quantum-box/tachyon-cowork/issues/new?labels=feedback&template=feedback.md&title=%5BFeedback%5D+";
 
 async function openFeedbackUrl() {
   const url = FEEDBACK_URL;
@@ -47,6 +52,7 @@ type Props = {
   recentProjects: ProjectEntry[];
   onPickProject?: () => void;
   onOpenWorkFolderList: (path?: string) => void;
+  onSwitchProject?: (path: string) => void;
   isProjectLoading?: boolean;
 };
 
@@ -69,10 +75,15 @@ export function Sidebar({
   recentProjects,
   onPickProject,
   onOpenWorkFolderList,
+  onSwitchProject,
   isProjectLoading = false,
 }: Props) {
+  const isMacDesktop = isTauriMacOS();
   const [search, setSearch] = useState("");
-  const recentWorkFolders = recentProjects.slice(0, 3);
+  const workFolderList = [
+    ...(activeProject ? [activeProject] : []),
+    ...recentProjects.filter((project) => project.path !== activeProject?.path),
+  ].slice(0, 3);
 
   const filtered = search
     ? sessions.filter((r) =>
@@ -89,17 +100,22 @@ export function Sidebar({
 
   if (isCollapsed) {
     return (
-      <div className="flex flex-col items-center h-full bg-gray-50 dark:bg-slate-900 border-r border-gray-200 dark:border-slate-700 py-3 gap-2 w-12">
+      <div
+        className={`flex h-full flex-col items-center gap-2 bg-transparent py-3 ${
+          isMacDesktop ? "w-[76px]" : "w-14"
+        }`}
+      >
+        <div className="window-drag-strip w-full" data-tauri-drag-region />
         <button
           onClick={onToggleCollapse}
-          className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-800 text-gray-500 dark:text-slate-400 transition-colors"
+          className="notion-icon-button p-2"
           title="サイドバーを開く"
         >
           <PanelLeftOpen size={18} />
         </button>
         <button
           onClick={onNewChat}
-          className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-800 text-gray-600 dark:text-gray-400 transition-colors"
+          className="notion-icon-button p-2"
           title="新しいチャット"
         >
           <MessageSquarePlus size={18} />
@@ -107,14 +123,14 @@ export function Sidebar({
         <div className="flex-1" />
         <button
           onClick={openFeedbackUrl}
-          className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-800 text-gray-500 dark:text-slate-400 transition-colors"
+          className="notion-icon-button p-2"
           title="フィードバック"
         >
           <MessageCircle size={16} />
         </button>
         <button
           onClick={onOpenSettings}
-          className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-800 text-gray-500 dark:text-slate-400 transition-colors"
+          className="notion-icon-button p-2"
           title="設定"
         >
           <Settings size={16} />
@@ -124,18 +140,21 @@ export function Sidebar({
   }
 
   return (
-    <div className="flex flex-col h-full bg-gray-50 dark:bg-slate-900 border-r border-gray-200 dark:border-slate-700 transition-colors duration-150">
+    <div className="flex h-full flex-col bg-transparent transition-colors duration-150">
+      <div className="window-drag-strip w-full" data-tauri-drag-region />
       {/* Header */}
-      <div className="p-4 border-b border-gray-200 dark:border-slate-700">
-        <div className="flex items-center justify-between mb-3">
-          <h1 className="text-sm font-semibold text-gray-800 dark:text-gray-200 tracking-tight">
-            Tachyon Cowork
-          </h1>
+      <div className="border-b border-stone-200/80 px-3 pb-3 pt-4 dark:border-stone-800/80">
+        <div className="titlebar-safe-header mb-2.5 flex items-center justify-between">
+          <div className="titlebar-safe-start" data-tauri-drag-region>
+            <h1 className="text-[13px] font-semibold tracking-[0.01em] text-stone-800 dark:text-stone-100">
+              Tachyon Cowork
+            </h1>
+          </div>
           <div className="flex items-center gap-0.5">
             {onToggleCollapse && (
               <button
                 onClick={onToggleCollapse}
-                className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-800 text-gray-500 dark:text-slate-400 transition-colors duration-150"
+                className="notion-icon-button p-2"
                 title="サイドバーを閉じる"
               >
                 <PanelLeftClose size={18} />
@@ -143,7 +162,7 @@ export function Sidebar({
             )}
             <button
               onClick={onNewChat}
-              className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-800 text-gray-600 dark:text-gray-400 transition-colors duration-150"
+              className="notion-icon-button p-2"
               title="新しいチャット"
             >
               <MessageSquarePlus size={18} />
@@ -162,60 +181,101 @@ export function Sidebar({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="検索..."
-            className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400/20 placeholder:text-gray-400 dark:placeholder:text-slate-500 transition-colors duration-150"
+            className="notion-input w-full rounded-2xl py-2 pl-9 pr-3 text-xs placeholder:text-stone-400 dark:placeholder:text-stone-500"
           />
         </div>
 
-        <div className="mt-3">
-          <div className="px-1 pb-1 text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-slate-500">
-            作業ディレクトリ
+        <div className="mt-2.5">
+          <div className="flex items-center justify-between px-1 pb-0.5">
+            <div className="notion-label">作業ディレクトリ一覧</div>
+            <div className="flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                onClick={() => onOpenWorkFolderList()}
+                className={`rounded-md px-1.5 py-1 text-[11px] transition-colors ${
+                  showWorkFolders
+                    ? "text-stone-900 dark:text-stone-100"
+                    : "text-stone-500 hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-100"
+                }`}
+              >
+                一覧
+              </button>
+              {!activeProject && onPickProject && (
+                <button
+                  type="button"
+                  onClick={onPickProject}
+                  className="rounded-md px-1.5 py-1 text-[11px] text-stone-500 transition-colors hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-100"
+                >
+                  {isProjectLoading ? "..." : "開く"}
+                </button>
+              )}
+            </div>
           </div>
-          <WorkFolderItem
-            label="作業ディレクトリ一覧"
-            subtitle={activeProject?.name ?? "未選択でもチャットは開始できます"}
-            isActive={showWorkFolders}
-            isLoading={isProjectLoading}
-            onOpen={onOpenWorkFolderList}
-            onPick={!activeProject ? onPickProject : undefined}
-          />
-          {recentWorkFolders.length > 0 && (
-            <div className="mt-2 space-y-1">
-              {recentWorkFolders.map((project) => {
+
+          {workFolderList.length > 0 ? (
+            <div className="mt-1.5 space-y-0.5">
+              {workFolderList.map((project) => {
                 const isCurrent = activeProject?.path === project.path;
                 return (
                   <button
                     key={project.path}
                     type="button"
-                    onClick={() => onOpenWorkFolderList(project.path)}
-                    className={`w-full rounded-lg px-3 py-2 text-left transition-colors ${
+                    onClick={() =>
                       isCurrent
-                        ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300"
-                        : "text-gray-600 hover:bg-gray-100 dark:text-slate-400 dark:hover:bg-slate-800"
+                        ? onOpenWorkFolderList(project.path)
+                        : onSwitchProject
+                          ? onSwitchProject(project.path)
+                          : onOpenWorkFolderList(project.path)
+                    }
+                    className={`w-full border-l px-3 py-1.5 text-left transition-colors ${
+                      isCurrent
+                        ? "border-stone-400 text-stone-900 dark:border-stone-500 dark:text-stone-100"
+                        : "border-transparent text-stone-500 hover:border-stone-200 hover:text-stone-800 dark:text-stone-400 dark:hover:border-stone-800 dark:hover:text-stone-200"
                     }`}
                   >
-                    <div className="truncate text-xs font-medium">
-                      {project.name}
+                    <div className="flex items-center gap-2">
+                      <div className="min-w-0 flex-1 truncate text-xs font-medium">
+                        {project.name}
+                      </div>
+                      {isCurrent && (
+                        <span className="shrink-0 text-[10px] text-stone-400 dark:text-stone-500">
+                          使用中
+                        </span>
+                      )}
                     </div>
-                    <div className="truncate text-[11px] text-gray-400 dark:text-slate-500">
+                    <div className="truncate pt-0.5 text-[11px] text-stone-400 dark:text-stone-500">
                       {project.path}
                     </div>
                   </button>
                 );
               })}
             </div>
+          ) : (
+            <button
+              type="button"
+              onClick={onPickProject ?? (() => onOpenWorkFolderList())}
+              className="mt-1.5 w-full border-l border-transparent px-3 py-1.5 text-left text-stone-500 transition-colors hover:border-stone-200 hover:text-stone-900 dark:text-stone-400 dark:hover:border-stone-800 dark:hover:text-stone-100"
+            >
+              <div className="truncate text-xs font-medium">
+                作業ディレクトリを選ぶ
+              </div>
+              <div className="truncate pt-0.5 text-[11px] text-stone-400 dark:text-stone-500">
+                未選択でもチャットは開始できます
+              </div>
+            </button>
           )}
         </div>
       </div>
 
       {/* File Tools button */}
       {onToggleTools && (
-        <div className="px-3 pt-3">
+        <div className="px-3 pt-2.5">
           <button
             onClick={onToggleTools}
-            className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+            className={`w-full flex items-center gap-2 rounded-2xl border px-3 py-2 text-xs font-medium transition-colors ${
               showTools
-                ? "bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-700"
-                : "bg-white dark:bg-slate-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-slate-600 hover:bg-gray-100 dark:hover:bg-slate-700"
+                ? "border-stone-300 bg-white/95 text-stone-900 shadow-[0_8px_18px_rgba(15,23,42,0.06)] dark:border-stone-700 dark:bg-stone-900/90 dark:text-stone-100"
+                : "border-stone-200 bg-white/70 text-stone-600 hover:bg-white/90 dark:border-stone-800 dark:bg-stone-900/50 dark:text-stone-300 dark:hover:bg-stone-900/80"
             }`}
           >
             <FolderOpen size={14} />
@@ -229,7 +289,7 @@ export function Sidebar({
         {/* Pinned section */}
         {pinned.length > 0 && (
           <div>
-            <div className="px-4 py-1.5 text-[10px] font-medium text-gray-400 dark:text-slate-500 uppercase tracking-wider flex items-center gap-1">
+            <div className="notion-label flex items-center gap-1 px-4 py-1.5">
               <Pin size={10} />
               ピン留め
             </div>
@@ -250,9 +310,7 @@ export function Sidebar({
         {/* Date-grouped rooms */}
         {Object.entries(grouped).map(([label, rooms]) => (
           <div key={label}>
-            <div className="px-4 py-1.5 text-[10px] font-medium text-gray-400 dark:text-slate-500 uppercase tracking-wider">
-              {label}
-            </div>
+            <div className="notion-label px-4 py-1.5">{label}</div>
             {rooms.map((room) => (
               <ChatRoomItem
                 key={room.id}
@@ -267,7 +325,7 @@ export function Sidebar({
           </div>
         ))}
         {filtered.length === 0 && (
-          <div className="px-4 py-8 text-center text-xs text-gray-400 dark:text-slate-500">
+          <div className="px-4 py-8 text-center text-xs text-stone-400 dark:text-stone-500">
             {search ? "該当なし" : "チャット履歴はまだありません"}
           </div>
         )}
@@ -277,24 +335,24 @@ export function Sidebar({
       <UpdateChecker />
 
       {/* Footer */}
-      <div className="p-3 border-t border-gray-200 dark:border-slate-700 flex items-center gap-2">
+      <div className="flex items-center gap-2 border-t border-stone-200/80 p-3 dark:border-stone-800/80">
         <button
           onClick={openFeedbackUrl}
-          className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-800 text-gray-500 dark:text-slate-400 transition-colors duration-150"
+          className="notion-icon-button p-2"
           title="フィードバック"
         >
           <MessageCircle size={16} />
         </button>
         <button
           onClick={onOpenSettings}
-          className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-800 text-gray-500 dark:text-slate-400 transition-colors duration-150"
+          className="notion-icon-button p-2"
           title="設定"
         >
           <Settings size={16} />
         </button>
         <button
           onClick={onLogout}
-          className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-800 text-gray-500 dark:text-slate-400 transition-colors duration-150"
+          className="notion-icon-button p-2"
           title="ログアウト"
         >
           <LogOut size={16} />
@@ -321,16 +379,16 @@ function ChatRoomItem({
 }) {
   return (
     <div
-      className={`group w-full text-left px-4 py-2 flex items-center gap-2 transition-colors duration-150 ${
+      className={`group mx-2 flex w-auto items-center gap-2 rounded-2xl px-3 py-2 transition-colors duration-150 ${
         isActive
-          ? "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300"
-          : "hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-700 dark:text-gray-300"
+          ? "bg-white/95 text-stone-900 shadow-[0_8px_18px_rgba(15,23,42,0.06)] ring-1 ring-stone-200 dark:bg-stone-900/90 dark:text-stone-100 dark:ring-stone-700"
+          : "text-stone-600 hover:bg-white/70 hover:text-stone-900 dark:text-stone-300 dark:hover:bg-stone-900/70 dark:hover:text-stone-100"
       }`}
     >
       <button
         type="button"
         onClick={onSelect}
-        className="min-w-0 flex-1 text-left text-xs truncate"
+        className="min-w-0 flex-1 text-left text-xs font-medium truncate"
       >
         {room.name || "新しいチャット"}
       </button>
@@ -341,7 +399,7 @@ function ChatRoomItem({
             e.stopPropagation();
             onTogglePin();
           }}
-          className="p-1 rounded hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-400 dark:text-slate-500 hover:text-indigo-500 dark:hover:text-indigo-400 transition-all"
+          className="rounded-md p-1 text-stone-400 transition-all hover:bg-stone-200/70 hover:text-stone-700 dark:text-stone-500 dark:hover:bg-stone-800 dark:hover:text-stone-200"
           title={isPinned ? "ピン解除" : "ピン留め"}
         >
           {isPinned ? <PinOff size={12} /> : <Pin size={12} />}
@@ -352,57 +410,11 @@ function ChatRoomItem({
             e.stopPropagation();
             onDelete();
           }}
-          className="p-1 rounded hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 transition-all"
+          className="rounded-md p-1 text-stone-400 transition-all hover:bg-red-50 hover:text-red-500 dark:text-stone-500 dark:hover:bg-red-950/40 dark:hover:text-red-400"
         >
           <Trash2 size={12} />
         </button>
       </div>
-    </div>
-  );
-}
-
-function WorkFolderItem({
-  label,
-  subtitle,
-  isActive,
-  isLoading,
-  onOpen,
-  onPick,
-}: {
-  label: string;
-  subtitle: string;
-  isActive: boolean;
-  isLoading: boolean;
-  onOpen: () => void;
-  onPick?: () => void;
-}) {
-  return (
-    <div
-      className={`group flex items-center gap-2 rounded-lg px-3 py-2 transition-colors duration-150 ${
-        isActive
-          ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300"
-          : "bg-white text-gray-700 hover:bg-gray-100 dark:bg-slate-800 dark:text-gray-300 dark:hover:bg-slate-700"
-      }`}
-    >
-      <button
-        type="button"
-        onClick={onOpen}
-        className="min-w-0 flex-1 text-left"
-      >
-        <div className="truncate text-xs font-medium">{label}</div>
-        <div className="truncate text-[11px] text-gray-500 dark:text-slate-400">
-          {subtitle}
-        </div>
-      </button>
-      {onPick && (
-        <button
-          type="button"
-          onClick={onPick}
-          className="shrink-0 rounded-md border border-gray-200 px-2 py-1 text-[11px] text-gray-600 transition-colors hover:bg-gray-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
-        >
-          {isLoading ? "..." : "選ぶ"}
-        </button>
-      )}
     </div>
   );
 }

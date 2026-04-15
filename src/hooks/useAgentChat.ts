@@ -14,6 +14,7 @@ import {
   isTauri,
   type ProjectContext,
 } from "../lib/tauri-bridge";
+import { DEFAULT_MODEL_ID } from "../lib/models";
 import {
   chunkToArtifact,
   isFileWriteTool,
@@ -413,15 +414,21 @@ function buildClientTools(
   ];
 }
 
-function buildProjectCustomInstructions(
+function buildAgentCustomInstructions(
   activeProjectPath?: string | null,
   activeProjectContext?: ProjectContext | null,
-): string | undefined {
-  if (!activeProjectPath) return undefined;
-
+): string {
   const sections = [
-    `Current project directory: ${activeProjectPath}`,
-    "Work directly in the selected project directory by default. Do not create or prefer a separate scratch workspace unless the user explicitly asks for one.",
+    "Use available client_tools proactively whenever they can reduce guessing or avoid asking the user for information you can inspect yourself.",
+    "Prefer client_tools for current local and project state: listing directories, searching files, reading files, inspecting metadata, reading PDFs or DOCX files, running safe host commands, and executing sandbox code.",
+    "Before answering questions about the current local environment, project contents, or generated files, inspect them with a relevant client tool whenever possible.",
+    "Do not claim you checked local files, folders, commands, or document contents unless you actually used a client tool to inspect them.",
+    activeProjectPath
+      ? `Current project directory: ${activeProjectPath}`
+      : "No current project directory is selected. If project-relative filesystem work is needed and the path is unclear, ask the user to select a project first.",
+    activeProjectPath
+      ? "Work directly in the selected project directory by default. Do not create or prefer a separate scratch workspace unless the user explicitly asks for one."
+      : null,
     activeProjectContext?.is_initialized
       ? "This project has project-specific custom instructions. Follow them unless the user overrides them."
       : null,
@@ -430,7 +437,7 @@ function buildProjectCustomInstructions(
       : null,
   ].filter(Boolean);
 
-  return sections.length > 0 ? sections.join("\n\n") : undefined;
+  return sections.join("\n\n");
 }
 
 function mergeChunkText(
@@ -735,7 +742,7 @@ export function useAgentChat(
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [pinnedRooms, setPinnedRooms] = useState<string[]>(loadPinnedRooms);
   const [selectedModel, setSelectedModel] = useState<string>(
-    () => localStorage.getItem(MODEL_KEY) ?? "anthropic/claude-sonnet-4-5",
+    () => localStorage.getItem(MODEL_KEY) ?? DEFAULT_MODEL_ID,
   );
   const abortRef = useRef<AbortController | null>(null);
   const skipNextSessionLoadRef = useRef<string | null>(null);
@@ -1038,7 +1045,7 @@ export function useAgentChat(
 
       const executeWithRetry = async (attempt: number): Promise<void> => {
         try {
-          const customInstructions = buildProjectCustomInstructions(
+          const customInstructions = buildAgentCustomInstructions(
             activeProjectPath,
             activeProjectContext,
           );

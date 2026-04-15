@@ -1,6 +1,7 @@
 mod commands;
 mod mcp;
 mod project;
+mod runtime_auth;
 mod sandbox;
 mod tools;
 
@@ -49,6 +50,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::chat::send_message,
             commands::chat::get_config,
+            commands::chat::chat_set_runtime_auth,
+            commands::chat::chat_clear_runtime_auth,
             commands::excel::read_excel,
             commands::excel::write_excel,
             commands::excel::save_excel_to_file,

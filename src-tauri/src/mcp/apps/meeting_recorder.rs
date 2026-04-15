@@ -3,6 +3,8 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use super::{BuiltinAppInfo, BuiltinToolDef};
+use crate::runtime_auth;
+use base64::Engine as _;
 
 // ---------------------------------------------------------------------------
 // Shared recording state
@@ -59,7 +61,8 @@ pub fn app_info() -> BuiltinAppInfo {
             },
             BuiltinToolDef {
                 name: "transcribe".to_string(),
-                description: "音声ファイルを文字起こしする（OpenAI Whisper API使用）".to_string(),
+                description: "音声ファイルを文字起こしする（Tachyon chat/completions API使用）"
+                    .to_string(),
                 input_schema: json!({
                     "type": "object",
                     "properties": {
@@ -70,6 +73,10 @@ pub fn app_info() -> BuiltinAppInfo {
                         "language": {
                             "type": "string",
                             "description": "言語コード（デフォルト: ja）"
+                        },
+                        "model": {
+                            "type": "string",
+                            "description": "Tachyonで利用するモデルID（省略時はサーバー既定）"
                         }
                     },
                     "required": ["audio_path"]
@@ -281,7 +288,7 @@ fn stop_recording() -> Result<serde_json::Value, String> {
 }
 
 // ---------------------------------------------------------------------------
-// transcribe – OpenAI Whisper API
+// transcribe – Tachyon chat/completions API
 // ---------------------------------------------------------------------------
 
 async fn transcribe(args: serde_json::Value) -> Result<serde_json::Value, String> {
@@ -290,14 +297,19 @@ async fn transcribe(args: serde_json::Value) -> Result<serde_json::Value, String
         .get("language")
         .and_then(|v| v.as_str())
         .unwrap_or("ja");
+    let model = args
+        .get("model")
+        .and_then(|v| v.as_str())
+        .map(str::to_string);
 
     let path = PathBuf::from(&audio_path);
     if !path.exists() {
         return Err(format!("Audio file not found: {}", audio_path));
     }
 
-    let api_key = std::env::var("OPENAI_API_KEY")
-        .map_err(|_| "OPENAI_API_KEY environment variable is not set".to_string())?;
+    let auth = runtime_auth::get_runtime_auth()
+        .await
+        .ok_or("Tachyon runtime auth is not available. Please sign in again.".to_string())?;
 
     let file_bytes = tokio::fs::read(&path)
         .await
@@ -307,48 +319,15 @@ async fn transcribe(args: serde_json::Value) -> Result<serde_json::Value, String
         .file_name()
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_else(|| "audio.wav".to_string());
-
-    let file_part = reqwest::multipart::Part::bytes(file_bytes)
-        .file_name(file_name)
-        .mime_str("audio/wav")
-        .map_err(|e| format!("Failed to create multipart: {}", e))?;
-
-    let form = reqwest::multipart::Form::new()
-        .part("file", file_part)
-        .text("model", "whisper-1")
-        .text("language", language.to_string())
-        .text("response_format", "verbose_json");
-
-    let client = reqwest::Client::new();
-    let resp = client
-        .post("https://api.openai.com/v1/audio/transcriptions")
-        .bearer_auth(&api_key)
-        .multipart(form)
-        .send()
-        .await
-        .map_err(|e| format!("Whisper API request failed: {}", e))?;
-
-    if !resp.status().is_success() {
-        let status = resp.status();
-        let body = resp.text().await.unwrap_or_default();
-        return Err(format!("Whisper API error ({}): {}", status, body));
-    }
-
-    let result: serde_json::Value = resp
-        .json()
-        .await
-        .map_err(|e| format!("Failed to parse Whisper response: {}", e))?;
-
-    let transcript = result
-        .get("text")
-        .and_then(|v| v.as_str())
-        .unwrap_or("")
+    let mime_type = mime_guess::from_path(&path)
+        .first_raw()
+        .unwrap_or("audio/wav")
         .to_string();
-
-    let duration = result
-        .get("duration")
-        .and_then(|v| v.as_f64())
-        .unwrap_or(0.0);
+    let file_data = base64::engine::general_purpose::STANDARD.encode(&file_bytes);
+    let transcript =
+        call_tachyon_transcription(&auth, &file_name, &mime_type, &file_data, language, model)
+            .await?;
+    let duration = wav_duration_seconds(&path).unwrap_or(0.0);
 
     Ok(json!({
         "status": "success",
@@ -357,6 +336,229 @@ async fn transcribe(args: serde_json::Value) -> Result<serde_json::Value, String
         "duration": duration,
         "audio_path": audio_path
     }))
+}
+
+async fn call_tachyon_transcription(
+    auth: &runtime_auth::RuntimeAuth,
+    file_name: &str,
+    mime_type: &str,
+    file_data: &str,
+    language: &str,
+    model: Option<String>,
+) -> Result<String, String> {
+    let base_url = auth.api_base_url.trim_end_matches('/');
+    let endpoint = format!("{}/v1/llms/chat/completions", base_url);
+    let data_uri = format!("data:{};base64,{}", mime_type, file_data);
+    let system_prompt = "You are a precise transcription engine. Transcribe the provided audio faithfully. Return only the transcript text. Do not summarize. If part of the audio is unclear, write [inaudible].";
+    let user_prompt = format!(
+        "この音声ファイルを文字起こししてください。想定言語: {}。会議の発話をそのまま書き起こしてください。",
+        language
+    );
+    let user_id = auth.user_id.clone();
+    let model_value = model.clone();
+
+    let payloads = [
+        json!({
+            "messages": [
+                { "role": "system", "content": system_prompt },
+                {
+                    "role": "user",
+                    "content": [
+                        { "type": "text", "text": user_prompt },
+                        { "type": "file", "file": data_uri }
+                    ]
+                }
+            ],
+            "temperature": 0,
+            "stream": false,
+            "user": user_id.clone(),
+            "model": model_value.clone()
+        }),
+        json!({
+            "messages": [
+                { "role": "system", "content": system_prompt },
+                { "role": "user", "content": user_prompt }
+            ],
+            "attachments": [
+                {
+                    "filename": file_name,
+                    "content_type": mime_type,
+                    "data": file_data
+                }
+            ],
+            "temperature": 0,
+            "stream": false,
+            "user": user_id,
+            "model": model_value
+        }),
+    ];
+
+    let client = reqwest::Client::new();
+    let mut errors = Vec::new();
+
+    for payload in payloads {
+        let mut request = client
+            .post(&endpoint)
+            .header("Authorization", format!("Bearer {}", auth.access_token))
+            .header("x-operator-id", &auth.tenant_id)
+            .header("content-type", "application/json")
+            .json(&payload);
+
+        if let Some(user_id) = &auth.user_id {
+            request = request.header("x-user-id", user_id);
+        }
+
+        let response = request
+            .send()
+            .await
+            .map_err(|e| format!("Tachyon transcription request failed: {}", e))?;
+
+        if response.status().is_success() {
+            let body: serde_json::Value = response
+                .json()
+                .await
+                .map_err(|e| format!("Failed to parse Tachyon completion response: {}", e))?;
+            let transcript = extract_completion_text(&body)
+                .ok_or_else(|| format!("Transcript text was not found in response: {}", body))?;
+            return Ok(clean_transcript_text(&transcript));
+        }
+
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+
+        if status == reqwest::StatusCode::UNAUTHORIZED || status == reqwest::StatusCode::FORBIDDEN {
+            return Err(format!("Tachyon auth error ({}): {}", status, body));
+        }
+
+        errors.push(format!("{}: {}", status, body));
+    }
+
+    Err(format!(
+        "Tachyon transcription failed after trying chat/completions payload variants: {}",
+        errors.join(" | ")
+    ))
+}
+
+fn extract_completion_text(value: &serde_json::Value) -> Option<String> {
+    let choices = value.get("choices")?.as_array()?;
+    let first = choices.first()?;
+
+    if let Some(content) = first
+        .get("message")
+        .and_then(|message| message.get("content"))
+        .and_then(content_value_to_text)
+    {
+        return Some(content);
+    }
+
+    first
+        .get("delta")
+        .and_then(|delta| delta.get("content"))
+        .and_then(content_value_to_text)
+}
+
+fn content_value_to_text(value: &serde_json::Value) -> Option<String> {
+    match value {
+        serde_json::Value::String(text) => Some(text.clone()),
+        serde_json::Value::Array(parts) => {
+            let texts = parts
+                .iter()
+                .filter_map(|part| part.get("text").and_then(|text| text.as_str()))
+                .map(str::trim)
+                .filter(|text| !text.is_empty())
+                .collect::<Vec<_>>();
+            if texts.is_empty() {
+                None
+            } else {
+                Some(texts.join("\n"))
+            }
+        }
+        _ => None,
+    }
+}
+
+fn clean_transcript_text(text: &str) -> String {
+    text.trim()
+        .trim_start_matches("```")
+        .trim_end_matches("```")
+        .trim()
+        .to_string()
+}
+
+fn wav_duration_seconds(path: &std::path::Path) -> Option<f64> {
+    let reader = hound::WavReader::open(path).ok()?;
+    let spec = reader.spec();
+    if spec.sample_rate == 0 || spec.channels == 0 {
+        return None;
+    }
+    let total_samples = reader.duration() as f64;
+    Some(total_samples / spec.sample_rate as f64 / spec.channels as f64)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{content_value_to_text, extract_completion_text};
+    use serde_json::json;
+
+    #[test]
+    fn extracts_text_from_message_content_string() {
+        let value = json!({
+            "choices": [
+                {
+                    "message": {
+                        "content": "こんにちは"
+                    }
+                }
+            ]
+        });
+        assert_eq!(
+            extract_completion_text(&value).as_deref(),
+            Some("こんにちは")
+        );
+    }
+
+    #[test]
+    fn extracts_text_from_message_content_parts() {
+        let value = json!({
+            "choices": [
+                {
+                    "message": {
+                        "content": [
+                            { "type": "text", "text": "一行目" },
+                            { "type": "text", "text": "二行目" }
+                        ]
+                    }
+                }
+            ]
+        });
+        assert_eq!(
+            extract_completion_text(&value).as_deref(),
+            Some("一行目\n二行目")
+        );
+    }
+
+    #[test]
+    fn extracts_text_from_delta_content() {
+        let value = json!({
+            "choices": [
+                {
+                    "delta": {
+                        "content": "partial"
+                    }
+                }
+            ]
+        });
+        assert_eq!(extract_completion_text(&value).as_deref(), Some("partial"));
+    }
+
+    #[test]
+    fn ignores_non_text_parts() {
+        let value = json!([
+            { "type": "file", "file": "data:audio/wav;base64,abc" },
+            { "type": "text", "text": "文字起こし" }
+        ]);
+        assert_eq!(content_value_to_text(&value).as_deref(), Some("文字起こし"));
+    }
 }
 
 // ---------------------------------------------------------------------------

@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { type AuthState, buildAuthState } from "../../lib/auth";
+import {
+  DEFAULT_API_BASE_URL,
+  type AuthState,
+  buildAuthState,
+} from "../../lib/auth";
 import { decodeJwtPayload } from "../../lib/jwt";
 import {
   buildOAuthLoginUrl,
@@ -46,7 +50,12 @@ function toRuntimeApiBaseUrl(raw: string): string {
 }
 
 function normalizeTenantOptions(payload: unknown): TenantOption[] {
-  const candidateKeys = ["tenants", "operators", "organizations", "memberships"];
+  const candidateKeys = [
+    "tenants",
+    "operators",
+    "organizations",
+    "memberships",
+  ];
   const records =
     payload && typeof payload === "object"
       ? candidateKeys
@@ -68,7 +77,10 @@ function normalizeTenantOptions(payload: unknown): TenantOption[] {
         record.operatorId,
         record.organization_id,
         record.organizationId,
-      ].find((value): value is string => typeof value === "string" && value.length > 0);
+      ].find(
+        (value): value is string =>
+          typeof value === "string" && value.length > 0,
+      );
       if (!id) return null;
 
       const name = [
@@ -76,7 +88,10 @@ function normalizeTenantOptions(payload: unknown): TenantOption[] {
         record.display_name,
         record.displayName,
         record.slug,
-      ].find((value): value is string => typeof value === "string" && value.length > 0);
+      ].find(
+        (value): value is string =>
+          typeof value === "string" && value.length > 0,
+      );
 
       return { id, name: name || id };
     })
@@ -111,11 +126,14 @@ async function fetchCognitoUserInfo(
   cognitoDomain: string,
   accessToken: string,
 ): Promise<unknown> {
-  const response = await fetch(`${cognitoDomain.replace(/\/+$/, "")}/oauth2/userInfo`, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
+  const response = await fetch(
+    `${cognitoDomain.replace(/\/+$/, "")}/oauth2/userInfo`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
     },
-  });
+  );
 
   if (!response.ok) {
     const body = await response.text().catch(() => "");
@@ -142,7 +160,7 @@ export function LoginScreen({
     ? TAURI_REDIRECT_URI
     : import.meta.env.VITE_COGNITO_REDIRECT_URI || "";
   const [apiBaseUrl, setApiBaseUrl] = useState(
-    import.meta.env.VITE_API_BASE_URL || "https://api.tachyon.dev",
+    import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL,
   );
   const [accessToken, setAccessToken] = useState("");
   const [refreshToken, setRefreshToken] = useState("");
@@ -153,10 +171,15 @@ export function LoginScreen({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showManualLogin, setShowManualLogin] = useState(false);
-  const runtimeApiBaseUrl = useMemo(() => toRuntimeApiBaseUrl(apiBaseUrl), [apiBaseUrl]);
+  const runtimeApiBaseUrl = useMemo(
+    () => toRuntimeApiBaseUrl(apiBaseUrl),
+    [apiBaseUrl],
+  );
   const isDevTauri = import.meta.env.DEV && isTauri();
 
-  const hostedLoginReady = Boolean(cognitoDomain && cognitoClientId && redirectUri);
+  const hostedLoginReady = Boolean(
+    cognitoDomain && cognitoClientId && redirectUri,
+  );
 
   const finalizeLogin = useCallback(
     (params: {
@@ -172,7 +195,9 @@ export function LoginScreen({
           tenantId: params.tenantId,
           userId: params.userId,
           refreshToken: params.refreshToken || undefined,
-          clientId: params.refreshToken ? cognitoClientId || undefined : undefined,
+          clientId: params.refreshToken
+            ? cognitoClientId || undefined
+            : undefined,
         }),
       );
     },
@@ -197,7 +222,10 @@ export function LoginScreen({
         });
 
         if (res.status === 404 && cognitoDomain) {
-          userInfo = await fetchCognitoUserInfo(cognitoDomain, params.accessToken);
+          userInfo = await fetchCognitoUserInfo(
+            cognitoDomain,
+            params.accessToken,
+          );
         } else if (!res.ok) {
           const body = await res.text().catch(() => "");
           throw new Error(
@@ -210,7 +238,8 @@ export function LoginScreen({
         const jwtPayload = decodeJwtPayload(params.accessToken);
         const context = extractTenantContext(
           userInfo,
-          (typeof jwtPayload?.tenant_id === "string" && jwtPayload.tenant_id) || defaultTenantId,
+          (typeof jwtPayload?.tenant_id === "string" && jwtPayload.tenant_id) ||
+            defaultTenantId,
         );
         const resolvedUserId =
           context.userId ??
@@ -284,9 +313,19 @@ export function LoginScreen({
       }
     } catch (e) {
       clearPendingOAuthState();
-      setError(e instanceof Error ? e.message : "ブラウザログインの開始に失敗しました。");
+      setError(
+        e instanceof Error
+          ? e.message
+          : "ブラウザログインの開始に失敗しました。",
+      );
     }
-  }, [cognitoClientId, cognitoDomain, cognitoScopes, hostedLoginReady, redirectUri]);
+  }, [
+    cognitoClientId,
+    cognitoDomain,
+    cognitoScopes,
+    hostedLoginReady,
+    redirectUri,
+  ]);
 
   const handleTenantLogin = useCallback(() => {
     if (!tenantId || !accessToken) return;
@@ -320,7 +359,9 @@ export function LoginScreen({
 
       const codeVerifier = consumeOAuthVerifier(callback.state);
       if (!codeVerifier) {
-        setError("ログインセッションを復元できませんでした。もう一度ログインしてください。");
+        setError(
+          "ログインセッションを復元できませんでした。もう一度ログインしてください。",
+        );
         return;
       }
 
@@ -341,7 +382,9 @@ export function LoginScreen({
         });
         setCallbackUrlInput("");
       } catch (e) {
-        setError(e instanceof Error ? e.message : "ログイン処理に失敗しました。");
+        setError(
+          e instanceof Error ? e.message : "ログイン処理に失敗しました。",
+        );
         setIsLoading(false);
       }
     },
@@ -366,9 +409,8 @@ export function LoginScreen({
     let unlisten: (() => void) | undefined;
 
     void (async () => {
-      const { getCurrent, onOpenUrl } = await import(
-        "@tauri-apps/plugin-deep-link"
-      );
+      const { getCurrent, onOpenUrl } =
+        await import("@tauri-apps/plugin-deep-link");
       const currentUrls = await getCurrent();
       if (!isDisposed && currentUrls?.length) {
         await handleDeepLinkUrls(currentUrls);
@@ -455,8 +497,10 @@ export function LoginScreen({
           {isDevTauri && (
             <div className="space-y-2 rounded-xl border border-dashed border-amber-300 dark:border-amber-700 bg-amber-50/70 dark:bg-amber-900/10 p-3">
               <p className="text-xs text-amber-800 dark:text-amber-300 leading-5">
-                `tauri dev` では deep link が戻らないことがあります。ブラウザで認証後、
-                `tachyon-cowork://...` の callback URL をここに貼ると、そのまま本物のログインを続行できます。
+                `tauri dev` では deep link
+                が戻らないことがあります。ブラウザで認証後、
+                `tachyon-cowork://...` の callback URL
+                をここに貼ると、そのまま本物のログインを続行できます。
               </p>
               <input
                 type="text"

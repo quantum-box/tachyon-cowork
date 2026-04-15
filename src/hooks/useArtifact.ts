@@ -1,6 +1,11 @@
 import { useCallback, useState } from "react";
 import { saveFile, readWorkspaceFile } from "../lib/tauri-bridge";
-import type { AgentChunk, Artifact, ArtifactVersion, WorkspaceFile } from "../lib/types";
+import type {
+  AgentChunk,
+  Artifact,
+  ArtifactVersion,
+  WorkspaceFile,
+} from "../lib/types";
 
 /** Infer a language hint for syntax highlighting from a filename */
 function inferLanguage(filename: string): string | undefined {
@@ -213,7 +218,11 @@ export function useArtifact() {
     const versioned: Artifact = {
       ...artifact,
       versions: artifact.versions ?? [
-        { version: 1, content: artifact.content, createdAt: artifact.createdAt },
+        {
+          version: 1,
+          content: artifact.content,
+          createdAt: artifact.createdAt,
+        },
       ],
       currentVersion: artifact.currentVersion ?? 1,
     };
@@ -248,7 +257,11 @@ export function useArtifact() {
     const versioned: Artifact = {
       ...artifact,
       versions: artifact.versions ?? [
-        { version: 1, content: artifact.content, createdAt: artifact.createdAt },
+        {
+          version: 1,
+          content: artifact.content,
+          createdAt: artifact.createdAt,
+        },
       ],
       currentVersion: artifact.currentVersion ?? 1,
     };
@@ -269,11 +282,13 @@ export function useArtifact() {
   );
 
   const closeCanvas = useCallback(() => {
-    setCanvas((prev) => ({ ...prev, isOpen: false }));
+    setCanvas((prev) => (prev.isOpen ? { ...prev, isOpen: false } : prev));
   }, []);
 
   const updateCanvasContent = useCallback((content: string) => {
-    setCanvas((prev) => ({ ...prev, content }));
+    setCanvas((prev) =>
+      prev.content === content ? prev : { ...prev, content },
+    );
   }, []);
 
   /** Switch to a specific version of the selected artifact */
@@ -303,7 +318,8 @@ export function useArtifact() {
     if (artifact.url) {
       try {
         const response = await fetch(artifact.url);
-        if (!response.ok) throw new Error(`Download failed: ${response.status}`);
+        if (!response.ok)
+          throw new Error(`Download failed: ${response.status}`);
         const blob = await response.blob();
         const blobUrl = URL.createObjectURL(blob);
         const a = document.createElement("a");

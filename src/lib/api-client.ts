@@ -188,7 +188,7 @@ export class AgentChatClient {
   async createSession(
     title?: string,
   ): Promise<{ session: { id: string; name: string } }> {
-    const data = await this.request<unknown>("/llms/sessions", {
+    const data = await this.request<unknown>("/v1/llms/sessions", {
       method: "POST",
       body: JSON.stringify({ ...(title && { name: title }) }),
     });
@@ -200,7 +200,7 @@ export class AgentChatClient {
   }
 
   async getSessions(): Promise<SessionSummary[]> {
-    const data = await this.request<unknown>("/llms/sessions");
+    const data = await this.request<unknown>("/v1/llms/sessions");
     return normalizeSessionsResponse(data);
   }
 
@@ -209,14 +209,14 @@ export class AgentChatClient {
     payload: { name?: string },
   ): Promise<SessionSummary> {
     const data = await this.request<{ session: SessionSummary }>(
-      `/llms/sessions/${id}`,
+      `/v1/llms/sessions/${id}`,
       { method: "PATCH", body: JSON.stringify(payload) },
     );
     return data.session;
   }
 
   async deleteSession(id: string): Promise<void> {
-    const url = this.buildUrl(`/llms/sessions/${id}`);
+    const url = this.buildUrl(`/v1/llms/sessions/${id}`);
     const headers = await this.getFreshHeaders();
     const response = await fetch(url, {
       method: "DELETE",
@@ -233,7 +233,7 @@ export class AgentChatClient {
     sessionId: string,
     args: AgentExecuteRequest,
   ): Promise<Response> {
-    const url = this.buildUrl(`/llms/sessions/${sessionId}/agent/execute`);
+    const url = this.buildUrl(`/v1/llms/sessions/${sessionId}/agent/execute`);
     const headers = await this.getFreshHeaders();
     const response = await fetch(url, {
       method: "POST",
@@ -245,7 +245,9 @@ export class AgentChatClient {
     });
     if (!response.ok) {
       const body = await response.text().catch(() => "");
-      throw new Error(`Agent execute failed: ${response.status}${body ? ` - ${body}` : ""}`);
+      throw new Error(
+        `Agent execute failed: ${response.status}${body ? ` - ${body}` : ""}`,
+      );
     }
     return response;
   }
@@ -256,7 +258,7 @@ export class AgentChatClient {
   ): Promise<void> {
     const headers = await this.getFreshHeaders();
     const response = await fetch(
-      this.buildUrl(`/llms/sessions/${sessionId}/agent/tool-result`),
+      this.buildUrl(`/v1/llms/sessions/${sessionId}/agent/tool-result`),
       {
         method: "POST",
         headers,
@@ -274,16 +276,13 @@ export class AgentChatClient {
   async getMessages(sessionId: string): Promise<AgentChunk[]> {
     try {
       const data = await this.request<unknown>(
-        `/llms/sessions/${sessionId}/agent/messages`,
+        `/v1/llms/sessions/${sessionId}/agent/messages`,
       );
       return normalizeMessagesResponse(data);
     } catch (error) {
-      if (
-        error instanceof Error &&
-        error.message.includes("404")
-      ) {
+      if (error instanceof Error && error.message.includes("404")) {
         const fallback = await this.request<unknown>(
-          `/llms/sessions/${sessionId}/messages`,
+          `/v1/llms/sessions/${sessionId}/messages`,
         );
         return normalizeMessagesResponse(fallback);
       }
@@ -293,7 +292,7 @@ export class AgentChatClient {
 
   async deleteMessage(sessionId: string, messageId: string): Promise<void> {
     const url = this.buildUrl(
-      `/llms/sessions/${sessionId}/agent/messages/${messageId}`,
+      `/v1/llms/sessions/${sessionId}/agent/messages/${messageId}`,
     );
     const headers = await this.getFreshHeaders();
     const response = await fetch(url, { method: "DELETE", headers });
@@ -307,16 +306,20 @@ export class AgentChatClient {
 
   async getModels(): Promise<ModelInfo[]> {
     const data = await this.request<{ models: ModelInfo[] }>(
-      "/llms/models?supported_feature=agent&require_agent_product=true",
+      "/v1/llms/models?supported_feature=agent&require_agent_product=true",
     );
     return data.models;
   }
 
   /** Download a file from a presigned URL as a Blob. */
-  async downloadFromUrl(url: string): Promise<{ blob: Blob; filename: string }> {
+  async downloadFromUrl(
+    url: string,
+  ): Promise<{ blob: Blob; filename: string }> {
     const response = await fetch(url);
     if (!response.ok) {
-      throw new Error(`Download failed: ${response.status} ${response.statusText}`);
+      throw new Error(
+        `Download failed: ${response.status} ${response.statusText}`,
+      );
     }
     const blob = await response.blob();
     const disposition = response.headers.get("Content-Disposition");

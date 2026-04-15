@@ -32,35 +32,43 @@ export function ToolsPanel({
   const [activeTab, setActiveTab] = useState<Tab>("search");
 
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-slate-950 transition-colors duration-150">
+    <div className="flex h-full flex-col bg-transparent transition-colors duration-150">
       {/* Header */}
-      <div className="border-b border-gray-200 dark:border-slate-700">
-        <div className="flex items-center gap-2 px-4 py-3">
+      <div className="border-b border-stone-200/80 bg-white/55 px-4 py-4 backdrop-blur-md dark:border-stone-800/80 dark:bg-stone-950/25">
+        <div className="flex items-center gap-2">
           <button
             onClick={onBack}
-            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-500 dark:text-slate-400 transition-colors"
+            className="notion-icon-button p-2"
             title={backLabel}
           >
             <ArrowLeft size={18} />
           </button>
-          <div>
-            <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-100">{title}</h2>
-            <p className="text-[11px] text-gray-500 dark:text-slate-400">{description}</p>
+          <div
+            className="titlebar-safe-header titlebar-safe-start"
+            data-tauri-drag-region
+          >
+            <div className="notion-label mb-1">Tools</div>
+            <h2 className="text-sm font-semibold text-stone-800 dark:text-stone-100">
+              {title}
+            </h2>
+            <p className="text-[11px] text-stone-500 dark:text-stone-400">
+              {description}
+            </p>
           </div>
         </div>
 
         {/* Tab navigation */}
-        <div className="flex border-t border-gray-100 dark:border-slate-800">
+        <div className="mt-4 flex rounded-[20px] border border-stone-200/80 bg-white/70 p-1 dark:border-stone-800 dark:bg-stone-900/60">
           {TABS.map((tab) => {
             const Icon = tab.icon;
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-2.5 text-xs font-medium transition-colors border-b-2 ${
+                className={`flex-1 flex items-center justify-center gap-1.5 rounded-2xl px-2 py-2.5 text-xs font-medium transition-colors ${
                   activeTab === tab.id
-                    ? "border-indigo-500 text-indigo-600 dark:text-indigo-300 bg-indigo-50/50 dark:bg-indigo-900/20"
-                    : "border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-900"
+                    ? "bg-white text-stone-900 shadow-[0_8px_18px_rgba(15,23,42,0.05)] dark:bg-stone-950 dark:text-stone-100"
+                    : "text-stone-500 hover:bg-white/70 hover:text-stone-800 dark:text-stone-400 dark:hover:bg-stone-900/80 dark:hover:text-stone-100"
                 }`}
               >
                 <Icon size={14} />
@@ -73,10 +81,18 @@ export function ToolsPanel({
 
       {/* Tab content */}
       <div className="flex-1 min-h-0">
-        {activeTab === "search" && <FileSearchPanel defaultDirectory={projectDirectory} />}
-        {activeTab === "organize" && <FileOrganizer defaultDirectory={projectDirectory} />}
-        {activeTab === "duplicates" && <DuplicateDetector defaultDirectory={projectDirectory} />}
-        {activeTab === "usage" && <DiskUsageChart defaultDirectory={projectDirectory} />}
+        {activeTab === "search" && (
+          <FileSearchPanel defaultDirectory={projectDirectory} />
+        )}
+        {activeTab === "organize" && (
+          <FileOrganizer defaultDirectory={projectDirectory} />
+        )}
+        {activeTab === "duplicates" && (
+          <DuplicateDetector defaultDirectory={projectDirectory} />
+        )}
+        {activeTab === "usage" && (
+          <DiskUsageChart defaultDirectory={projectDirectory} />
+        )}
       </div>
     </div>
   );
