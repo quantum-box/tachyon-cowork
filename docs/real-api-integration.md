@@ -58,6 +58,7 @@ npm run test:e2e:real-api -- \
   --project "/absolute/path/to/workspace" \
   --expect-chunk-type tool_call \
   --expect-chunk-type tool_result \
+  --expect-chunk-type tool_call_pending \
   --output /tmp/tachyon-real-api-report.json
 ```
 
