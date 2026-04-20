@@ -387,8 +387,13 @@ fn workspace_paths(root: &Path) -> WorkspacePaths {
 
 fn ensure_agent_dir(root: &Path) -> Result<(), String> {
     let paths = workspace_paths(root);
-    fs::create_dir_all(&paths.agent_dir)
-        .map_err(|e| format!("Failed to create agent directory '{}': {}", paths.agent_dir.display(), e))
+    fs::create_dir_all(&paths.agent_dir).map_err(|e| {
+        format!(
+            "Failed to create agent directory '{}': {}",
+            paths.agent_dir.display(),
+            e
+        )
+    })
 }
 
 fn read_optional_workspace_file(path: &Path) -> Result<Option<String>, String> {
@@ -406,7 +411,10 @@ fn read_optional_workspace_file(path: &Path) -> Result<Option<String>, String> {
     Ok(Some(trimmed.to_string()))
 }
 
-fn update_workspace_custom_instructions(root: &Path, custom_instructions: &str) -> Result<(), String> {
+fn update_workspace_custom_instructions(
+    root: &Path,
+    custom_instructions: &str,
+) -> Result<(), String> {
     let trimmed = custom_instructions.trim();
     let paths = workspace_paths(root);
 
