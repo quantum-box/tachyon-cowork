@@ -495,72 +495,6 @@ fn wav_duration_seconds(path: &std::path::Path) -> Option<f64> {
     Some(total_samples / spec.sample_rate as f64 / spec.channels as f64)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::{content_value_to_text, extract_completion_text};
-    use serde_json::json;
-
-    #[test]
-    fn extracts_text_from_message_content_string() {
-        let value = json!({
-            "choices": [
-                {
-                    "message": {
-                        "content": "こんにちは"
-                    }
-                }
-            ]
-        });
-        assert_eq!(
-            extract_completion_text(&value).as_deref(),
-            Some("こんにちは")
-        );
-    }
-
-    #[test]
-    fn extracts_text_from_message_content_parts() {
-        let value = json!({
-            "choices": [
-                {
-                    "message": {
-                        "content": [
-                            { "type": "text", "text": "一行目" },
-                            { "type": "text", "text": "二行目" }
-                        ]
-                    }
-                }
-            ]
-        });
-        assert_eq!(
-            extract_completion_text(&value).as_deref(),
-            Some("一行目\n二行目")
-        );
-    }
-
-    #[test]
-    fn extracts_text_from_delta_content() {
-        let value = json!({
-            "choices": [
-                {
-                    "delta": {
-                        "content": "partial"
-                    }
-                }
-            ]
-        });
-        assert_eq!(extract_completion_text(&value).as_deref(), Some("partial"));
-    }
-
-    #[test]
-    fn ignores_non_text_parts() {
-        let value = json!([
-            { "type": "file", "file": "data:audio/wav;base64,abc" },
-            { "type": "text", "text": "文字起こし" }
-        ]);
-        assert_eq!(content_value_to_text(&value).as_deref(), Some("文字起こし"));
-    }
-}
-
 // ---------------------------------------------------------------------------
 // generate_minutes – Claude API
 // ---------------------------------------------------------------------------
@@ -717,4 +651,70 @@ fn get_str(args: &serde_json::Value, key: &str) -> Result<String, String> {
         .and_then(|v| v.as_str())
         .map(String::from)
         .ok_or_else(|| format!("Missing '{}' argument", key))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{content_value_to_text, extract_completion_text};
+    use serde_json::json;
+
+    #[test]
+    fn extracts_text_from_message_content_string() {
+        let value = json!({
+            "choices": [
+                {
+                    "message": {
+                        "content": "こんにちは"
+                    }
+                }
+            ]
+        });
+        assert_eq!(
+            extract_completion_text(&value).as_deref(),
+            Some("こんにちは")
+        );
+    }
+
+    #[test]
+    fn extracts_text_from_message_content_parts() {
+        let value = json!({
+            "choices": [
+                {
+                    "message": {
+                        "content": [
+                            { "type": "text", "text": "一行目" },
+                            { "type": "text", "text": "二行目" }
+                        ]
+                    }
+                }
+            ]
+        });
+        assert_eq!(
+            extract_completion_text(&value).as_deref(),
+            Some("一行目\n二行目")
+        );
+    }
+
+    #[test]
+    fn extracts_text_from_delta_content() {
+        let value = json!({
+            "choices": [
+                {
+                    "delta": {
+                        "content": "partial"
+                    }
+                }
+            ]
+        });
+        assert_eq!(extract_completion_text(&value).as_deref(), Some("partial"));
+    }
+
+    #[test]
+    fn ignores_non_text_parts() {
+        let value = json!([
+            { "type": "file", "file": "data:audio/wav;base64,abc" },
+            { "type": "text", "text": "文字起こし" }
+        ]);
+        assert_eq!(content_value_to_text(&value).as_deref(), Some("文字起こし"));
+    }
 }

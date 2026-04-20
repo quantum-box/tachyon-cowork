@@ -138,14 +138,12 @@ fn parse_document_xml(xml: &str) -> (Vec<DocxParagraph>, Vec<DocxTable>) {
                     _ => {}
                 }
             }
-            Ok(Event::Text(ref e)) => {
-                if in_text {
-                    let text = e.unescape().unwrap_or_default().to_string();
-                    if in_table_cell {
-                        current_cell_text.push_str(&text);
-                    } else if in_paragraph {
-                        current_text.push_str(&text);
-                    }
+            Ok(Event::Text(ref e)) if in_text => {
+                let text = e.unescape().unwrap_or_default().to_string();
+                if in_table_cell {
+                    current_cell_text.push_str(&text);
+                } else if in_paragraph {
+                    current_text.push_str(&text);
                 }
             }
             Ok(Event::End(ref e)) => {
