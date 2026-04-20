@@ -12,7 +12,7 @@ env:
 jobs:
   # ── Frontend checks ─────────────────────────────────────────────────
   frontend:
-    name: Frontend (typecheck)
+    name: Frontend (typecheck + test)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,6 +28,9 @@ jobs:
 
       - name: TypeScript type check
         run: npx tsc --noEmit
+
+      - name: Unit and integration tests
+        run: npm test
 
   # ── Rust lint + format + test ───────────────────────────────────────
   rust:

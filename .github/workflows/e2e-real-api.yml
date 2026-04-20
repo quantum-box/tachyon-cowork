@@ -1,0 +1,130 @@
+name: E2E Real API Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      message:
+        description: "Prompt to send to the agent"
+        required: false
+        default: "Use a tool to list the first 3 items in the workspace root and answer briefly."
+      model:
+        description: "Optional model id override"
+        required: false
+        default: ""
+      timeout_ms:
+        description: "Chat completion timeout in milliseconds"
+        required: false
+        default: "120000"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  native-real-api-smoke:
+    name: Native Tauri real API smoke
+    runs-on: macos-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+    env:
+      TACHYON_E2E_API_BASE_URL: ${{ secrets.TACHYON_E2E_API_BASE_URL }}
+      TACHYON_E2E_ACCESS_TOKEN: ${{ secrets.TACHYON_E2E_ACCESS_TOKEN }}
+      TACHYON_E2E_TENANT_ID: ${{ secrets.TACHYON_E2E_TENANT_ID }}
+      TACHYON_E2E_USER_ID: ${{ secrets.TACHYON_E2E_USER_ID }}
+      TACHYON_E2E_REFRESH_TOKEN: ${{ secrets.TACHYON_E2E_REFRESH_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Validate E2E secrets
+        run: |
+          missing=0
+          for name in \
+            TACHYON_E2E_API_BASE_URL \
+            TACHYON_E2E_ACCESS_TOKEN \
+            TACHYON_E2E_TENANT_ID
+          do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name secret is required for the real API smoke test"
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+      - name: Build debug Tauri binary
+        run: npm run tauri -- build --debug --no-bundle --ci
+
+      - name: Install Tauri WebDriver bridge
+        run: cargo install tauri-webdriver-automation --locked
+
+      - name: Start WebDriver bridge
+        run: |
+          tauri-wd --port 4444 --log-level info > "$RUNNER_TEMP/tauri-wd.log" 2>&1 &
+          echo "TAURI_WD_PID=$!" >> "$GITHUB_ENV"
+
+          for attempt in {1..30}; do
+            if curl --silent --fail http://127.0.0.1:4444/status >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+
+          echo "::error::tauri-wd did not become ready"
+          cat "$RUNNER_TEMP/tauri-wd.log"
+          exit 1
+
+      - name: Run native real API smoke
+        env:
+          E2E_MESSAGE: ${{ inputs.message }}
+          E2E_MODEL: ${{ inputs.model }}
+          E2E_TIMEOUT_MS: ${{ inputs.timeout_ms }}
+        run: |
+          args=(
+            --message "$E2E_MESSAGE"
+            --project "$GITHUB_WORKSPACE"
+            --timeout-ms "$E2E_TIMEOUT_MS"
+            --binary "$GITHUB_WORKSPACE/src-tauri/target/debug/tachyon-cowork"
+            --expect-tool host_list_dir
+            --expect-chunk-type tool_call
+            --expect-chunk-type tool_result
+            --output "$RUNNER_TEMP/tachyon-real-api-report.json"
+          )
+
+          if [ -n "$E2E_MODEL" ]; then
+            args+=(--model "$E2E_MODEL")
+          fi
+
+          npm run test:e2e:real-api -- "${args[@]}"
+
+      - name: Upload E2E artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-real-api-smoke
+          path: |
+            ${{ runner.temp }}/tachyon-real-api-report.json
+            ${{ runner.temp }}/tauri-wd.log
+          if-no-files-found: warn
+
+      - name: Stop WebDriver bridge
+        if: always()
+        run: |
+          if [ -n "$TAURI_WD_PID" ]; then
+            kill "$TAURI_WD_PID" || true
+          fi

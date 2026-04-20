@@ -188,7 +188,53 @@ async function deleteSession(baseUrl, sessionId) {
   await webdriverRequest(baseUrl, "DELETE", `/session/${sessionId}`);
 }
 
+function isNoWindowError(error) {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return (
+    error.message.includes('"message":"no window"') ||
+    error.message.includes('"message":"no such window"')
+  );
+}
+
+function isTransientWebdriverError(error) {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return (
+    isNoWindowError(error) ||
+    error.message.includes("plugin request failed") ||
+    error.message.includes('"error":"javascript error"')
+  );
+}
+
+async function waitForWindow(baseUrl, sessionId, timeoutMs = 30_000) {
+  const startedAt = Date.now();
+  let lastError = null;
+
+  while (Date.now() - startedAt < timeoutMs) {
+    try {
+      await webdriverRequest(baseUrl, "GET", `/session/${sessionId}/title`);
+      return;
+    } catch (error) {
+      if (!isNoWindowError(error)) {
+        throw error;
+      }
+      lastError = error;
+      await sleep(1000);
+    }
+  }
+
+  throw new Error(
+    `Timed out waiting for app window: ${lastError instanceof Error ? lastError.message : "no window"}`,
+  );
+}
+
 async function setWindowRect(baseUrl, sessionId) {
+  await waitForWindow(baseUrl, sessionId);
   await webdriverRequest(
     baseUrl,
     "POST",
@@ -234,9 +280,15 @@ async function waitFor(baseUrl, sessionId, predicate, timeoutMs, label) {
   const startedAt = Date.now();
 
   while (Date.now() - startedAt < timeoutMs) {
-    const state = await getBridgeState(baseUrl, sessionId);
-    if (predicate(state)) {
-      return state;
+    try {
+      const state = await getBridgeState(baseUrl, sessionId);
+      if (predicate(state)) {
+        return state;
+      }
+    } catch (error) {
+      if (!isTransientWebdriverError(error)) {
+        throw error;
+      }
     }
     await sleep(1000);
   }
@@ -248,13 +300,19 @@ async function waitForBridge(baseUrl, sessionId, timeoutMs) {
   const startedAt = Date.now();
 
   while (Date.now() - startedAt < timeoutMs) {
-    const ready = await executeSync(
-      baseUrl,
-      sessionId,
-      "return !!window.__tachyonTestBridge;",
-    );
-    if (ready) {
-      return;
+    try {
+      const ready = await executeSync(
+        baseUrl,
+        sessionId,
+        "return !!window.__tachyonTestBridge;",
+      );
+      if (ready) {
+        return;
+      }
+    } catch (error) {
+      if (!isTransientWebdriverError(error)) {
+        throw error;
+      }
     }
     await sleep(1000);
   }
@@ -366,6 +424,23 @@ function summarizeChunks(chunks) {
     toolCalls,
     toolResults,
     assistantTexts,
+  };
+}
+
+function sanitizeStateForReport(state) {
+  if (!state) {
+    return state;
+  }
+
+  return {
+    ...state,
+    auth: state.auth
+      ? {
+          ...state.auth,
+          accessToken: state.auth.accessToken ? "[REDACTED]" : null,
+          refreshToken: state.auth.refreshToken ? "[REDACTED]" : null,
+        }
+      : null,
   };
 }
 
@@ -509,7 +584,7 @@ async function main() {
       "chat completion",
     );
 
-    report.finalState = finalState;
+    report.finalState = sanitizeStateForReport(finalState);
     report.summary = summarizeChunks(finalState.chunks);
     report.failures = assertExpectations(finalState, options);
 

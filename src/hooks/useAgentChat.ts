@@ -751,6 +751,7 @@ export function useAgentChat(
   );
   const abortRef = useRef<AbortController | null>(null);
   const skipNextSessionLoadRef = useRef<string | null>(null);
+  const handledToolSubmissionRef = useRef<Set<string>>(new Set());
   const lastMessageRef = useRef<{
     message: string;
     task: string;
@@ -763,8 +764,14 @@ export function useAgentChat(
       chunk: AgentChunk & { args?: Record<string, unknown> },
     ) => {
       if (!client || !chunk.tool_id || !chunk.tool_name) return;
+      const handledKey = `${currentSessionId}:${chunk.tool_id}`;
+      if (handledToolSubmissionRef.current.has(handledKey)) {
+        return;
+      }
+      handledToolSubmissionRef.current.add(handledKey);
 
       let resultText: string;
+      let submitted = false;
 
       // Handle canvas tool call on the client side (no Tauri needed)
       if (chunk.tool_name === "canvas") {
@@ -835,6 +842,7 @@ export function useAgentChat(
           result: resultText,
           is_finished: true,
         });
+        submitted = true;
       } catch (error) {
         if (isUnauthorizedApiError(error)) {
           throw error;
@@ -847,11 +855,19 @@ export function useAgentChat(
           error,
         });
         throw error;
+      } finally {
+        if (!submitted) {
+          handledToolSubmissionRef.current.delete(handledKey);
+        }
       }
       setChunks((prev) => resolvePendingToolCall(prev, chunk.tool_id!));
     },
     [client, onCanvasToolCall, onArtifact],
   );
+
+  useEffect(() => {
+    handledToolSubmissionRef.current.clear();
+  }, [sessionId]);
 
   useEffect(() => {
     localStorage.setItem(MODEL_KEY, selectedModel);
