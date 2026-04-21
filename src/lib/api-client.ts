@@ -21,6 +21,21 @@ export class ApiRequestError extends Error {
   }
 }
 
+const TOOL_RESULT_RETRY_BASE_DELAY_MS = 150;
+const TOOL_RESULT_MAX_RETRIES = 5;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isPendingToolCallRaceError(error: unknown): boolean {
+  return (
+    error instanceof ApiRequestError &&
+    error.status === 404 &&
+    error.body.includes("No pending tool call found")
+  );
+}
+
 export function isUnauthorizedApiError(error: unknown): boolean {
   if (error instanceof ApiRequestError) {
     return error.status === 401;
@@ -294,22 +309,36 @@ export class AgentChatClient {
     sessionId: string,
     payload: { tool_id: string; result: string; is_finished: boolean },
   ): Promise<void> {
-    const headers = await this.getFreshHeaders();
-    const response = await fetch(
-      this.buildUrl(`/v1/llms/sessions/${sessionId}/agent/tool-result`),
-      {
-        method: "POST",
-        headers,
-        body: JSON.stringify(payload),
-      },
-    );
-    if (response.ok) return;
+    for (let attempt = 0; attempt <= TOOL_RESULT_MAX_RETRIES; attempt += 1) {
+      const headers = await this.getFreshHeaders();
+      const response = await fetch(
+        this.buildUrl(`/v1/llms/sessions/${sessionId}/agent/tool-result`),
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify(payload),
+        },
+      );
+      if (response.ok) return;
 
-    if (response.status === 401 && this.tokenManager) {
-      this.tokenManager.handleUnauthorizedError();
+      if (response.status === 401 && this.tokenManager) {
+        this.tokenManager.handleUnauthorizedError();
+      }
+      const body = await response.text().catch(() => "");
+      const error = new ApiRequestError(
+        response.status,
+        response.statusText,
+        body,
+      );
+      if (
+        attempt < TOOL_RESULT_MAX_RETRIES &&
+        isPendingToolCallRaceError(error)
+      ) {
+        await sleep(TOOL_RESULT_RETRY_BASE_DELAY_MS * 2 ** attempt);
+        continue;
+      }
+      throw error;
     }
-    const body = await response.text().catch(() => "");
-    throw new ApiRequestError(response.status, response.statusText, body);
   }
 
   async getMessages(sessionId: string): Promise<AgentChunk[]> {

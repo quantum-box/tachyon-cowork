@@ -47,6 +47,7 @@ import {
   setTauriRuntimeAuth,
 } from "./lib/tauri-bridge";
 import { hasModelOption, resolveModelOptions } from "./lib/models";
+import { shouldEnableTestBridge, type TachyonTestBridge } from "./lib/test-bridge";
 import {
   Navigate,
   Route,
@@ -315,6 +316,17 @@ export default function App() {
     activeProject?.path,
     projectContext,
   );
+  const {
+    chunks,
+    clearError,
+    isLoading: isChatLoading,
+    newChat,
+    selectedModel,
+    sendMessage,
+    sessionId,
+    setSelectedModel,
+    error: chatError,
+  } = chat;
   const modelOptions = useMemo(
     () => resolveModelOptions(availableModels),
     [availableModels],
@@ -373,6 +385,85 @@ export default function App() {
     setAuth(newAuth);
     setOfflineMode(false);
   }, []);
+
+  useEffect(() => {
+    if (!shouldEnableTestBridge()) {
+      delete window.__tachyonTestBridge;
+      return;
+    }
+
+    const bridge: TachyonTestBridge = {
+      version: "1",
+      getState: () => ({
+        auth,
+        activeProject,
+        recentProjects,
+        projectContext,
+        sessionId,
+        chunks,
+        isLoading: isChatLoading,
+        error: chatError,
+        selectedModel,
+        availableModels,
+        mcpToolNames: mcpTools.map((tool) => tool.name),
+        pathname: location.pathname,
+        canvasOpen: artifactState.canvas.isOpen,
+        artifactPanelOpen: artifactState.isPanelOpen,
+      }),
+      setAuth: (nextAuth) => {
+        if (nextAuth) {
+          handleLogin(nextAuth);
+          return;
+        }
+        handleLogout();
+      },
+      activateProject: async (path) => {
+        await activateProject(path);
+      },
+      sendMessage: async (message, taskOverride) => {
+        await sendMessage(message, undefined, taskOverride);
+      },
+      newChat: () => {
+        newChat();
+      },
+      setSelectedModel: (modelId) => {
+        setSelectedModel(modelId);
+      },
+      clearError: () => {
+        clearError();
+      },
+    };
+
+    window.__tachyonTestBridge = bridge;
+
+    return () => {
+      if (window.__tachyonTestBridge === bridge) {
+        delete window.__tachyonTestBridge;
+      }
+    };
+  }, [
+    activateProject,
+    activeProject,
+    artifactState.canvas.isOpen,
+    artifactState.isPanelOpen,
+    auth,
+    availableModels,
+    chatError,
+    chunks,
+    clearError,
+    handleLogin,
+    handleLogout,
+    isChatLoading,
+    location.pathname,
+    mcpTools,
+    newChat,
+    projectContext,
+    recentProjects,
+    selectedModel,
+    sendMessage,
+    sessionId,
+    setSelectedModel,
+  ]);
 
   const handleOpenArtifact = useCallback(
     (artifact: Parameters<typeof openArtifact>[0]) => {

@@ -1,6 +1,6 @@
 {
   "name": "tachyon-cowork",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -15,7 +15,8 @@
     "format:check": "prettier --check .",
     "format": "prettier --write .",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e:real-api": "node scripts/e2e/real-api-tool-use.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.10.1",

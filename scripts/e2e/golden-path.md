@@ -4,7 +4,7 @@
 
 ## Why this is a scaffold, not a runnable script
 
-`tauri-plugin-webdriver-automation` is only registered under `debug_assertions` (see `docs/tauri-webdriver.md`), so Golden Path automation needs a **debug** build, not the release `.dmg`/`.msi` operators install. Running it also needs a desktop session — not available on the Sakura VPS where CI-side validation lives. We therefore document the harness and let the on-site engineer execute it.
+`tauri-plugin-webdriver-automation` is only registered under `debug_assertions` (see `docs/tauri-webdriver.md`), so Golden Path automation needs a **debug** build, not the release `.dmg`/`.msi` operators install. Running it also needs a desktop session — not available on the Sakura VPS where CI-side validation lives. A narrower native smoke can run from GitHub Actions on a macOS runner via `.github/workflows/e2e-real-api.yml`, while the full operator Golden Path remains a local/on-site harness.
 
 ## Prereqs (on the exhibition PC or a developer Mac)
 
@@ -38,21 +38,23 @@ Session capabilities:
 ```ts
 // scripts/e2e/golden-path.spec.ts (to be implemented on exhibition PC)
 await driver.waitForUrl(/\/login/);
-await driver.$('#cognito-signin').click();
+await driver.$("#cognito-signin").click();
 // Cognito Hosted UI flow (runs in system browser via deep-link) — the harness
 // needs to hand control back to the human for the actual username/password
 // entry since we do not want test credentials in CI.
 
 await driver.waitForUrl(/\/projects/);
-await driver.$('[data-testid=new-project]').click();
-await driver.$('[data-testid=project-name]').setValue('展示会デモ');
-await driver.$('[data-testid=create-project]').click();
+await driver.$("[data-testid=new-project]").click();
+await driver.$("[data-testid=project-name]").setValue("展示会デモ");
+await driver.$("[data-testid=create-project]").click();
 
-await driver.$('[data-testid=record-start]').click();
+await driver.$("[data-testid=record-start]").click();
 await driver.pause(30_000);
-await driver.$('[data-testid=record-stop]').click();
+await driver.$("[data-testid=record-stop]").click();
 
-await driver.$('[data-testid=minutes-panel]').waitForDisplayed({ timeout: 60_000 });
+await driver
+  .$("[data-testid=minutes-panel]")
+  .waitForDisplayed({ timeout: 60_000 });
 ```
 
 ## Known gaps to close before running
