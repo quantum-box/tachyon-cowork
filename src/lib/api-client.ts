@@ -5,6 +5,7 @@ import type {
   ModelInfo,
   SessionSummary,
 } from "./types";
+import { fetchWithAuth } from "./fetch-with-auth";
 import type { TokenManager } from "./token-manager";
 
 export class ApiRequestError extends Error {
@@ -311,19 +312,16 @@ export class AgentChatClient {
   ): Promise<void> {
     for (let attempt = 0; attempt <= TOOL_RESULT_MAX_RETRIES; attempt += 1) {
       const headers = await this.getFreshHeaders();
-      const response = await fetch(
+      const response = await fetchWithAuth(
         this.buildUrl(`/v1/llms/sessions/${sessionId}/agent/tool-result`),
         {
           method: "POST",
           headers,
           body: JSON.stringify(payload),
+          tokenManager: this.tokenManager ?? undefined,
         },
       );
       if (response.ok) return;
-
-      if (response.status === 401 && this.tokenManager) {
-        this.tokenManager.handleUnauthorizedError();
-      }
       const body = await response.text().catch(() => "");
       const error = new ApiRequestError(
         response.status,
