@@ -22,6 +22,10 @@ IGNORED_ADVISORIES=(
   RUSTSEC-2025-0081
   RUSTSEC-2025-0098
   RUSTSEC-2025-0100
+  # hickory-proto via microsandbox-network 0.3.x; fixed line requires a future
+  # microsandbox upgrade beyond the current PR scope.
+  RUSTSEC-2026-0118
+  RUSTSEC-2026-0119
 )
 
 args=()

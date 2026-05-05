@@ -8,6 +8,10 @@ ignore = [
     "RUSTSEC-2023-0071",
     # rustls-webpki CRL matching - transitive via tauri/microsandbox -> reqwest -> rustls
     "RUSTSEC-2026-0049",
+    # hickory-proto O(n^2) DNS name compression - transitive via microsandbox-network 0.3.x, fixed in hickory 0.26 but not compatible with microsandbox 0.3
+    "RUSTSEC-2026-0119",
+    # hickory-proto NSEC3 validation loop - transitive via microsandbox-network 0.3.x, no fixed upgrade available in the current dependency line
+    "RUSTSEC-2026-0118",
 ]
 
 [yanked]
