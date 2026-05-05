@@ -18,6 +18,7 @@ pub struct McpManager {
     errors: Mutex<HashMap<String, String>>,
 }
 
+#[cfg_attr(any(target_os = "ios", target_os = "android"), allow(dead_code))]
 impl McpManager {
     pub fn new() -> Self {
         Self {

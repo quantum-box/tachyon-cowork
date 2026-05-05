@@ -17,6 +17,7 @@ pub struct WorkspaceFile {
 }
 
 /// Create a workspace directory for the given sandbox and return its host path.
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 pub fn create_workspace(sandbox_id: &str) -> Result<String, String> {
     let dir = workspace_path(sandbox_id);
     std::fs::create_dir_all(&dir)

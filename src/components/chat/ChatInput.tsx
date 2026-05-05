@@ -117,7 +117,7 @@ export function ChatInput({
   return (
     <form
       onSubmit={onSubmit}
-      className="px-3 pb-2.5 pt-2 transition-colors duration-150"
+      className="px-2.5 pb-[calc(env(safe-area-inset-bottom)+0.625rem)] pt-2 transition-colors duration-150 sm:px-3 sm:pb-2.5"
     >
       <div className="mx-auto max-w-[920px]">
         {/* Prompt templates */}
@@ -129,7 +129,7 @@ export function ChatInput({
         {/* File preview chips */}
         <FilePreview files={files} onRemove={onFileRemove} />
 
-        <div className="rounded-[22px] border border-stone-200/80 bg-white/92 p-1.5 shadow-[0_10px_24px_rgba(15,23,42,0.045)] dark:border-stone-700/80 dark:bg-stone-900/90">
+        <div className="rounded-[20px] border border-stone-200/80 bg-white/92 p-1.5 shadow-[0_10px_24px_rgba(15,23,42,0.045)] dark:border-stone-700/80 dark:bg-stone-900/90 sm:rounded-[22px]">
           <div className="flex items-end gap-1.5">
             {/* Paperclip button */}
             <button
@@ -151,7 +151,7 @@ export function ChatInput({
               placeholder={placeholder ?? "メッセージを入力..."}
               disabled={isDisabled}
               rows={1}
-              className="min-h-[46px] flex-1 resize-none rounded-2xl bg-transparent px-3 py-2.5 text-[15px] leading-6 text-stone-900 outline-none ring-0 placeholder:text-stone-400 disabled:opacity-50 dark:text-stone-100 dark:placeholder:text-stone-500"
+              className="min-h-[44px] flex-1 resize-none rounded-2xl bg-transparent px-2.5 py-2.5 text-[16px] leading-6 text-stone-900 outline-none ring-0 placeholder:text-stone-400 disabled:opacity-50 dark:text-stone-100 dark:placeholder:text-stone-500 sm:min-h-[46px] sm:px-3 sm:text-[15px]"
             />
             <button
               type="submit"
@@ -161,7 +161,7 @@ export function ChatInput({
               <SendHorizonal size={17} />
             </button>
           </div>
-          <div className="flex items-center justify-between px-2.5 pb-0.5 pt-1.5 text-[11px] text-stone-400 dark:text-stone-500">
+          <div className="hidden items-center justify-between px-2.5 pb-0.5 pt-1.5 text-[11px] text-stone-400 dark:text-stone-500 sm:flex">
             <span>
               {sendKey === "cmd-enter"
                 ? "⌘/Ctrl + Enter で送信"

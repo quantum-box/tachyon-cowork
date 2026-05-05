@@ -337,7 +337,7 @@ export default function App() {
     [availableModels],
   );
   const hasSideSurface =
-    artifactState.canvas.isOpen || artifactState.isPanelOpen;
+    !isMobile && (artifactState.canvas.isOpen || artifactState.isPanelOpen);
 
   useEffect(() => {
     let cancelled = false;
@@ -784,6 +784,7 @@ export default function App() {
             content={artifactState.canvas.content}
             contentType={artifactState.canvas.contentType}
             onClose={artifactState.closeCanvas}
+            isMobile={isMobile}
           />
         ) : (
           <ArtifactPanel
@@ -793,6 +794,7 @@ export default function App() {
             onDownload={artifactState.downloadArtifact}
             onSwitchVersion={artifactState.switchVersion}
             onOpenCanvas={artifactState.openCanvas}
+            isMobile={isMobile}
           />
         )}
       </div>
@@ -809,7 +811,8 @@ export default function App() {
         onLogout={handleLogout}
         apiBaseUrl={auth.apiBaseUrl}
         tenantId={auth.tenantId}
-        onMcpConfigChanged={refreshMcpTools}
+        onMcpConfigChanged={supportsDesktopTools ? refreshMcpTools : undefined}
+        showMcpSettings={supportsDesktopTools}
         sendKey={sendKey}
         onSendKeyChange={setSendKey}
         globalCustomInstructions={globalCustomInstructions}

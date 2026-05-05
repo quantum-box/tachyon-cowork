@@ -7,6 +7,7 @@ type Props = {
   content: string;
   contentType: "html" | "jsx";
   onClose: () => void;
+  isMobile?: boolean;
 };
 
 export function CanvasView({
@@ -14,6 +15,7 @@ export function CanvasView({
   content,
   contentType,
   onClose,
+  isMobile = false,
 }: Props) {
   const [width, setWidth] = useState(560);
   const [isDragging, setIsDragging] = useState(false);
@@ -44,24 +46,30 @@ export function CanvasView({
 
   return (
     <div
-      className="shrink-0 h-full flex"
+      className={
+        isMobile
+          ? "fixed inset-0 z-[80] flex bg-white dark:bg-slate-950"
+          : "shrink-0 h-full flex"
+      }
       style={isDragging ? { userSelect: "none" } : undefined}
     >
       {/* Drag handle */}
-      <div
-        onMouseDown={handleMouseDown}
-        className="shrink-0 w-1.5 cursor-col-resize flex items-center justify-center border-l border-gray-200 dark:border-slate-700 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors group"
-      >
-        <GripVertical
-          size={12}
-          className="text-gray-300 dark:text-slate-600 group-hover:text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity"
-        />
-      </div>
+      {!isMobile && (
+        <div
+          onMouseDown={handleMouseDown}
+          className="shrink-0 w-1.5 cursor-col-resize flex items-center justify-center border-l border-gray-200 dark:border-slate-700 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors group"
+        >
+          <GripVertical
+            size={12}
+            className="text-gray-300 dark:text-slate-600 group-hover:text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity"
+          />
+        </div>
+      )}
 
       {/* Panel */}
       <div
         className="h-full bg-white dark:bg-slate-950 flex flex-col"
-        style={{ width: `${width}px` }}
+        style={isMobile ? { width: "100%" } : { width: `${width}px` }}
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-200 dark:border-slate-700 px-4 py-2.5 shrink-0">
@@ -83,7 +91,7 @@ export function CanvasView({
         </div>
 
         {/* Preview */}
-        <div className="flex-1 min-h-0 p-2">
+        <div className="flex-1 min-h-0 p-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)]">
           <CanvasPreview
             content={content}
             contentType={contentType}
