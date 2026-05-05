@@ -226,7 +226,16 @@ pub async fn move_file(
 }
 
 pub async fn move_to_trash_impl(path: String) -> Result<(), String> {
-    trash::delete(&path).map_err(|e| e.to_string())
+    #[cfg(not(any(target_os = "ios", target_os = "android")))]
+    {
+        trash::delete(&path).map_err(|e| e.to_string())
+    }
+
+    #[cfg(any(target_os = "ios", target_os = "android"))]
+    {
+        let _ = path;
+        Err("Moving files to trash is not supported on mobile builds.".to_string())
+    }
 }
 
 #[derive(Deserialize)]

@@ -7,6 +7,7 @@ mod tools;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[allow(unused_mut)]
     let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_shell::init())
@@ -105,7 +106,7 @@ pub fn run() {
             .plugin(tauri_plugin_updater::Builder::new().build());
     }
 
-    #[cfg(debug_assertions)]
+    #[cfg(all(debug_assertions, desktop))]
     {
         builder = builder.plugin(tauri_plugin_webdriver_automation::init());
     }

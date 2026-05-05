@@ -1,19 +1,28 @@
 pub mod executor;
 pub mod workspace;
 
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 use microsandbox::Sandbox;
 
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 const DEFAULT_PYTHON_IMAGE: &str = "python:3.12-slim";
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 const DEFAULT_NODE_IMAGE: &str = "node:20-slim";
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 const DEFAULT_SHELL_IMAGE: &str = "alpine:latest";
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 const TACHYON_IMAGE: &str = "tachyon-sandbox:latest";
 
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 const DEFAULT_MEMORY_MIB: u32 = 512;
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 const DEFAULT_CPUS: u8 = 1;
 
 /// Sandbox manager for creating and managing microsandbox instances
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 pub struct SandboxManager;
 
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 impl SandboxManager {
     pub fn new() -> Self {
         Self
@@ -75,6 +84,7 @@ impl SandboxManager {
     }
 }
 
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 impl Default for SandboxManager {
     fn default() -> Self {
         Self::new()

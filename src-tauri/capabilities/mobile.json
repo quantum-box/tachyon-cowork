@@ -1,0 +1,16 @@
+{
+  "$schema": "../gen/schemas/mobile-schema.json",
+  "identifier": "mobile",
+  "description": "Mobile capability for the main window",
+  "platforms": ["iOS", "android"],
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "deep-link:default",
+    "shell:allow-open",
+    "dialog:default",
+    "fs:default",
+    "store:default",
+    "notification:default"
+  ]
+}
