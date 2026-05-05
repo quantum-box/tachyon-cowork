@@ -13,9 +13,37 @@ export function isTauri(): boolean {
   return typeof window !== "undefined" && "__TAURI__" in window;
 }
 
+export type TauriPlatform = "android" | "ios" | "linux" | "macos" | "windows";
+
+const MOBILE_TAURI_PLATFORMS = new Set<TauriPlatform>(["android", "ios"]);
+
+export function getTauriPlatform(): TauriPlatform | null {
+  const platform = import.meta.env.TAURI_ENV_PLATFORM;
+  if (
+    platform === "android" ||
+    platform === "ios" ||
+    platform === "linux" ||
+    platform === "macos" ||
+    platform === "windows"
+  ) {
+    return platform;
+  }
+
+  return null;
+}
+
+export function isTauriMobile(): boolean {
+  const platform = getTauriPlatform();
+  return isTauri() && !!platform && MOBILE_TAURI_PLATFORMS.has(platform);
+}
+
+export function isTauriDesktop(): boolean {
+  return isTauri() && !isTauriMobile();
+}
+
 export function isTauriMacOS(): boolean {
   return (
-    isTauri() &&
+    isTauriDesktop() &&
     typeof navigator !== "undefined" &&
     /Mac/i.test(navigator.userAgent)
   );

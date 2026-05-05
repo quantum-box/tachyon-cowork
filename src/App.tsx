@@ -41,13 +41,17 @@ import type { ModelInfo, SessionSummary } from "./lib/types";
 import {
   clearTauriRuntimeAuth,
   isTauri,
+  isTauriDesktop,
   isTauriMacOS,
   type ProjectContext,
   type ProjectEntry,
   setTauriRuntimeAuth,
 } from "./lib/tauri-bridge";
 import { hasModelOption, resolveModelOptions } from "./lib/models";
-import { shouldEnableTestBridge, type TachyonTestBridge } from "./lib/test-bridge";
+import {
+  shouldEnableTestBridge,
+  type TachyonTestBridge,
+} from "./lib/test-bridge";
 import {
   Navigate,
   Route,
@@ -86,6 +90,7 @@ export default function App() {
   const showTools = location.pathname === "/tools";
   const showWorkFolders = location.pathname.startsWith("/work-folders");
   const isMacDesktop = isTauriMacOS();
+  const supportsDesktopTools = isTauriDesktop();
   const desktopShellClass =
     isMacDesktop && !isMobile
       ? "relative flex h-screen overflow-hidden pb-2 pr-2 pl-0 pt-1.5 md:pb-3 md:pr-3"
@@ -508,7 +513,7 @@ export default function App() {
   );
 
   const handlePickProject = useCallback(async () => {
-    if (!isTauri()) return;
+    if (!supportsDesktopTools) return;
     const { open } = await import("@tauri-apps/plugin-dialog");
     const selected = await open({ directory: true, multiple: false });
     if (selected && typeof selected === "string") {
@@ -518,7 +523,13 @@ export default function App() {
         openWorkFolderPage(selected);
       }
     }
-  }, [activateProject, refreshMcpTools, location.pathname, openWorkFolderPage]);
+  }, [
+    activateProject,
+    refreshMcpTools,
+    location.pathname,
+    openWorkFolderPage,
+    supportsDesktopTools,
+  ]);
 
   const handleSelectProject = useCallback(
     async (path: string) => {
@@ -609,7 +620,9 @@ export default function App() {
         oauthError={oauthError}
         isExchangingToken={isExchangingToken}
         isOffline={!isOnline}
-        onEnterOfflineMode={isTauri() ? () => setOfflineMode(true) : undefined}
+        onEnterOfflineMode={
+          supportsDesktopTools ? () => setOfflineMode(true) : undefined
+        }
       />
     );
   }
@@ -651,7 +664,7 @@ export default function App() {
           onDeleteRoom={chat.deleteRoom}
           onTogglePin={chat.togglePin}
           onLogout={handleLogout}
-          onToggleTools={isTauri() ? handleToggleTools : undefined}
+          onToggleTools={supportsDesktopTools ? handleToggleTools : undefined}
           showTools={showTools}
           showWorkFolders={showWorkFolders}
           onOpenSettings={() => setSettingsOpen(true)}
@@ -659,7 +672,7 @@ export default function App() {
           onToggleCollapse={() => setSidebarCollapsed((prev) => !prev)}
           activeProject={activeProject}
           recentProjects={recentProjects}
-          onPickProject={isTauri() ? handlePickProject : undefined}
+          onPickProject={supportsDesktopTools ? handlePickProject : undefined}
           onSwitchProject={handleSidebarProjectSwitch}
           onOpenWorkFolderList={(path) => {
             openWorkFolderPage(path);
@@ -696,8 +709,12 @@ export default function App() {
                   onSearchClose={() => setSearchOpen(false)}
                   sendKey={sendKey}
                   isOffline={!isOnline}
-                  onOpenTools={() => navigate("/tools")}
-                  projectContext={projectContext}
+                  onOpenTools={
+                    supportsDesktopTools ? () => navigate("/tools") : undefined
+                  }
+                  projectContext={
+                    supportsDesktopTools ? projectContext : undefined
+                  }
                   onToggleSidebar={
                     isMobile
                       ? () => setSidebarCollapsed((prev) => !prev)
@@ -706,7 +723,7 @@ export default function App() {
                 />
               }
             />
-            {isTauri() && (
+            {supportsDesktopTools && (
               <Route
                 path="/tools"
                 element={
@@ -717,41 +734,45 @@ export default function App() {
                 }
               />
             )}
-            <Route
-              path="/work-folders"
-              element={
-                <WorkFolderListPanel
-                  onBack={handleBackToChat}
-                  onPickProject={handlePickProject}
-                  recentProjects={recentProjects}
-                  activeProject={activeProject}
-                  isLoading={isProjectLoading}
-                  onOpenProject={openWorkFolderPage}
-                  onRemoveProject={handleRemoveProject}
-                />
-              }
-            />
-            <Route
-              path="/work-folders/:folderPath"
-              element={
-                <WorkFolderRoute
-                  onBack={handleBackToChat}
-                  onStartChat={handleStartChatFromWorkFolder}
-                  onPickProject={handlePickProject}
-                  activeProject={activeProject}
-                  projectContext={projectContext}
-                  sessions={chat.sessions}
-                  isLoading={isProjectContextLoading}
-                  isSaving={isProjectContextSaving}
-                  error={projectContextError}
-                  onSaveCustomInstructions={
-                    handleSaveProjectCustomInstructions
+            {supportsDesktopTools && (
+              <>
+                <Route
+                  path="/work-folders"
+                  element={
+                    <WorkFolderListPanel
+                      onBack={handleBackToChat}
+                      onPickProject={handlePickProject}
+                      recentProjects={recentProjects}
+                      activeProject={activeProject}
+                      isLoading={isProjectLoading}
+                      onOpenProject={openWorkFolderPage}
+                      onRemoveProject={handleRemoveProject}
+                    />
                   }
-                  onActivateProject={handleSelectProject}
-                  onOpenSession={handleOpenSessionFromWorkFolder}
                 />
-              }
-            />
+                <Route
+                  path="/work-folders/:folderPath"
+                  element={
+                    <WorkFolderRoute
+                      onBack={handleBackToChat}
+                      onStartChat={handleStartChatFromWorkFolder}
+                      onPickProject={handlePickProject}
+                      activeProject={activeProject}
+                      projectContext={projectContext}
+                      sessions={chat.sessions}
+                      isLoading={isProjectContextLoading}
+                      isSaving={isProjectContextSaving}
+                      error={projectContextError}
+                      onSaveCustomInstructions={
+                        handleSaveProjectCustomInstructions
+                      }
+                      onActivateProject={handleSelectProject}
+                      onOpenSession={handleOpenSessionFromWorkFolder}
+                    />
+                  }
+                />
+              </>
+            )}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>

@@ -1,7 +1,13 @@
 import { useEffect, useState } from "react";
-import { isTauri } from "../../lib/tauri-bridge";
+import { isTauriDesktop } from "../../lib/tauri-bridge";
 
-type UpdateStatus = "idle" | "checking" | "available" | "downloading" | "done" | "error";
+type UpdateStatus =
+  | "idle"
+  | "checking"
+  | "available"
+  | "downloading"
+  | "done"
+  | "error";
 
 export function UpdateChecker() {
   const [status, setStatus] = useState<UpdateStatus>("idle");
@@ -9,7 +15,7 @@ export function UpdateChecker() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!isTauri()) return;
+    if (!isTauriDesktop()) return;
 
     let cancelled = false;
 

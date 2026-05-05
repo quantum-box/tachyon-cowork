@@ -86,6 +86,7 @@ export function Sidebar({
       : activeProject
         ? [activeProject]
         : [];
+  const canUseWorkFolders = !!onPickProject;
 
   const filtered = search
     ? sessions.filter((r) =>
@@ -187,86 +188,88 @@ export function Sidebar({
           />
         </div>
 
-        <div className="mt-2.5">
-          <div className="flex items-center justify-between px-1 pb-0.5">
-            <div className="notion-label">作業ディレクトリ一覧</div>
-            <div className="flex shrink-0 items-center gap-1">
-              <button
-                type="button"
-                onClick={() => onOpenWorkFolderList()}
-                className={`rounded-md px-1.5 py-1 text-[11px] transition-colors ${
-                  showWorkFolders
-                    ? "text-stone-900 dark:text-stone-100"
-                    : "text-stone-500 hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-100"
-                }`}
-              >
-                一覧
-              </button>
-              {!activeProject && onPickProject && (
+        {canUseWorkFolders && (
+          <div className="mt-2.5">
+            <div className="flex items-center justify-between px-1 pb-0.5">
+              <div className="notion-label">作業ディレクトリ一覧</div>
+              <div className="flex shrink-0 items-center gap-1">
                 <button
                   type="button"
-                  onClick={onPickProject}
-                  className="rounded-md px-1.5 py-1 text-[11px] text-stone-500 transition-colors hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-100"
+                  onClick={() => onOpenWorkFolderList()}
+                  className={`rounded-md px-1.5 py-1 text-[11px] transition-colors ${
+                    showWorkFolders
+                      ? "text-stone-900 dark:text-stone-100"
+                      : "text-stone-500 hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-100"
+                  }`}
                 >
-                  {isProjectLoading ? "..." : "開く"}
+                  一覧
                 </button>
-              )}
-            </div>
-          </div>
-
-          {workFolderList.length > 0 ? (
-            <div className="mt-1.5 space-y-0.5">
-              {workFolderList.map((project) => {
-                const isCurrent = activeProject?.path === project.path;
-                return (
+                {!activeProject && onPickProject && (
                   <button
-                    key={project.path}
                     type="button"
-                    onClick={() =>
-                      isCurrent
-                        ? onOpenWorkFolderList(project.path)
-                        : onSwitchProject
-                          ? onSwitchProject(project.path)
-                          : onOpenWorkFolderList(project.path)
-                    }
-                    className={`w-full border-l px-3 py-1.5 text-left transition-colors ${
-                      isCurrent
-                        ? "border-stone-400 text-stone-900 dark:border-stone-500 dark:text-stone-100"
-                        : "border-transparent text-stone-500 hover:border-stone-200 hover:text-stone-800 dark:text-stone-400 dark:hover:border-stone-800 dark:hover:text-stone-200"
-                    }`}
+                    onClick={onPickProject}
+                    className="rounded-md px-1.5 py-1 text-[11px] text-stone-500 transition-colors hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-100"
                   >
-                    <div className="flex items-center gap-2">
-                      <div className="min-w-0 flex-1 truncate text-xs font-medium">
-                        {project.name}
-                      </div>
-                      {isCurrent && (
-                        <span className="shrink-0 text-[10px] text-stone-400 dark:text-stone-500">
-                          使用中
-                        </span>
-                      )}
-                    </div>
-                    <div className="truncate pt-0.5 text-[11px] text-stone-400 dark:text-stone-500">
-                      {project.path}
-                    </div>
+                    {isProjectLoading ? "..." : "開く"}
                   </button>
-                );
-              })}
+                )}
+              </div>
             </div>
-          ) : (
-            <button
-              type="button"
-              onClick={onPickProject ?? (() => onOpenWorkFolderList())}
-              className="mt-1.5 w-full border-l border-transparent px-3 py-1.5 text-left text-stone-500 transition-colors hover:border-stone-200 hover:text-stone-900 dark:text-stone-400 dark:hover:border-stone-800 dark:hover:text-stone-100"
-            >
-              <div className="truncate text-xs font-medium">
-                作業ディレクトリを選ぶ
+
+            {workFolderList.length > 0 ? (
+              <div className="mt-1.5 space-y-0.5">
+                {workFolderList.map((project) => {
+                  const isCurrent = activeProject?.path === project.path;
+                  return (
+                    <button
+                      key={project.path}
+                      type="button"
+                      onClick={() =>
+                        isCurrent
+                          ? onOpenWorkFolderList(project.path)
+                          : onSwitchProject
+                            ? onSwitchProject(project.path)
+                            : onOpenWorkFolderList(project.path)
+                      }
+                      className={`w-full border-l px-3 py-1.5 text-left transition-colors ${
+                        isCurrent
+                          ? "border-stone-400 text-stone-900 dark:border-stone-500 dark:text-stone-100"
+                          : "border-transparent text-stone-500 hover:border-stone-200 hover:text-stone-800 dark:text-stone-400 dark:hover:border-stone-800 dark:hover:text-stone-200"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="min-w-0 flex-1 truncate text-xs font-medium">
+                          {project.name}
+                        </div>
+                        {isCurrent && (
+                          <span className="shrink-0 text-[10px] text-stone-400 dark:text-stone-500">
+                            使用中
+                          </span>
+                        )}
+                      </div>
+                      <div className="truncate pt-0.5 text-[11px] text-stone-400 dark:text-stone-500">
+                        {project.path}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
-              <div className="truncate pt-0.5 text-[11px] text-stone-400 dark:text-stone-500">
-                未選択でもチャットは開始できます
-              </div>
-            </button>
-          )}
-        </div>
+            ) : (
+              <button
+                type="button"
+                onClick={onPickProject ?? (() => onOpenWorkFolderList())}
+                className="mt-1.5 w-full border-l border-transparent px-3 py-1.5 text-left text-stone-500 transition-colors hover:border-stone-200 hover:text-stone-900 dark:text-stone-400 dark:hover:border-stone-800 dark:hover:text-stone-100"
+              >
+                <div className="truncate text-xs font-medium">
+                  作業ディレクトリを選ぶ
+                </div>
+                <div className="truncate pt-0.5 text-[11px] text-stone-400 dark:text-stone-500">
+                  未選択でもチャットは開始できます
+                </div>
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* File Tools button */}
