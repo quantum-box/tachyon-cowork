@@ -38,11 +38,24 @@
       "desktop": {
         "schemes": ["tachyon-cowork"]
       }
+    },
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDUyQjhERjlGQ0ZDMTcxQUEKUldTcWNjSFBuOSs0VXBKSzlZM09ZcmNqZzkyZ1lsaXN0S3dGcW9mRHpDSVVCUm96NWZyY2dLMUkK",
+      "endpoints": [
+        "https://github.com/quantum-box/tachyon-cowork/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
     }
   },
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
+    "iOS": {
+      "developmentTeam": "J8429VCGMR"
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

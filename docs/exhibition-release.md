@@ -94,7 +94,7 @@ workflow_dispatch は同一タグに対して artifact を上書きする。
   - 本署名 cert を取得するまで回避運用（[INSTALL.md](./INSTALL.md#smartscreen-警告の回避) 参照）
 - **`latest.json` の署名検証エラー**
   - `TAURI_SIGNING_PRIVATE_KEY` / `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` が secrets に設定されているか確認（自動更新用で Apple signing とは別）
-  - `src-tauri/tauri.conf.json` の `plugins.updater.pubkey` がプレースホルダー (`REPLACE_WITH_TAURI_SIGNING_PUBLIC_KEY`) のままだと自動更新は機能しない
+  - `src-tauri/tauri.conf.json` の `plugins.updater.pubkey` と、GitHub Secrets の `TAURI_SIGNING_PRIVATE_KEY` が同じ鍵ペアか確認する
 
 ## 関連ドキュメント
 
