@@ -11,6 +11,8 @@
     "fs:default",
     "store:default",
     "notification:default",
-    "global-shortcut:default"
+    "global-shortcut:default",
+    "process:allow-restart",
+    "updater:default"
   ]
 }

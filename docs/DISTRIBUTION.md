@@ -46,27 +46,27 @@ GitHub Actions の `workflow_dispatch` からも実行可能。バージョン�
 
 ## 自動更新 (Auto-Update)
 
-PR#39 で Tauri Updater プラグインを導入済み。
+Tauri Updater プラグインでアプリ内更新を提供する。
 
 - **エンドポイント**: `https://github.com/quantum-box/tachyon-cowork/releases/latest/download/latest.json`
 - **動作**: アプリ起動 5 秒後にバックグラウンドで更新チェック → 更新があればアプリ内バナーで通知 → ユーザー操作でダウンロード & 再起動
 - **署名検証**: `TAURI_SIGNING_PRIVATE_KEY` で署名、アプリ内蔵の公開鍵で検証
+- **アプリ内公開鍵**: `src-tauri/tauri.conf.json` の `plugins.updater.pubkey`
+- **更新 artifact**: `src-tauri/tauri.conf.json` の `bundle.createUpdaterArtifacts: true` で生成
 
 ### 必要な GitHub Secrets
 
 | Secret | 説明 |
 |---|---|
-| `TAURI_SIGNING_PRIVATE_KEY` | Tauri 更新署名用の秘密鍵 |
-| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | 秘密鍵のパスワード |
+| `TAURI_SIGNING_PRIVATE_KEY` | Tauri 更新署名用の秘密鍵。公開鍵と対になる値を登録する |
+| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | 秘密鍵のパスワード。パスワードなし鍵の場合は未設定または空 |
 
-鍵生成:
+鍵を再生成する場合:
 ```bash
 npx @tauri-apps/cli signer generate -w ~/.tauri/tachyon-cowork.key
 ```
-生成された公開鍵を `src-tauri/tauri.conf.json` の `plugins.updater.pubkey` に設定する。
 
-> **現状**: `pubkey` がプレースホルダー (`REPLACE_WITH_TAURI_SIGNING_PUBLIC_KEY`) のため、
-> 署名鍵を生成して設定するまで自動更新は機能しない。
+生成された公開鍵を `src-tauri/tauri.conf.json` の `plugins.updater.pubkey` に設定し、秘密鍵は GitHub Secrets の `TAURI_SIGNING_PRIVATE_KEY` に登録する。公開鍵を変更すると、既存インストール済みアプリは新しい鍵で署名された更新を検証できないため、鍵の再生成は初回配布前だけに限定する。
 
 ## コード署名
 
