@@ -276,7 +276,7 @@ export function ArtifactPanel({
             }`
           : `shrink-0 h-full flex flex-col overflow-hidden transition-all duration-300 ease-in-out ${
               isOpen
-                ? "surface-panel w-[460px] rounded-[28px] opacity-100"
+                ? "surface-panel w-full md:w-[480px] rounded-[28px] opacity-100"
                 : "pointer-events-none w-0 opacity-0"
             }`
       }
