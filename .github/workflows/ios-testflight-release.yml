@@ -155,8 +155,47 @@ jobs:
           echo "IOS_BUILD_NUMBER=$BUILD_NUMBER" >> "$GITHUB_ENV"
           echo "Using iOS build number: $BUILD_NUMBER"
 
-      - name: Build iOS IPA
-        run: mise run ios:build
+      - name: Archive iOS app
+        run: |
+          set -euo pipefail
+          npx tauri ios build --ci --export-method app-store-connect --build-number "$IOS_BUILD_NUMBER" --archive-only
+
+      - name: Export iOS IPA
+        run: |
+          set -euo pipefail
+          EXPORT_OPTIONS="$RUNNER_TEMP/ExportOptions.plist"
+          ARCHIVE_PATH="src-tauri/gen/apple/build/tachyon-cowork_iOS.xcarchive"
+          EXPORT_PATH="$RUNNER_TEMP/ios-export"
+
+          cat > "$EXPORT_OPTIONS" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store-connect</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>teamID</key>
+            <string>${IOS_DEVELOPMENT_TEAM}</string>
+            <key>signingCertificate</key>
+            <string>Apple Distribution</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>com.quantumbox.tachyon-cowork</key>
+              <string>${IOS_PROVISIONING_PROFILE_SPECIFIER}</string>
+            </dict>
+          </dict>
+          </plist>
+          EOF
+
+          xcodebuild -exportArchive \
+            -archivePath "$ARCHIVE_PATH" \
+            -exportPath "$EXPORT_PATH" \
+            -exportOptionsPlist "$EXPORT_OPTIONS"
+
+          mkdir -p "$(dirname "$IOS_IPA_PATH")"
+          cp "$EXPORT_PATH/Tachyon Cowork.ipa" "$IOS_IPA_PATH"
 
       - name: Verify export compliance key in IPA
         id: ipa
