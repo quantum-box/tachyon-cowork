@@ -7,6 +7,7 @@
   "permissions": [
     "core:default",
     "deep-link:default",
+    "opener:default",
     "shell:allow-open",
     "dialog:default",
     "fs:default",
