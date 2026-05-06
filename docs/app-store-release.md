@@ -14,6 +14,8 @@ Do not commit the `.p8` key. `mise.toml` copies it into
 
 ## Release Command
 
+### Local
+
 ```bash
 mise run ios:release
 ```
@@ -24,6 +26,10 @@ This runs:
 mise run ios:build
 mise run ios:upload
 ```
+
+`ios:build` initializes the generated iOS project with
+`npx tauri ios init --ci` when `src-tauri/gen/apple` is missing. This matters
+on fresh CI checkouts because `src-tauri/gen/` is intentionally ignored.
 
 The generated IPA path is:
 
@@ -38,6 +44,44 @@ IOS_BUILD_NUMBER=5051657 mise run ios:build
 IOS_IPA_PATH="src-tauri/gen/apple/build/arm64/Tachyon Cowork.ipa" mise run ios:upload
 APP_STORE_CONNECT_KEY_ID=... APP_STORE_CONNECT_ISSUER_ID=... APP_STORE_CONNECT_KEY_PATH=... mise run ios:upload
 ```
+
+### GitHub Actions
+
+Use **Actions -> iOS TestFlight Release -> Run workflow** to build the iOS IPA
+on a macOS runner and upload it to App Store Connect. Leave `build_number`
+blank for the default `MMDDHHMM` suffix, or set it explicitly when retrying a
+failed upload. Turn `upload` off to produce and download the IPA without sending
+it to TestFlight.
+
+The same workflow also runs automatically on non-draft pull requests targeting
+`main` when the PR branch is in this repository. Fork PRs are skipped because
+GitHub does not safely expose repository secrets to them. Each PR run uploads a
+TestFlight build and comments the uploaded build number back on the PR.
+
+Required repository secrets:
+
+- `APP_STORE_CONNECT_KEY_ID`
+- `APP_STORE_CONNECT_ISSUER_ID`
+- `APP_STORE_CONNECT_API_KEY_P8` - contents of the App Store Connect `.p8` key
+
+Signing secrets, usually required on GitHub-hosted macOS runners:
+
+- `IOS_DISTRIBUTION_CERTIFICATE_BASE64` - base64-encoded `.p12`
+- `IOS_DISTRIBUTION_CERTIFICATE_PASSWORD`
+- `IOS_PROVISIONING_PROFILE_BASE64` - base64-encoded App Store distribution
+  `.mobileprovision`
+- `IOS_BUILD_KEYCHAIN_PASSWORD` - optional temporary keychain password
+
+Create the base64 values on macOS with:
+
+```bash
+base64 -i ios_distribution.p12 | pbcopy
+base64 -i appstore_distribute.mobileprovision | pbcopy
+```
+
+The workflow verifies that the generated IPA includes
+`ITSAppUsesNonExemptEncryption=false` before uploading, so TestFlight should not
+show the repeated Missing Compliance prompt for that build.
 
 ## Build Number
 
