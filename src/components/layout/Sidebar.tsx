@@ -89,7 +89,7 @@ export function Sidebar({
 
   if (isCollapsed) {
     return (
-      <div className="flex flex-col items-center h-full bg-gray-50 dark:bg-slate-900 border-r border-gray-200 dark:border-slate-700 py-3 gap-2 w-12">
+      <div className="flex flex-col items-center h-full bg-gray-50 dark:bg-slate-900 border-r border-gray-200 dark:border-slate-700 px-0 pt-[calc(0.75rem+env(safe-area-inset-top))] pb-[calc(0.75rem+env(safe-area-inset-bottom))] gap-2 w-12">
         <button
           onClick={onToggleCollapse}
           className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-800 text-gray-500 dark:text-slate-400 transition-colors"
@@ -126,7 +126,7 @@ export function Sidebar({
   return (
     <div className="flex flex-col h-full bg-gray-50 dark:bg-slate-900 border-r border-gray-200 dark:border-slate-700 transition-colors duration-150">
       {/* Header */}
-      <div className="p-4 border-b border-gray-200 dark:border-slate-700">
+      <div className="px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-4 border-b border-gray-200 dark:border-slate-700">
         <div className="flex items-center justify-between mb-3">
           <h1 className="text-sm font-semibold text-gray-800 dark:text-gray-200 tracking-tight">
             Tachyon Cowork
@@ -277,7 +277,7 @@ export function Sidebar({
       <UpdateChecker />
 
       {/* Footer */}
-      <div className="p-3 border-t border-gray-200 dark:border-slate-700 flex items-center gap-2">
+      <div className="px-3 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] border-t border-gray-200 dark:border-slate-700 flex items-center gap-2">
         <button
           onClick={openFeedbackUrl}
           className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-800 text-gray-500 dark:text-slate-400 transition-colors duration-150"

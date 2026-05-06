@@ -57,7 +57,7 @@ export function MessageList({ chunks, isLoading, onOpenArtifact, onOpenCanvas, s
 
   return (
     <div
-      className="flex-1 overflow-y-auto px-4 py-6"
+      className="flex-1 overflow-y-auto px-4 pt-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]"
       role="log"
       aria-live="polite"
     >

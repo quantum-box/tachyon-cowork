@@ -117,7 +117,7 @@ export function ChatInput({
   return (
     <form
       onSubmit={onSubmit}
-      className="border-t border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-950 p-4 transition-colors duration-150"
+      className="border-t border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-4 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] transition-colors duration-150"
     >
       <div className="max-w-3xl mx-auto">
         {/* Prompt templates */}

@@ -96,7 +96,7 @@ export function ChatPanel({
       <div className="flex flex-col h-full bg-white dark:bg-slate-950 transition-colors duration-150">
         {/* Mobile header */}
         {onToggleSidebar && (
-          <div className="md:hidden flex items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-slate-700">
+          <div className="md:hidden flex items-center gap-3 px-4 pt-[calc(0.75rem+env(safe-area-inset-top))] pb-3 border-b border-gray-200 dark:border-slate-700">
             <button
               type="button"
               onClick={onToggleSidebar}
