@@ -32,7 +32,9 @@ fi
 
 mkdir -p "$KEY_DIR"
 chmod 700 "$KEY_DIR"
-cp "$KEY_SRC" "$KEY_DIR/AuthKey_${KEY_ID}.p8"
+if [ "$KEY_SRC" != "$KEY_DIR/AuthKey_${KEY_ID}.p8" ]; then
+  cp "$KEY_SRC" "$KEY_DIR/AuthKey_${KEY_ID}.p8"
+fi
 chmod 600 "$KEY_DIR/AuthKey_${KEY_ID}.p8"
 
 xcrun altool --upload-app \
