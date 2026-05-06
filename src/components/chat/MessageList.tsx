@@ -80,7 +80,7 @@ export function MessageList({
       role="log"
       aria-live="polite"
     >
-      <div className="mx-auto max-w-[920px]">
+      <div className="mx-auto max-w-full md:max-w-3xl">
         {showInitialLoading && <LoadingState />}
         {chunks.length === 0 && !isLoading && (
           <EmptyState onSendMessage={onSendMessage} />
