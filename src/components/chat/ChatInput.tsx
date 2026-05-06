@@ -136,10 +136,10 @@ export function ChatInput({
               type="button"
               onClick={handlePickFiles}
               disabled={isLoading || isDisabled}
-              className="notion-icon-button shrink-0 rounded-2xl p-2.5 disabled:cursor-not-allowed disabled:opacity-40"
+              className="notion-icon-button min-h-11 min-w-11 shrink-0 rounded-2xl p-3 disabled:cursor-not-allowed disabled:opacity-40"
               aria-label="ファイルを添付"
             >
-              <Paperclip size={17} />
+              <Paperclip size={20} />
             </button>
 
             <textarea
@@ -156,9 +156,10 @@ export function ChatInput({
             <button
               type="submit"
               disabled={!hasContent || isLoading || isDisabled}
-              className="notion-button-primary shrink-0 rounded-2xl p-2.5 disabled:cursor-not-allowed disabled:opacity-40"
+              className="notion-button-primary min-h-11 min-w-11 shrink-0 rounded-2xl p-3 disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label="送信"
             >
-              <SendHorizonal size={17} />
+              <SendHorizonal size={20} />
             </button>
           </div>
           <div className="hidden items-center justify-between px-2.5 pb-0.5 pt-1.5 text-[11px] text-stone-400 dark:text-stone-500 sm:flex">
