@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AgentChatClient, isUnauthorizedApiError } from "./lib/api-client";
 import {
-  DEFAULT_API_BASE_URL,
   type AuthState,
   buildAuthState,
   clearAuth,
@@ -17,6 +16,10 @@ import {
   getCallbackError,
   getOAuth2Config,
 } from "./lib/oauth2";
+import {
+  getConfiguredApiBaseUrl,
+  getConfiguredDefaultTenantId,
+} from "./lib/auth-config";
 import { decodeJwtPayload } from "./lib/jwt";
 import { useAgentChat } from "./hooks/useAgentChat";
 import { useFileHandler } from "./hooks/useFileHandler";
@@ -167,9 +170,9 @@ export default function App() {
         const config = getOAuth2Config();
         const payload = decodeJwtPayload(tokens.access_token);
         const newAuth = buildAuthState({
-          apiBaseUrl: import.meta.env.VITE_API_BASE_URL ?? DEFAULT_API_BASE_URL,
+          apiBaseUrl: getConfiguredApiBaseUrl(),
           accessToken: tokens.access_token,
-          tenantId: import.meta.env.VITE_DEFAULT_TENANT_ID ?? "",
+          tenantId: getConfiguredDefaultTenantId(),
           userId: payload?.sub,
           refreshToken: tokens.refresh_token,
           clientId: config.clientId,

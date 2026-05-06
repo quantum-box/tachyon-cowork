@@ -6,7 +6,8 @@
  */
 
 import type { ToolCall, ToolResult } from "./types";
-import { DEFAULT_API_BASE_URL, type AuthState } from "./auth";
+import type { AuthState } from "./auth";
+import { getConfiguredApiBaseUrl } from "./auth-config";
 
 /** Detect whether we are running inside a Tauri webview. */
 export function isTauri(): boolean {
@@ -64,9 +65,7 @@ function resolveRuntimeAuthApiBaseUrl(apiBaseUrl: string): string {
     return trimmed;
   }
 
-  return (import.meta.env.VITE_API_BASE_URL ?? DEFAULT_API_BASE_URL)
-    .trim()
-    .replace(/\/+$/, "");
+  return getConfiguredApiBaseUrl().trim().replace(/\/+$/, "");
 }
 
 /** Read a local file via the Tauri FS plugin. Throws on web. */

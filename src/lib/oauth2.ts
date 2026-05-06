@@ -6,6 +6,8 @@
  * navigation natively.
  */
 
+import { getConfiguredCognitoConfig } from "./auth-config";
+
 const VERIFIER_STORAGE_KEY = "tachyon-cowork-pkce-verifier";
 
 /** Generate a cryptographically random code_verifier (43-128 chars). */
@@ -38,12 +40,7 @@ export type OAuth2Config = {
 };
 
 export function getOAuth2Config(): OAuth2Config {
-  return {
-    domain: import.meta.env.VITE_COGNITO_DOMAIN ?? "",
-    clientId: import.meta.env.VITE_COGNITO_CLIENT_ID ?? "",
-    redirectUri: import.meta.env.VITE_COGNITO_REDIRECT_URI ?? "",
-    scopes: import.meta.env.VITE_COGNITO_SCOPES ?? "openid email profile",
-  };
+  return getConfiguredCognitoConfig();
 }
 
 /** Redirect the user to the authorization endpoint with PKCE. */

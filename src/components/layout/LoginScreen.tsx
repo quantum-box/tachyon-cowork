@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  DEFAULT_API_BASE_URL,
   type AuthState,
   buildAuthState,
 } from "../../lib/auth";
@@ -12,6 +11,11 @@ import {
   exchangeAuthorizationCode,
   parseOAuthCallback,
 } from "../../lib/oauth";
+import {
+  getConfiguredApiBaseUrl,
+  getConfiguredCognitoConfig,
+  getConfiguredDefaultTenantId,
+} from "../../lib/auth-config";
 import { isTauri } from "../../lib/tauri-bridge";
 
 type Props = {
@@ -152,16 +156,15 @@ export function LoginScreen({
   isOffline = false,
   onEnterOfflineMode,
 }: Props) {
-  const defaultTenantId = import.meta.env.VITE_DEFAULT_TENANT_ID || "";
-  const cognitoDomain = import.meta.env.VITE_COGNITO_DOMAIN || "";
-  const cognitoClientId = import.meta.env.VITE_COGNITO_CLIENT_ID || "";
-  const cognitoScopes = import.meta.env.VITE_COGNITO_SCOPES || "openid";
   const redirectUri = isTauri()
     ? TAURI_REDIRECT_URI
-    : import.meta.env.VITE_COGNITO_REDIRECT_URI || "";
-  const [apiBaseUrl, setApiBaseUrl] = useState(
-    import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL,
-  );
+    : getConfiguredCognitoConfig().redirectUri;
+  const cognitoConfig = getConfiguredCognitoConfig(redirectUri);
+  const defaultTenantId = getConfiguredDefaultTenantId();
+  const cognitoDomain = cognitoConfig.domain;
+  const cognitoClientId = cognitoConfig.clientId;
+  const cognitoScopes = cognitoConfig.scopes;
+  const [apiBaseUrl, setApiBaseUrl] = useState(getConfiguredApiBaseUrl);
   const [accessToken, setAccessToken] = useState("");
   const [refreshToken, setRefreshToken] = useState("");
   const [tenantOptions, setTenantOptions] = useState<TenantOption[]>([]);
