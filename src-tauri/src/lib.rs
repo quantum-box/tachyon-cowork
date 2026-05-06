@@ -7,16 +7,15 @@ mod tools;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[allow(unused_mut)]
     let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_notification::init())
-        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
-        .plugin(tauri_plugin_process::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(mcp::manager::McpManager::new())
         .manage(project::ProjectManager::new())
         .setup(|app| {
@@ -35,15 +34,17 @@ pub fn run() {
                 }
             }
 
-            // Load MCP config and connect enabled servers in background
-            let handle = app.handle().clone();
-            tauri::async_runtime::spawn(async move {
-                use tauri::Manager;
-                let manager = handle.state::<mcp::manager::McpManager>();
-                if let Err(e) = manager.load_and_connect_all(&handle).await {
-                    eprintln!("MCP startup error: {}", e);
-                }
-            });
+            #[cfg(desktop)]
+            {
+                let handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    use tauri::Manager;
+                    let manager = handle.state::<mcp::manager::McpManager>();
+                    if let Err(e) = manager.load_and_connect_all(&handle).await {
+                        eprintln!("MCP startup error: {}", e);
+                    }
+                });
+            }
 
             Ok(())
         })
@@ -98,7 +99,15 @@ pub fn run() {
             mcp::commands::mcp_get_builtin_apps,
         ]);
 
-    #[cfg(debug_assertions)]
+    #[cfg(desktop)]
+    {
+        builder = builder
+            .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+            .plugin(tauri_plugin_process::init())
+            .plugin(tauri_plugin_updater::Builder::new().build());
+    }
+
+    #[cfg(all(debug_assertions, desktop))]
     {
         builder = builder.plugin(tauri_plugin_webdriver_automation::init());
     }

@@ -26,34 +26,43 @@ pub async fn get_system_info() -> Result<SystemInfo, String> {
 
 #[tauri::command]
 pub async fn show_in_folder(path: String) -> Result<(), String> {
-    let canonical =
-        std::fs::canonicalize(&path).unwrap_or_else(|_| std::path::PathBuf::from(&path));
+    #[cfg(any(target_os = "ios", target_os = "android"))]
+    {
+        let _ = path;
+        Err("Showing files in the system folder is not supported on mobile builds.".to_string())
+    }
 
-    #[cfg(target_os = "macos")]
+    #[cfg(not(any(target_os = "ios", target_os = "android")))]
     {
-        std::process::Command::new("open")
-            .arg("-R")
-            .arg(&canonical)
-            .spawn()
-            .map_err(|e| e.to_string())?;
+        let canonical =
+            std::fs::canonicalize(&path).unwrap_or_else(|_| std::path::PathBuf::from(&path));
+
+        #[cfg(target_os = "macos")]
+        {
+            std::process::Command::new("open")
+                .arg("-R")
+                .arg(&canonical)
+                .spawn()
+                .map_err(|e| e.to_string())?;
+        }
+        #[cfg(target_os = "windows")]
+        {
+            std::process::Command::new("explorer")
+                .arg(format!("/select,{}", canonical.display()))
+                .spawn()
+                .map_err(|e| e.to_string())?;
+        }
+        #[cfg(target_os = "linux")]
+        {
+            let dir = canonical
+                .parent()
+                .map(|p| p.to_string_lossy().to_string())
+                .unwrap_or_else(|| canonical.to_string_lossy().to_string());
+            std::process::Command::new("xdg-open")
+                .arg(&dir)
+                .spawn()
+                .map_err(|e| e.to_string())?;
+        }
+        Ok(())
     }
-    #[cfg(target_os = "windows")]
-    {
-        std::process::Command::new("explorer")
-            .arg(format!("/select,{}", canonical.display()))
-            .spawn()
-            .map_err(|e| e.to_string())?;
-    }
-    #[cfg(target_os = "linux")]
-    {
-        let dir = canonical
-            .parent()
-            .map(|p| p.to_string_lossy().to_string())
-            .unwrap_or_else(|| canonical.to_string_lossy().to_string());
-        std::process::Command::new("xdg-open")
-            .arg(&dir)
-            .spawn()
-            .map_err(|e| e.to_string())?;
-    }
-    Ok(())
 }

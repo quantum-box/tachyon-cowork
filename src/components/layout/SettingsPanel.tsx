@@ -18,6 +18,7 @@ type Props = {
   apiBaseUrl?: string;
   tenantId?: string;
   onMcpConfigChanged?: () => void;
+  showMcpSettings?: boolean;
   sendKey: SendKeyMode;
   onSendKeyChange: (mode: SendKeyMode) => void;
   globalCustomInstructions: string;
@@ -52,6 +53,7 @@ export function SettingsPanel({
   apiBaseUrl,
   tenantId,
   onMcpConfigChanged,
+  showMcpSettings = true,
   sendKey,
   onSendKeyChange,
   globalCustomInstructions,
@@ -70,7 +72,7 @@ export function SettingsPanel({
       />
 
       {/* Panel */}
-      <div className="surface-panel relative mx-4 w-full max-w-lg overflow-hidden rounded-[28px] animate-fade-in">
+      <div className="surface-panel relative mx-3 w-full max-w-lg overflow-hidden rounded-[24px] animate-fade-in sm:mx-4 sm:rounded-[28px]">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-stone-200/80 px-6 py-4 dark:border-stone-800/80">
           <h2 className="text-base font-semibold text-stone-900 dark:text-stone-100">
@@ -82,7 +84,7 @@ export function SettingsPanel({
         </div>
 
         {/* Body */}
-        <div className="px-6 py-5 space-y-6 max-h-[70vh] overflow-y-auto">
+        <div className="max-h-[78vh] space-y-6 overflow-y-auto px-4 py-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] sm:max-h-[70vh] sm:px-6 sm:pb-5">
           {/* Theme */}
           <section>
             <div className="flex items-center gap-2 mb-3">
@@ -126,14 +128,13 @@ export function SettingsPanel({
               </h3>
             </div>
             <p className="mb-3 text-xs text-stone-500 dark:text-stone-400">
-              ここに書いた内容は、すべての Workspace に共通で適用されます。Workspace
-              側の `AGENTS.md` に書いた内容がある場合は、そちらを優先します。
+              ここに書いた内容は、すべての Workspace
+              に共通で適用されます。Workspace 側の `AGENTS.md`
+              に書いた内容がある場合は、そちらを優先します。
             </p>
             <textarea
               value={globalCustomInstructions}
-              onChange={(e) =>
-                onGlobalCustomInstructionsChange(e.target.value)
-              }
+              onChange={(e) => onGlobalCustomInstructionsChange(e.target.value)}
               placeholder="常に守ってほしい指示、話し方、出力ルールを書く"
               className="notion-input min-h-[144px] w-full resize-y rounded-[22px] px-4 py-3 text-sm text-stone-700 outline-none dark:text-stone-200"
             />
@@ -206,18 +207,20 @@ export function SettingsPanel({
           </section>
 
           {/* MCP Servers */}
-          <section>
-            <div className="flex items-center gap-2 mb-3">
-              <Puzzle
-                size={14}
-                className="text-stone-500 dark:text-stone-400"
-              />
-              <h3 className="text-sm font-medium text-stone-800 dark:text-stone-200">
-                MCP Servers
-              </h3>
-            </div>
-            <McpSettingsSection onConfigChanged={onMcpConfigChanged} />
-          </section>
+          {showMcpSettings && (
+            <section>
+              <div className="flex items-center gap-2 mb-3">
+                <Puzzle
+                  size={14}
+                  className="text-stone-500 dark:text-stone-400"
+                />
+                <h3 className="text-sm font-medium text-stone-800 dark:text-stone-200">
+                  MCP Servers
+                </h3>
+              </div>
+              <McpSettingsSection onConfigChanged={onMcpConfigChanged} />
+            </section>
+          )}
 
           {/* Account */}
           <section>

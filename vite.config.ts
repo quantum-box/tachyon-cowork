@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
 const isTauri = !!process.env.TAURI_ENV_PLATFORM;
+const tauriDevHost = process.env.TAURI_DEV_HOST;
 const platform = process.env.VITE_PLATFORM ?? (isTauri ? "tauri" : "web");
 const isWeb = platform === "web" && !isTauri;
 
@@ -20,9 +21,17 @@ export default defineConfig(({ mode }) => {
     plugins: [react(), tailwindcss()],
     clearScreen: false,
     server: {
+      host: tauriDevHost ?? "127.0.0.1",
       port: 1420,
       strictPort: isTauri,
       allowedHosts: true,
+      hmr: tauriDevHost
+        ? {
+            protocol: "ws",
+            host: tauriDevHost,
+            port: 1421,
+          }
+        : undefined,
       ...(apiProxyTarget
         ? {
             proxy: {

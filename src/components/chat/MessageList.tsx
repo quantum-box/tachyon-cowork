@@ -76,7 +76,7 @@ export function MessageList({
 
   return (
     <div
-      className="flex-1 overflow-y-auto px-4 py-5 md:px-6 md:py-6"
+      className="flex-1 overflow-y-auto px-3 py-4 sm:px-4 sm:py-5 md:px-6 md:py-6"
       role="log"
       aria-live="polite"
     >
@@ -160,17 +160,17 @@ function LoadingState() {
 
 function EmptyState(_: { onSendMessage?: (message: string) => void }) {
   return (
-    <div className="flex h-full min-h-[320px] items-center px-2">
+    <div className="flex h-full min-h-[260px] items-center px-1 sm:min-h-[320px] sm:px-2">
       <div className="w-full max-w-2xl">
         <div className="notion-label mb-2">Tachyon Cowork</div>
-        <h2 className="text-[2rem] font-semibold tracking-tight text-stone-900 dark:text-stone-100">
+        <h2 className="text-2xl font-semibold tracking-tight text-stone-900 dark:text-stone-100 sm:text-[2rem]">
           今日は何を進めますか
         </h2>
         <p className="mt-3 max-w-xl text-sm leading-6 text-stone-500 dark:text-stone-400">
           会話しながら、文章作成、調査、分析、ローカルファイル作業まで
           ひと続きで進められます。
         </p>
-        <p className="mt-6 text-xs text-stone-400 dark:text-stone-500">
+        <p className="mt-4 text-xs text-stone-400 dark:text-stone-500 sm:mt-6">
           下の入力欄からそのまま話しかけられます。
         </p>
       </div>

@@ -306,8 +306,8 @@ export function LoginScreen({
         scopes: cognitoScopes,
       });
       if (isTauri()) {
-        const { open } = await import("@tauri-apps/plugin-shell");
-        await open(loginUrl);
+        const { openUrl } = await import("@tauri-apps/plugin-opener");
+        await openUrl(loginUrl);
       } else {
         window.open(loginUrl, "_self");
       }

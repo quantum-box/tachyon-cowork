@@ -1,0 +1,47 @@
+[tasks."ios:build"]
+description = "Build the iOS IPA for App Store Connect"
+run = """
+IOS_BUILD_NUMBER="${IOS_BUILD_NUMBER:-$(date +%m%d%H%M | sed 's/^0*//')}"
+npx tauri ios build --ci --export-method app-store-connect --build-number "$IOS_BUILD_NUMBER"
+"""
+
+[tasks."ios:upload"]
+description = "Upload the generated iOS IPA to App Store Connect"
+run = """
+set -euo pipefail
+
+KEY_ID="${APP_STORE_CONNECT_KEY_ID:?Set APP_STORE_CONNECT_KEY_ID}"
+ISSUER_ID="${APP_STORE_CONNECT_ISSUER_ID:?Set APP_STORE_CONNECT_ISSUER_ID}"
+KEY_SRC="${APP_STORE_CONNECT_KEY_PATH:-$HOME/Downloads/AuthKey_${KEY_ID}.p8}"
+KEY_DIR="$HOME/.appstoreconnect/private_keys"
+IPA="${IOS_IPA_PATH:-src-tauri/gen/apple/build/arm64/Tachyon Cowork.ipa}"
+
+if [ ! -f "$KEY_SRC" ]; then
+  echo "Missing App Store Connect API key: $KEY_SRC" >&2
+  exit 2
+fi
+
+if [ ! -f "$IPA" ]; then
+  echo "Missing IPA: $IPA" >&2
+  echo "Run: mise run ios:build" >&2
+  exit 3
+fi
+
+mkdir -p "$KEY_DIR"
+chmod 700 "$KEY_DIR"
+cp "$KEY_SRC" "$KEY_DIR/AuthKey_${KEY_ID}.p8"
+chmod 600 "$KEY_DIR/AuthKey_${KEY_ID}.p8"
+
+xcrun altool --upload-app \
+  --type ios \
+  -f "$IPA" \
+  --apiKey "$KEY_ID" \
+  --apiIssuer "$ISSUER_ID"
+"""
+
+[tasks."ios:release"]
+description = "Build and upload the iOS IPA to App Store Connect"
+run = """
+mise run ios:build
+mise run ios:upload
+"""

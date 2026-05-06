@@ -54,7 +54,8 @@
     "targets": "all",
     "createUpdaterArtifacts": true,
     "iOS": {
-      "developmentTeam": "J8429VCGMR"
+      "developmentTeam": "J8429VCGMR",
+      "infoPlist": "Info.ios.plist"
     },
     "icon": [
       "icons/32x32.png",

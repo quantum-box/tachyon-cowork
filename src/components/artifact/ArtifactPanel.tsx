@@ -31,6 +31,7 @@ type ArtifactPanelProps = {
     content: string,
     contentType: "html" | "jsx",
   ) => void;
+  isMobile?: boolean;
 };
 
 function CsvTable({ content }: { content: string }) {
@@ -255,6 +256,7 @@ export function ArtifactPanel({
   onDownload,
   onSwitchVersion,
   onOpenCanvas,
+  isMobile = false,
 }: ArtifactPanelProps) {
   const [copied, setCopied] = useState(false);
 
@@ -267,11 +269,17 @@ export function ArtifactPanel({
 
   return (
     <div
-      className={`shrink-0 h-full flex flex-col overflow-hidden transition-all duration-300 ease-in-out ${
-        isOpen
-          ? "surface-panel w-[460px] rounded-[28px] opacity-100"
-          : "pointer-events-none w-0 opacity-0"
-      }`}
+      className={
+        isMobile
+          ? `fixed inset-0 z-[80] flex flex-col overflow-hidden bg-white transition-opacity duration-200 dark:bg-stone-950 ${
+              isOpen ? "opacity-100" : "pointer-events-none opacity-0"
+            }`
+          : `shrink-0 h-full flex flex-col overflow-hidden transition-all duration-300 ease-in-out ${
+              isOpen
+                ? "surface-panel w-[460px] rounded-[28px] opacity-100"
+                : "pointer-events-none w-0 opacity-0"
+            }`
+      }
     >
       {artifact && (
         <>
@@ -314,13 +322,13 @@ export function ArtifactPanel({
           </div>
 
           {/* Content */}
-          <div className="flex-1 overflow-auto p-4">
+          <div className="flex-1 overflow-auto p-3 md:p-4">
             <ArtifactContent artifact={artifact} />
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-between border-t border-stone-200/80 px-4 py-3 dark:border-stone-800/80">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-col gap-2 border-t border-stone-200/80 px-3 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] dark:border-stone-800/80 sm:flex-row sm:items-center sm:justify-between sm:px-4 sm:pb-3">
+            <div className="flex items-center gap-2 overflow-x-auto">
               <button
                 onClick={() => onDownload(artifact)}
                 className="notion-button notion-button-primary px-3 py-1.5 text-xs font-medium"

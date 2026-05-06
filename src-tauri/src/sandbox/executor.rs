@@ -1,14 +1,23 @@
 use serde::{Deserialize, Serialize};
+
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 use std::time::{Duration, Instant};
 
-use super::workspace::{self, WorkspaceFile};
+use super::workspace::WorkspaceFile;
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
+use super::workspace::{self};
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 use super::SandboxManager;
 
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 const DEFAULT_TIMEOUT_SECS: u64 = 30;
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 const MAX_TIMEOUT_SECS: u64 = 300;
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 const MAX_OUTPUT_BYTES: usize = 10 * 1024 * 1024; // 10MB
 
 #[derive(Deserialize)]
+#[cfg_attr(any(target_os = "ios", target_os = "android"), allow(dead_code))]
 pub struct ExecuteCodeRequest {
     pub language: String,
     pub code: String,
@@ -29,6 +38,7 @@ pub struct ExecuteCodeResult {
 }
 
 #[derive(Deserialize)]
+#[cfg_attr(any(target_os = "ios", target_os = "android"), allow(dead_code))]
 pub struct GenerateFileRequest {
     pub file_type: String,
     pub data: serde_json::Value,
@@ -47,6 +57,7 @@ pub struct GenerateFileResult {
 }
 
 /// Execute code in a sandboxed environment with a persistent workspace volume
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 pub async fn run_code(request: &ExecuteCodeRequest) -> Result<ExecuteCodeResult, String> {
     let timeout_secs = request
         .timeout_secs
@@ -132,7 +143,13 @@ pub async fn run_code(request: &ExecuteCodeRequest) -> Result<ExecuteCodeResult,
     Ok(result)
 }
 
+#[cfg(any(target_os = "ios", target_os = "android"))]
+pub async fn run_code(_request: &ExecuteCodeRequest) -> Result<ExecuteCodeResult, String> {
+    Err("Sandbox code execution is not supported on mobile builds.".to_string())
+}
+
 /// Generate a file (PDF/DOCX/PPTX) using Python libraries in sandbox
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 pub async fn generate_file(request: &GenerateFileRequest) -> Result<GenerateFileResult, String> {
     let sandbox_name = format!("tachyon-gen-{}", uuid_simple());
     let workspace_dir = workspace::create_workspace(&sandbox_name)?;
@@ -216,6 +233,12 @@ pub async fn generate_file(request: &GenerateFileRequest) -> Result<GenerateFile
     })
 }
 
+#[cfg(any(target_os = "ios", target_os = "android"))]
+pub async fn generate_file(_request: &GenerateFileRequest) -> Result<GenerateFileResult, String> {
+    Err("Sandbox file generation is not supported on mobile builds.".to_string())
+}
+
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 fn generate_python_script(
     file_type: &str,
     data: &serde_json::Value,
@@ -238,6 +261,7 @@ fn generate_python_script(
     }
 }
 
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 fn generate_pdf_script(_data: &serde_json::Value, embedded_data_json: &str) -> String {
     format!(
         r#"
@@ -280,6 +304,7 @@ print('PDF generated successfully')
     )
 }
 
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 fn generate_docx_script(_data: &serde_json::Value, embedded_data_json: &str) -> String {
     format!(
         r#"
@@ -330,6 +355,7 @@ print('DOCX generated successfully')
     )
 }
 
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 fn generate_pptx_script(_data: &serde_json::Value, embedded_data_json: &str) -> String {
     format!(
         r#"
@@ -398,11 +424,13 @@ print('PPTX generated successfully')
     )
 }
 
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 fn shell_escape(s: &str) -> String {
     // Single-quote escape for shell: replace ' with '\''
     format!("'{}'", s.replace('\'', "'\\''"))
 }
 
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 fn truncate_output(s: &str, max_bytes: usize) -> String {
     if s.len() > max_bytes {
         format!(
@@ -415,6 +443,7 @@ fn truncate_output(s: &str, max_bytes: usize) -> String {
     }
 }
 
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 fn uuid_simple() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
     let ts = SystemTime::now()
@@ -423,7 +452,7 @@ fn uuid_simple() -> String {
     format!("{:x}{:x}", ts.as_secs(), ts.subsec_nanos())
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(any(target_os = "ios", target_os = "android"))))]
 mod tests {
     use super::*;
 
