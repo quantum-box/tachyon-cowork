@@ -72,7 +72,7 @@ export function SettingsPanel({
       />
 
       {/* Panel */}
-      <div className="surface-panel relative mx-3 w-full max-w-lg overflow-hidden rounded-[24px] animate-fade-in sm:mx-4 sm:rounded-[28px]">
+      <div className="surface-panel relative mx-3 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-[24px] animate-fade-in sm:mx-4 sm:rounded-[28px]">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-stone-200/80 px-6 py-4 dark:border-stone-800/80">
           <h2 className="text-base font-semibold text-stone-900 dark:text-stone-100">
