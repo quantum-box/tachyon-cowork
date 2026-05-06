@@ -26,7 +26,7 @@ concurrency:
 jobs:
   testflight:
     name: Build and upload TestFlight IPA
-    runs-on: macos-latest
+    runs-on: macos-26
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository)
     timeout-minutes: 90
     permissions:
