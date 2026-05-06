@@ -115,7 +115,29 @@ jobs:
           mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
           /usr/bin/security cms -D -i "$PROFILE_PATH" > "$PROFILE_PLIST_PATH"
           UUID=$(/usr/libexec/PlistBuddy -c 'Print UUID' "$PROFILE_PLIST_PATH")
+          NAME=$(/usr/libexec/PlistBuddy -c 'Print Name' "$PROFILE_PLIST_PATH")
+          TEAM_ID=$(/usr/libexec/PlistBuddy -c 'Print TeamIdentifier:0' "$PROFILE_PLIST_PATH")
           cp "$PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$UUID.mobileprovision"
+          echo "IOS_PROVISIONING_PROFILE_SPECIFIER=$NAME" >> "$GITHUB_ENV"
+          echo "IOS_DEVELOPMENT_TEAM=$TEAM_ID" >> "$GITHUB_ENV"
+
+      - name: Initialize generated iOS project
+        run: |
+          set -euo pipefail
+          if [ ! -d src-tauri/gen/apple ]; then
+            npx tauri ios init --ci
+          fi
+
+      - name: Configure manual iOS signing
+        run: |
+          set -euo pipefail
+          test -n "${IOS_PROVISIONING_PROFILE_SPECIFIER:-}"
+          test -n "${IOS_DEVELOPMENT_TEAM:-}"
+          PBXPROJ="src-tauri/gen/apple/tachyon-cowork.xcodeproj/project.pbxproj"
+          perl -0pi -e '
+            s/CODE_SIGN_IDENTITY = "iPhone Developer";/CODE_SIGN_IDENTITY = "Apple Distribution";\n\t\t\t\tCODE_SIGN_STYLE = Manual;\n\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = "$ENV{IOS_PROVISIONING_PROFILE_SPECIFIER}";/g;
+            s/DEVELOPMENT_TEAM = "[^"]+";/DEVELOPMENT_TEAM = "$ENV{IOS_DEVELOPMENT_TEAM}";/g;
+          ' "$PBXPROJ"
 
       - name: Check iOS Rust target
         run: cargo check --manifest-path src-tauri/Cargo.toml --target aarch64-apple-ios --lib
