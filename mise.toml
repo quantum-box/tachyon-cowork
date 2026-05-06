@@ -2,6 +2,9 @@
 description = "Build the iOS IPA for App Store Connect"
 run = """
 IOS_BUILD_NUMBER="${IOS_BUILD_NUMBER:-$(date +%m%d%H%M | sed 's/^0*//')}"
+if [ ! -d src-tauri/gen/apple ]; then
+  npx tauri ios init --ci
+fi
 npx tauri ios build --ci --export-method app-store-connect --build-number "$IOS_BUILD_NUMBER"
 """
 
@@ -29,7 +32,9 @@ fi
 
 mkdir -p "$KEY_DIR"
 chmod 700 "$KEY_DIR"
-cp "$KEY_SRC" "$KEY_DIR/AuthKey_${KEY_ID}.p8"
+if [ "$KEY_SRC" != "$KEY_DIR/AuthKey_${KEY_ID}.p8" ]; then
+  cp "$KEY_SRC" "$KEY_DIR/AuthKey_${KEY_ID}.p8"
+fi
 chmod 600 "$KEY_DIR/AuthKey_${KEY_ID}.p8"
 
 xcrun altool --upload-app \

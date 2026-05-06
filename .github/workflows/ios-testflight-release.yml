@@ -1,0 +1,238 @@
+name: iOS TestFlight Release
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      build_number:
+        description: "Optional numeric build suffix. Defaults to MMDDHHMM."
+        required: false
+      upload:
+        description: "Upload the IPA to App Store Connect"
+        required: true
+        default: true
+        type: boolean
+
+env:
+  CARGO_TERM_COLOR: always
+  IOS_IPA_PATH: "src-tauri/gen/apple/build/arm64/Tachyon Cowork.ipa"
+
+concurrency:
+  group: ios-testflight-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  testflight:
+    name: Build and upload TestFlight IPA
+    runs-on: macos-26
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository)
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: aarch64-apple-ios-testflight
+          workspaces: src-tauri -> target
+
+      - name: Install mise
+        uses: jdx/mise-action@v2
+        with:
+          install: false
+
+      - name: Install npm dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Install App Store Connect API key
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_API_KEY_P8: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
+        run: |
+          set -euo pipefail
+          test -n "$APP_STORE_CONNECT_KEY_ID"
+          test -n "$APP_STORE_CONNECT_API_KEY_P8"
+          mkdir -p "$HOME/.appstoreconnect/private_keys"
+          chmod 700 "$HOME/.appstoreconnect/private_keys"
+          printf '%s' "$APP_STORE_CONNECT_API_KEY_P8" > "$HOME/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
+          chmod 600 "$HOME/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
+
+      - name: Import iOS signing certificate
+        env:
+          IOS_DISTRIBUTION_CERTIFICATE_BASE64: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_BASE64 }}
+          IOS_DISTRIBUTION_CERTIFICATE_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.IOS_BUILD_KEYCHAIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "$IOS_DISTRIBUTION_CERTIFICATE_BASE64" ]; then
+            echo "IOS_DISTRIBUTION_CERTIFICATE_BASE64 is not set; relying on Xcode automatic signing."
+            exit 0
+          fi
+
+          CERT_PATH="$RUNNER_TEMP/ios_distribution.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/ios-build.keychain-db"
+          KEYCHAIN_PASSWORD="${KEYCHAIN_PASSWORD:-temporary-ci-keychain-password}"
+
+          printf '%s' "$IOS_DISTRIBUTION_CERTIFICATE_BASE64" | base64 --decode > "$CERT_PATH"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -P "$IOS_DISTRIBUTION_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH" login.keychain-db
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+      - name: Install provisioning profile
+        env:
+          IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "$IOS_PROVISIONING_PROFILE_BASE64" ]; then
+            echo "IOS_PROVISIONING_PROFILE_BASE64 is not set; relying on Xcode automatic signing."
+            exit 0
+          fi
+
+          PROFILE_PATH="$RUNNER_TEMP/profile.mobileprovision"
+          PROFILE_PLIST_PATH="$RUNNER_TEMP/profile.plist"
+          printf '%s' "$IOS_PROVISIONING_PROFILE_BASE64" | base64 --decode > "$PROFILE_PATH"
+          test -s "$PROFILE_PATH"
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          /usr/bin/security cms -D -i "$PROFILE_PATH" > "$PROFILE_PLIST_PATH"
+          UUID=$(/usr/libexec/PlistBuddy -c 'Print UUID' "$PROFILE_PLIST_PATH")
+          NAME=$(/usr/libexec/PlistBuddy -c 'Print Name' "$PROFILE_PLIST_PATH")
+          TEAM_ID=$(/usr/libexec/PlistBuddy -c 'Print TeamIdentifier:0' "$PROFILE_PLIST_PATH")
+          cp "$PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$UUID.mobileprovision"
+          echo "IOS_PROVISIONING_PROFILE_SPECIFIER=$NAME" >> "$GITHUB_ENV"
+          echo "IOS_DEVELOPMENT_TEAM=$TEAM_ID" >> "$GITHUB_ENV"
+
+      - name: Initialize generated iOS project
+        run: |
+          set -euo pipefail
+          if [ ! -d src-tauri/gen/apple ]; then
+            npx tauri ios init --ci
+          fi
+
+      - name: Configure manual iOS signing
+        run: |
+          set -euo pipefail
+          test -n "${IOS_PROVISIONING_PROFILE_SPECIFIER:-}"
+          test -n "${IOS_DEVELOPMENT_TEAM:-}"
+          PBXPROJ="src-tauri/gen/apple/tachyon-cowork.xcodeproj/project.pbxproj"
+          perl -0pi -e '
+            s/CODE_SIGN_IDENTITY = "iPhone Developer";/CODE_SIGN_IDENTITY = "Apple Distribution";\n\t\t\t\tCODE_SIGN_STYLE = Manual;\n\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = "$ENV{IOS_PROVISIONING_PROFILE_SPECIFIER}";/g;
+            s/DEVELOPMENT_TEAM = "[^"]+";/DEVELOPMENT_TEAM = "$ENV{IOS_DEVELOPMENT_TEAM}";/g;
+          ' "$PBXPROJ"
+
+      - name: Check iOS Rust target
+        run: cargo check --manifest-path src-tauri/Cargo.toml --target aarch64-apple-ios --lib
+
+      - name: Set iOS build number
+        run: |
+          set -euo pipefail
+          if [ -n "${{ inputs.build_number }}" ]; then
+            BUILD_NUMBER="${{ inputs.build_number }}"
+          elif [ "${{ github.event_name }}" = "pull_request" ]; then
+            BUILD_NUMBER="$(date +%m%d%H%M)${GITHUB_RUN_ATTEMPT}"
+          else
+            BUILD_NUMBER="$(date +%m%d%H%M | sed 's/^0*//')"
+          fi
+          echo "IOS_BUILD_NUMBER=$BUILD_NUMBER" >> "$GITHUB_ENV"
+          echo "Using iOS build number: $BUILD_NUMBER"
+
+      - name: Archive iOS app
+        run: |
+          set -euo pipefail
+          npx tauri ios build --ci --export-method app-store-connect --build-number "$IOS_BUILD_NUMBER" --archive-only
+
+      - name: Export iOS IPA
+        run: |
+          set -euo pipefail
+          EXPORT_OPTIONS="$RUNNER_TEMP/ExportOptions.plist"
+          ARCHIVE_PATH="src-tauri/gen/apple/build/tachyon-cowork_iOS.xcarchive"
+          EXPORT_PATH="$RUNNER_TEMP/ios-export"
+
+          cat > "$EXPORT_OPTIONS" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store-connect</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>teamID</key>
+            <string>${IOS_DEVELOPMENT_TEAM}</string>
+            <key>signingCertificate</key>
+            <string>Apple Distribution</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>com.quantumbox.tachyon-cowork</key>
+              <string>${IOS_PROVISIONING_PROFILE_SPECIFIER}</string>
+            </dict>
+          </dict>
+          </plist>
+          EOF
+
+          xcodebuild -exportArchive \
+            -archivePath "$ARCHIVE_PATH" \
+            -exportPath "$EXPORT_PATH" \
+            -exportOptionsPlist "$EXPORT_OPTIONS"
+
+          mkdir -p "$(dirname "$IOS_IPA_PATH")"
+          cp "$EXPORT_PATH/Tachyon Cowork.ipa" "$IOS_IPA_PATH"
+
+      - name: Verify export compliance key in IPA
+        id: ipa
+        run: |
+          set -euo pipefail
+          TMPDIR="$(mktemp -d)"
+          unzip -q "$IOS_IPA_PATH" -d "$TMPDIR"
+          VALUE="$(plutil -extract ITSAppUsesNonExemptEncryption raw "$TMPDIR/Payload/Tachyon Cowork.app/Info.plist")"
+          VERSION="$(plutil -extract CFBundleVersion raw "$TMPDIR/Payload/Tachyon Cowork.app/Info.plist")"
+          rm -rf "$TMPDIR"
+          test "$VALUE" = "false"
+          echo "Verified ITSAppUsesNonExemptEncryption=false in build $VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Tachyon-Cowork-iOS-IPA
+          path: ${{ env.IOS_IPA_PATH }}
+
+      - name: Upload to App Store Connect
+        if: github.event_name == 'pull_request' || inputs.upload
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: |
+          APP_STORE_CONNECT_KEY_PATH="$HOME/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8" mise run ios:upload
+
+      - name: Comment on pull request
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const version = '${{ steps.ipa.outputs.version }}';
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `Uploaded TestFlight build \`${version}\` for this PR.`
+            });
