@@ -18,6 +18,8 @@ on:
 env:
   CARGO_TERM_COLOR: always
   IOS_IPA_PATH: "src-tauri/gen/apple/build/arm64/Tachyon Cowork.ipa"
+  RUSTC_WRAPPER: sccache
+  SCCACHE_GHA_ENABLED: "true"
 
 concurrency:
   group: ios-testflight-${{ github.event.pull_request.number || github.ref }}
@@ -46,6 +48,9 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-ios
+
+      - name: Setup Rust compiler cache
+        uses: mozilla-actions/sccache-action@v0.0.9
 
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
@@ -139,9 +144,6 @@ jobs:
             s/DEVELOPMENT_TEAM = "[^"]+";/DEVELOPMENT_TEAM = "$ENV{IOS_DEVELOPMENT_TEAM}";/g;
           ' "$PBXPROJ"
 
-      - name: Check iOS Rust target
-        run: cargo check --manifest-path src-tauri/Cargo.toml --target aarch64-apple-ios --lib
-
       - name: Set iOS build number
         run: |
           set -euo pipefail
@@ -223,6 +225,10 @@ jobs:
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
           APP_STORE_CONNECT_KEY_PATH="$HOME/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8" mise run ios:upload
+
+      - name: Show Rust compiler cache stats
+        if: always()
+        run: sccache --show-stats
 
       - name: Comment on pull request
         if: github.event_name == 'pull_request'
