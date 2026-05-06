@@ -104,7 +104,7 @@ export function Sidebar({
   if (isCollapsed) {
     return (
       <div
-        className={`flex h-full flex-col items-center gap-2 bg-transparent py-3 ${
+        className={`flex h-full flex-col items-center gap-2 bg-transparent pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-[calc(env(safe-area-inset-top)+0.75rem)] ${
           isMacDesktop ? "w-[76px]" : "w-14"
         }`}
       >
@@ -146,7 +146,7 @@ export function Sidebar({
     <div className="flex h-full flex-col bg-transparent transition-colors duration-150">
       <div className="window-drag-strip w-full" data-tauri-drag-region />
       {/* Header */}
-      <div className="border-b border-stone-200/80 px-3 pb-3 pt-4 dark:border-stone-800/80">
+      <div className="border-b border-stone-200/80 px-3 pb-3 pt-[calc(env(safe-area-inset-top)+1rem)] dark:border-stone-800/80">
         <div className="titlebar-safe-header mb-2.5 flex items-center justify-between">
           <div className="titlebar-safe-start" data-tauri-drag-region>
             <h1 className="text-[13px] font-semibold tracking-[0.01em] text-stone-800 dark:text-stone-100">
@@ -290,7 +290,7 @@ export function Sidebar({
       )}
 
       {/* Chat list */}
-      <div className="flex-1 overflow-y-auto py-2">
+      <div className="flex-1 overflow-y-auto pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2">
         {/* Pinned section */}
         {pinned.length > 0 && (
           <div>
@@ -340,7 +340,7 @@ export function Sidebar({
       <UpdateChecker />
 
       {/* Footer */}
-      <div className="flex items-center gap-2 border-t border-stone-200/80 p-3 dark:border-stone-800/80">
+      <div className="flex items-center gap-2 border-t border-stone-200/80 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 dark:border-stone-800/80">
         <button
           onClick={openFeedbackUrl}
           className="notion-icon-button p-2"

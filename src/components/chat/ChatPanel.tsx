@@ -97,7 +97,7 @@ export function ChatPanel({
   return (
     <FileDropZone onFilesDropped={onFilesAdd}>
       <div className="flex h-full flex-col bg-transparent transition-colors duration-150">
-        <div className="border-b border-stone-200/80 bg-white/55 py-2.5 backdrop-blur-md dark:border-stone-800/80 dark:bg-stone-950/25">
+        <div className="border-b border-stone-200/80 bg-white/55 pb-2.5 pt-[calc(env(safe-area-inset-top)+0.625rem)] backdrop-blur-md dark:border-stone-800/80 dark:bg-stone-950/25">
           <div className="flex w-full items-center justify-between gap-3 px-2.5 md:px-3">
             <div className="titlebar-safe-header flex min-w-0 items-center gap-3">
               {onToggleSidebar && (

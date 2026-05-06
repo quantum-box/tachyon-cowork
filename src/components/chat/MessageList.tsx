@@ -76,7 +76,7 @@ export function MessageList({
 
   return (
     <div
-      className="flex-1 overflow-y-auto px-3 py-4 sm:px-4 sm:py-5 md:px-6 md:py-6"
+      className="flex-1 overflow-y-auto px-3 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4 sm:px-4 sm:pb-[calc(env(safe-area-inset-bottom)+1.25rem)] sm:pt-5 md:px-6 md:pb-[calc(env(safe-area-inset-bottom)+1.5rem)] md:pt-6"
       role="log"
       aria-live="polite"
     >
