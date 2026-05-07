@@ -309,7 +309,7 @@ export class AgentChatClient {
   async submitToolResult(
     sessionId: string,
     payload: { tool_id: string; result: string; is_finished: boolean },
-  ): Promise<void> {
+  ): Promise<Response> {
     for (let attempt = 0; attempt <= TOOL_RESULT_MAX_RETRIES; attempt += 1) {
       const headers = await this.getFreshHeaders();
       const response = await fetchWithAuth(
@@ -321,7 +321,7 @@ export class AgentChatClient {
           tokenManager: this.tokenManager ?? undefined,
         },
       );
-      if (response.ok) return;
+      if (response.ok) return response;
       const body = await response.text().catch(() => "");
       const error = new ApiRequestError(
         response.status,
@@ -337,6 +337,7 @@ export class AgentChatClient {
       }
       throw error;
     }
+    throw new Error("Tool result submission exhausted retries");
   }
 
   async getMessages(sessionId: string): Promise<AgentChunk[]> {
