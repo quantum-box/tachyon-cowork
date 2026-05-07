@@ -1,3 +1,4 @@
+pub mod auth_session;
 pub mod chat;
 pub mod docx;
 pub mod excel;

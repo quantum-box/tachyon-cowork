@@ -762,16 +762,17 @@ export function useAgentChat(
     async (
       currentSessionId: string,
       chunk: AgentChunk & { args?: Record<string, unknown> },
-    ) => {
-      if (!client || !chunk.tool_id || !chunk.tool_name) return;
+    ): Promise<Response | null> => {
+      if (!client || !chunk.tool_id || !chunk.tool_name) return null;
       const handledKey = `${currentSessionId}:${chunk.tool_id}`;
       if (handledToolSubmissionRef.current.has(handledKey)) {
-        return;
+        return null;
       }
       handledToolSubmissionRef.current.add(handledKey);
 
       let resultText: string;
       let submitted = false;
+      let submitResponse: Response | null = null;
 
       // Handle canvas tool call on the client side (no Tauri needed)
       if (chunk.tool_name === "canvas") {
@@ -835,9 +836,9 @@ export function useAgentChat(
         }
       }
 
-      if (chunk.fire_and_forget) return;
+      if (chunk.fire_and_forget) return null;
       try {
-        await client.submitToolResult(currentSessionId, {
+        submitResponse = await client.submitToolResult(currentSessionId, {
           tool_id: chunk.tool_id,
           result: resultText,
           is_finished: true,
@@ -861,6 +862,7 @@ export function useAgentChat(
         }
       }
       setChunks((prev) => resolvePendingToolCall(prev, chunk.tool_id!));
+      return submitResponse;
     },
     [client, onCanvasToolCall, onArtifact],
   );
@@ -1055,7 +1057,13 @@ export function useAgentChat(
 
         if (chunk.type === "tool_call_pending" && currentSessionId) {
           try {
-            await handlePendingToolCall(currentSessionId, parsedChunk);
+            const toolResponse = await handlePendingToolCall(
+              currentSessionId,
+              parsedChunk,
+            );
+            if (toolResponse?.body) {
+              await consumeAgentStream(toolResponse);
+            }
           } catch (error) {
             const message =
               error instanceof Error
@@ -1073,6 +1081,84 @@ export function useAgentChat(
         }
         trackToolCall(chunk);
         detectFileWriteArtifact(chunk);
+      };
+
+      const consumeAgentStream = async (response: Response): Promise<void> => {
+        if (!response.body) throw new Error("Response body is null");
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let streamTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
+        const resetStreamTimeout = () => {
+          if (streamTimeoutId) clearTimeout(streamTimeoutId);
+          streamTimeoutId = setTimeout(() => {
+            ac.abort();
+            setError({
+              kind: "network",
+              message:
+                "Agent API の応答がタイムアウトしました。接続を確認して再試行してください。",
+            });
+          }, STREAM_TIMEOUT_MS);
+        };
+
+        resetStreamTimeout();
+
+        try {
+          while (true) {
+            if (ac.signal.aborted) break;
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            resetStreamTimeout();
+            buffer += decoder.decode(value, { stream: true });
+            const { events, rest } = extractSseEvents(buffer);
+            buffer = rest;
+
+            for (const eventBlock of events) {
+              const data = parseSseEvent(eventBlock);
+              if (!data || data === "[DONE]") continue;
+              try {
+                const parsed = JSON.parse(data) as AgentChunk & {
+                  args?: Record<string, unknown>;
+                };
+                if ("error" in parsed && parsed.error) {
+                  const msg =
+                    (parsed.error as { message?: string }).message ??
+                    "Unknown error";
+                  setError(toChatError(new Error(msg)));
+                  continue;
+                }
+                await processIncomingChunk(parsed);
+              } catch (error) {
+                if (error instanceof SyntaxError) {
+                  // skip malformed JSON
+                  continue;
+                }
+                console.error("Failed to process SSE chunk:", error);
+              }
+            }
+          }
+        } finally {
+          if (streamTimeoutId) clearTimeout(streamTimeoutId);
+        }
+
+        const finalData = parseSseEvent(buffer);
+        if (finalData && finalData !== "[DONE]") {
+          try {
+            const parsed = JSON.parse(finalData) as AgentChunk & {
+              args?: Record<string, unknown>;
+            };
+            await processIncomingChunk(parsed);
+          } catch (error) {
+            if (error instanceof SyntaxError) {
+              // ignore trailing partial event
+            } else {
+              console.error("Failed to process trailing SSE chunk:", error);
+            }
+          }
+        }
       };
 
       const executeWithRetry = async (attempt: number): Promise<void> => {
@@ -1097,81 +1183,7 @@ export function useAgentChat(
             ...(attachments && attachments.length > 0 && { attachments }),
           };
           const response = await client.executeAgent(currentSessionId!, args);
-          if (!response.body) throw new Error("Response body is null");
-
-          const reader = response.body.getReader();
-          const decoder = new TextDecoder();
-          let buffer = "";
-          let streamTimeoutId: ReturnType<typeof setTimeout> | null = null;
-
-          const resetStreamTimeout = () => {
-            if (streamTimeoutId) clearTimeout(streamTimeoutId);
-            streamTimeoutId = setTimeout(() => {
-              ac.abort();
-              setError({
-                kind: "network",
-                message:
-                  "Agent API の応答がタイムアウトしました。接続を確認して再試行してください。",
-              });
-            }, STREAM_TIMEOUT_MS);
-          };
-
-          resetStreamTimeout();
-
-          try {
-            while (true) {
-              if (ac.signal.aborted) break;
-              const { done, value } = await reader.read();
-              if (done) break;
-
-              resetStreamTimeout();
-              buffer += decoder.decode(value, { stream: true });
-              const { events, rest } = extractSseEvents(buffer);
-              buffer = rest;
-
-              for (const eventBlock of events) {
-                const data = parseSseEvent(eventBlock);
-                if (!data || data === "[DONE]") continue;
-                try {
-                  const parsed = JSON.parse(data) as AgentChunk & {
-                    args?: Record<string, unknown>;
-                  };
-                  if ("error" in parsed && parsed.error) {
-                    const msg =
-                      (parsed.error as { message?: string }).message ??
-                      "Unknown error";
-                    setError(toChatError(new Error(msg)));
-                    continue;
-                  }
-                  await processIncomingChunk(parsed);
-                } catch (error) {
-                  if (error instanceof SyntaxError) {
-                    // skip malformed JSON
-                    continue;
-                  }
-                  console.error("Failed to process SSE chunk:", error);
-                }
-              }
-            }
-          } finally {
-            if (streamTimeoutId) clearTimeout(streamTimeoutId);
-          }
-
-          const finalData = parseSseEvent(buffer);
-          if (finalData && finalData !== "[DONE]") {
-            try {
-              const parsed = JSON.parse(finalData) as AgentChunk & {
-                args?: Record<string, unknown>;
-              };
-              await processIncomingChunk(parsed);
-            } catch (error) {
-              if (error instanceof SyntaxError) {
-                // ignore trailing partial event
-              } else {
-                console.error("Failed to process trailing SSE chunk:", error);
-              }
-            }
-          }
+          await consumeAgentStream(response);
         } catch (e) {
           if (e instanceof Error && e.name === "AbortError") throw e;
           // Retry on transient errors if we haven't received any chunks yet

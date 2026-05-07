@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  DEFAULT_API_BASE_URL,
   type AuthState,
   buildAuthState,
 } from "../../lib/auth";
@@ -12,7 +11,16 @@ import {
   exchangeAuthorizationCode,
   parseOAuthCallback,
 } from "../../lib/oauth";
-import { isTauri } from "../../lib/tauri-bridge";
+import {
+  getConfiguredApiBaseUrl,
+  getConfiguredCognitoConfig,
+  getConfiguredDefaultTenantId,
+} from "../../lib/auth-config";
+import {
+  authenticateWithTauriMobileSession,
+  isTauri,
+  isTauriMobile,
+} from "../../lib/tauri-bridge";
 
 type Props = {
   onLogin: (auth: AuthState) => void;
@@ -152,16 +160,15 @@ export function LoginScreen({
   isOffline = false,
   onEnterOfflineMode,
 }: Props) {
-  const defaultTenantId = import.meta.env.VITE_DEFAULT_TENANT_ID || "";
-  const cognitoDomain = import.meta.env.VITE_COGNITO_DOMAIN || "";
-  const cognitoClientId = import.meta.env.VITE_COGNITO_CLIENT_ID || "";
-  const cognitoScopes = import.meta.env.VITE_COGNITO_SCOPES || "openid";
   const redirectUri = isTauri()
     ? TAURI_REDIRECT_URI
-    : import.meta.env.VITE_COGNITO_REDIRECT_URI || "";
-  const [apiBaseUrl, setApiBaseUrl] = useState(
-    import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL,
-  );
+    : getConfiguredCognitoConfig().redirectUri;
+  const cognitoConfig = getConfiguredCognitoConfig(redirectUri);
+  const defaultTenantId = getConfiguredDefaultTenantId();
+  const cognitoDomain = cognitoConfig.domain;
+  const cognitoClientId = cognitoConfig.clientId;
+  const cognitoScopes = cognitoConfig.scopes;
+  const [apiBaseUrl, setApiBaseUrl] = useState(getConfiguredApiBaseUrl);
   const [accessToken, setAccessToken] = useState("");
   const [refreshToken, setRefreshToken] = useState("");
   const [tenantOptions, setTenantOptions] = useState<TenantOption[]>([]);
@@ -290,43 +297,6 @@ export function LoginScreen({
     [cognitoDomain, defaultTenantId, finalizeLogin, runtimeApiBaseUrl],
   );
 
-  const handleBrowserLogin = useCallback(async () => {
-    if (!hostedLoginReady) {
-      setError("Cognito のログイン設定が不足しています。");
-      return;
-    }
-
-    setError(null);
-
-    try {
-      const loginUrl = await buildOAuthLoginUrl({
-        domain: cognitoDomain,
-        clientId: cognitoClientId,
-        redirectUri,
-        scopes: cognitoScopes,
-      });
-      if (isTauri()) {
-        const { openUrl } = await import("@tauri-apps/plugin-opener");
-        await openUrl(loginUrl);
-      } else {
-        window.open(loginUrl, "_self");
-      }
-    } catch (e) {
-      clearPendingOAuthState();
-      setError(
-        e instanceof Error
-          ? e.message
-          : "ブラウザログインの開始に失敗しました。",
-      );
-    }
-  }, [
-    cognitoClientId,
-    cognitoDomain,
-    cognitoScopes,
-    hostedLoginReady,
-    redirectUri,
-  ]);
-
   const handleTenantLogin = useCallback(() => {
     if (!tenantId || !accessToken) return;
 
@@ -390,6 +360,51 @@ export function LoginScreen({
     },
     [cognitoClientId, cognitoDomain, redirectUri, resolveTenantAndLogin],
   );
+
+  const handleBrowserLogin = useCallback(async () => {
+    if (!hostedLoginReady) {
+      setError("Cognito のログイン設定が不足しています。");
+      return;
+    }
+
+    setError(null);
+
+    try {
+      const loginUrl = await buildOAuthLoginUrl({
+        domain: cognitoDomain,
+        clientId: cognitoClientId,
+        redirectUri,
+        scopes: cognitoScopes,
+      });
+
+      if (isTauriMobile()) {
+        const callbackUrl = await authenticateWithTauriMobileSession({
+          authUrl: loginUrl,
+          callbackScheme: "tachyon-cowork",
+        });
+        await handleOAuthCallbackUrl(callbackUrl);
+      } else if (isTauri()) {
+        const { openUrl } = await import("@tauri-apps/plugin-opener");
+        await openUrl(loginUrl);
+      } else {
+        window.open(loginUrl, "_self");
+      }
+    } catch (e) {
+      clearPendingOAuthState();
+      setError(
+        e instanceof Error
+          ? e.message
+          : "ブラウザログインの開始に失敗しました。",
+      );
+    }
+  }, [
+    cognitoClientId,
+    cognitoDomain,
+    cognitoScopes,
+    handleOAuthCallbackUrl,
+    hostedLoginReady,
+    redirectUri,
+  ]);
 
   const handleDeepLinkUrls = useCallback(
     async (urls: string[]) => {

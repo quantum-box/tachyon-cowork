@@ -49,7 +49,7 @@ describe("AgentChatClient.submitToolResult", () => {
     });
 
     await vi.runAllTimersAsync();
-    await expect(promise).resolves.toBeUndefined();
+    await expect(promise).resolves.toMatchObject({ ok: true, status: 200 });
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 

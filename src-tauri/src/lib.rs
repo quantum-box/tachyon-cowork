@@ -10,6 +10,7 @@ pub fn run() {
     #[allow(unused_mut)]
     let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_oauth_session::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
@@ -53,6 +54,7 @@ pub fn run() {
             commands::chat::get_config,
             commands::chat::chat_set_runtime_auth,
             commands::chat::chat_clear_runtime_auth,
+            commands::auth_session::auth_session_authenticate,
             commands::excel::read_excel,
             commands::excel::write_excel,
             commands::excel::save_excel_to_file,

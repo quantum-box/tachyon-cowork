@@ -6,7 +6,8 @@
  */
 
 import type { ToolCall, ToolResult } from "./types";
-import { DEFAULT_API_BASE_URL, type AuthState } from "./auth";
+import type { AuthState } from "./auth";
+import { getConfiguredApiBaseUrl } from "./auth-config";
 
 /** Detect whether we are running inside a Tauri webview. */
 export function isTauri(): boolean {
@@ -64,9 +65,7 @@ function resolveRuntimeAuthApiBaseUrl(apiBaseUrl: string): string {
     return trimmed;
   }
 
-  return (import.meta.env.VITE_API_BASE_URL ?? DEFAULT_API_BASE_URL)
-    .trim()
-    .replace(/\/+$/, "");
+  return getConfiguredApiBaseUrl().trim().replace(/\/+$/, "");
 }
 
 /** Read a local file via the Tauri FS plugin. Throws on web. */
@@ -109,6 +108,24 @@ export async function clearTauriRuntimeAuth(): Promise<void> {
   }
 
   await tauriInvoke<void>("chat_clear_runtime_auth");
+}
+
+export async function authenticateWithTauriMobileSession(params: {
+  authUrl: string;
+  callbackScheme: string;
+}): Promise<string> {
+  if (!isTauriMobile()) {
+    throw new Error("native auth session is only available on Tauri mobile");
+  }
+
+  const response = await tauriInvoke<{ url: string }>(
+    "auth_session_authenticate",
+    {
+      authUrl: params.authUrl,
+      callbackScheme: params.callbackScheme,
+    },
+  );
+  return response.url;
 }
 
 // ── MCP Types ──────────────────────────────────────────────────────

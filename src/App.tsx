@@ -1,7 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type TouchEvent as ReactTouchEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { AgentChatClient, isUnauthorizedApiError } from "./lib/api-client";
 import {
-  DEFAULT_API_BASE_URL,
   type AuthState,
   buildAuthState,
   clearAuth,
@@ -17,6 +23,10 @@ import {
   getCallbackError,
   getOAuth2Config,
 } from "./lib/oauth2";
+import {
+  getConfiguredApiBaseUrl,
+  getConfiguredDefaultTenantId,
+} from "./lib/auth-config";
 import { decodeJwtPayload } from "./lib/jwt";
 import { useAgentChat } from "./hooks/useAgentChat";
 import { useFileHandler } from "./hooks/useFileHandler";
@@ -61,6 +71,25 @@ import {
   useParams,
 } from "react-router-dom";
 
+const MOBILE_DRAWER_EDGE_SWIPE_ZONE_PX = 36;
+const MOBILE_DRAWER_CLOSE_SWIPE_ZONE_PX = 280;
+const MOBILE_DRAWER_SWIPE_DISTANCE_PX = 56;
+const MOBILE_DRAWER_SWIPE_MAX_VERTICAL_PX = 80;
+const MOBILE_DRAWER_SWIPE_DOMINANCE_RATIO = 1.2;
+
+type MobileDrawerGesture = {
+  startX: number;
+  startY: number;
+  intent: "open" | "close";
+};
+
+function isEditableSwipeTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return Boolean(
+    target.closest("input, textarea, select, [contenteditable='true']"),
+  );
+}
+
 export default function App() {
   const [auth, setAuth] = useState<AuthState | null>(loadAuth);
   const [oauthError, setOauthError] = useState<string | null>(null);
@@ -80,6 +109,7 @@ export default function App() {
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== "undefined" ? window.innerWidth < 768 : false,
   );
+  const mobileDrawerGestureRef = useRef<MobileDrawerGesture | null>(null);
 
   const { theme, setTheme } = useTheme();
   const { sendKey, setSendKey } = useSendKey();
@@ -167,9 +197,9 @@ export default function App() {
         const config = getOAuth2Config();
         const payload = decodeJwtPayload(tokens.access_token);
         const newAuth = buildAuthState({
-          apiBaseUrl: import.meta.env.VITE_API_BASE_URL ?? DEFAULT_API_BASE_URL,
+          apiBaseUrl: getConfiguredApiBaseUrl(),
           accessToken: tokens.access_token,
-          tenantId: import.meta.env.VITE_DEFAULT_TENANT_ID ?? "",
+          tenantId: getConfiguredDefaultTenantId(),
           userId: payload?.sub,
           refreshToken: tokens.refresh_token,
           clientId: config.clientId,
@@ -572,6 +602,88 @@ export default function App() {
     if (isMobile) setSidebarCollapsed(true);
   }, [isMobile]);
 
+  const handleMobileDrawerTouchStart = useCallback(
+    (event: ReactTouchEvent<HTMLDivElement>) => {
+      mobileDrawerGestureRef.current = null;
+      if (
+        !isMobile ||
+        event.touches.length !== 1 ||
+        isEditableSwipeTarget(event.target)
+      ) {
+        return;
+      }
+
+      const touch = event.touches.item(0);
+      if (!touch) return;
+
+      if (sidebarCollapsed) {
+        if (touch.clientX > MOBILE_DRAWER_EDGE_SWIPE_ZONE_PX) return;
+        mobileDrawerGestureRef.current = {
+          startX: touch.clientX,
+          startY: touch.clientY,
+          intent: "open",
+        };
+        return;
+      }
+
+      if (touch.clientX > MOBILE_DRAWER_CLOSE_SWIPE_ZONE_PX) return;
+      mobileDrawerGestureRef.current = {
+        startX: touch.clientX,
+        startY: touch.clientY,
+        intent: "close",
+      };
+    },
+    [isMobile, sidebarCollapsed],
+  );
+
+  const handleMobileDrawerTouchMove = useCallback(
+    (event: ReactTouchEvent<HTMLDivElement>) => {
+      const gesture = mobileDrawerGestureRef.current;
+      const touch = event.touches.item(0);
+      if (!gesture || !touch) return;
+
+      const deltaX = touch.clientX - gesture.startX;
+      const deltaY = touch.clientY - gesture.startY;
+      if (Math.abs(deltaY) > 24 && Math.abs(deltaY) > Math.abs(deltaX)) {
+        mobileDrawerGestureRef.current = null;
+      }
+    },
+    [],
+  );
+
+  const handleMobileDrawerTouchEnd = useCallback(
+    (event: ReactTouchEvent<HTMLDivElement>) => {
+      const gesture = mobileDrawerGestureRef.current;
+      mobileDrawerGestureRef.current = null;
+      const touch = event.changedTouches.item(0);
+      if (!gesture || !touch) return;
+
+      const deltaX = touch.clientX - gesture.startX;
+      const deltaY = touch.clientY - gesture.startY;
+      const absX = Math.abs(deltaX);
+      const absY = Math.abs(deltaY);
+
+      if (
+        absX < MOBILE_DRAWER_SWIPE_DISTANCE_PX ||
+        absY > MOBILE_DRAWER_SWIPE_MAX_VERTICAL_PX ||
+        absX < absY * MOBILE_DRAWER_SWIPE_DOMINANCE_RATIO
+      ) {
+        return;
+      }
+
+      if (gesture.intent === "open" && deltaX > 0) {
+        setSidebarCollapsed(false);
+      } else if (gesture.intent === "close" && deltaX < 0) {
+        setSidebarCollapsed(true);
+      }
+    },
+    [],
+  );
+
+  const handleMobileDrawerTouchCancel = useCallback(() => {
+    mobileDrawerGestureRef.current = null;
+  }, []);
+
   // Keyboard shortcuts
   useKeyboardShortcuts(
     useMemo(
@@ -628,7 +740,13 @@ export default function App() {
   }
 
   return (
-    <div className={desktopShellClass}>
+    <div
+      className={desktopShellClass}
+      onTouchStart={handleMobileDrawerTouchStart}
+      onTouchMove={handleMobileDrawerTouchMove}
+      onTouchEnd={handleMobileDrawerTouchEnd}
+      onTouchCancel={handleMobileDrawerTouchCancel}
+    >
       {/* Sidebar - overlay on mobile, inline on desktop */}
       {isMobile && !sidebarCollapsed && (
         <div
@@ -640,7 +758,7 @@ export default function App() {
         className={`
           ${
             isMobile
-              ? `fixed inset-y-3 left-3 z-[70] transition-transform duration-200 ${sidebarCollapsed ? "-translate-x-full" : "translate-x-0"} w-[240px] md:w-[280px] overflow-hidden rounded-[28px] surface-panel`
+              ? `fixed inset-y-3 left-3 z-[70] w-[240px] overflow-hidden rounded-[28px] surface-panel transition-transform duration-200 md:w-[280px] ${sidebarCollapsed ? "pointer-events-none -translate-x-[calc(100%+1rem)]" : "translate-x-0"}`
               : `shrink-0 ${sidebarCollapsed ? (isMacDesktop ? "w-[76px]" : "w-14") : "w-[286px]"} transition-all duration-200 overflow-hidden`
           }
         `}
