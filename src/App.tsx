@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type TouchEvent as ReactTouchEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { AgentChatClient, isUnauthorizedApiError } from "./lib/api-client";
 import {
   type AuthState,
@@ -64,6 +71,25 @@ import {
   useParams,
 } from "react-router-dom";
 
+const MOBILE_DRAWER_EDGE_SWIPE_ZONE_PX = 36;
+const MOBILE_DRAWER_CLOSE_SWIPE_ZONE_PX = 280;
+const MOBILE_DRAWER_SWIPE_DISTANCE_PX = 56;
+const MOBILE_DRAWER_SWIPE_MAX_VERTICAL_PX = 80;
+const MOBILE_DRAWER_SWIPE_DOMINANCE_RATIO = 1.2;
+
+type MobileDrawerGesture = {
+  startX: number;
+  startY: number;
+  intent: "open" | "close";
+};
+
+function isEditableSwipeTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return Boolean(
+    target.closest("input, textarea, select, [contenteditable='true']"),
+  );
+}
+
 export default function App() {
   const [auth, setAuth] = useState<AuthState | null>(loadAuth);
   const [oauthError, setOauthError] = useState<string | null>(null);
@@ -83,6 +109,7 @@ export default function App() {
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== "undefined" ? window.innerWidth < 768 : false,
   );
+  const mobileDrawerGestureRef = useRef<MobileDrawerGesture | null>(null);
 
   const { theme, setTheme } = useTheme();
   const { sendKey, setSendKey } = useSendKey();
@@ -575,6 +602,88 @@ export default function App() {
     if (isMobile) setSidebarCollapsed(true);
   }, [isMobile]);
 
+  const handleMobileDrawerTouchStart = useCallback(
+    (event: ReactTouchEvent<HTMLDivElement>) => {
+      mobileDrawerGestureRef.current = null;
+      if (
+        !isMobile ||
+        event.touches.length !== 1 ||
+        isEditableSwipeTarget(event.target)
+      ) {
+        return;
+      }
+
+      const touch = event.touches.item(0);
+      if (!touch) return;
+
+      if (sidebarCollapsed) {
+        if (touch.clientX > MOBILE_DRAWER_EDGE_SWIPE_ZONE_PX) return;
+        mobileDrawerGestureRef.current = {
+          startX: touch.clientX,
+          startY: touch.clientY,
+          intent: "open",
+        };
+        return;
+      }
+
+      if (touch.clientX > MOBILE_DRAWER_CLOSE_SWIPE_ZONE_PX) return;
+      mobileDrawerGestureRef.current = {
+        startX: touch.clientX,
+        startY: touch.clientY,
+        intent: "close",
+      };
+    },
+    [isMobile, sidebarCollapsed],
+  );
+
+  const handleMobileDrawerTouchMove = useCallback(
+    (event: ReactTouchEvent<HTMLDivElement>) => {
+      const gesture = mobileDrawerGestureRef.current;
+      const touch = event.touches.item(0);
+      if (!gesture || !touch) return;
+
+      const deltaX = touch.clientX - gesture.startX;
+      const deltaY = touch.clientY - gesture.startY;
+      if (Math.abs(deltaY) > 24 && Math.abs(deltaY) > Math.abs(deltaX)) {
+        mobileDrawerGestureRef.current = null;
+      }
+    },
+    [],
+  );
+
+  const handleMobileDrawerTouchEnd = useCallback(
+    (event: ReactTouchEvent<HTMLDivElement>) => {
+      const gesture = mobileDrawerGestureRef.current;
+      mobileDrawerGestureRef.current = null;
+      const touch = event.changedTouches.item(0);
+      if (!gesture || !touch) return;
+
+      const deltaX = touch.clientX - gesture.startX;
+      const deltaY = touch.clientY - gesture.startY;
+      const absX = Math.abs(deltaX);
+      const absY = Math.abs(deltaY);
+
+      if (
+        absX < MOBILE_DRAWER_SWIPE_DISTANCE_PX ||
+        absY > MOBILE_DRAWER_SWIPE_MAX_VERTICAL_PX ||
+        absX < absY * MOBILE_DRAWER_SWIPE_DOMINANCE_RATIO
+      ) {
+        return;
+      }
+
+      if (gesture.intent === "open" && deltaX > 0) {
+        setSidebarCollapsed(false);
+      } else if (gesture.intent === "close" && deltaX < 0) {
+        setSidebarCollapsed(true);
+      }
+    },
+    [],
+  );
+
+  const handleMobileDrawerTouchCancel = useCallback(() => {
+    mobileDrawerGestureRef.current = null;
+  }, []);
+
   // Keyboard shortcuts
   useKeyboardShortcuts(
     useMemo(
@@ -631,7 +740,13 @@ export default function App() {
   }
 
   return (
-    <div className={desktopShellClass}>
+    <div
+      className={desktopShellClass}
+      onTouchStart={handleMobileDrawerTouchStart}
+      onTouchMove={handleMobileDrawerTouchMove}
+      onTouchEnd={handleMobileDrawerTouchEnd}
+      onTouchCancel={handleMobileDrawerTouchCancel}
+    >
       {/* Sidebar - overlay on mobile, inline on desktop */}
       {isMobile && !sidebarCollapsed && (
         <div
