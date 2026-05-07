@@ -643,7 +643,7 @@ export default function App() {
         className={`
           ${
             isMobile
-              ? `fixed inset-y-3 left-3 z-[70] transition-transform duration-200 ${sidebarCollapsed ? "-translate-x-full" : "translate-x-0"} w-[240px] md:w-[280px] overflow-hidden rounded-[28px] surface-panel`
+              ? `fixed inset-y-3 left-3 z-[70] w-[240px] overflow-hidden rounded-[28px] surface-panel transition-transform duration-200 md:w-[280px] ${sidebarCollapsed ? "pointer-events-none -translate-x-[calc(100%+1rem)]" : "translate-x-0"}`
               : `shrink-0 ${sidebarCollapsed ? (isMacDesktop ? "w-[76px]" : "w-14") : "w-[286px]"} transition-all duration-200 overflow-hidden`
           }
         `}
