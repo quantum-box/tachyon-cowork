@@ -16,7 +16,11 @@ import {
   getConfiguredCognitoConfig,
   getConfiguredDefaultTenantId,
 } from "../../lib/auth-config";
-import { isTauri } from "../../lib/tauri-bridge";
+import {
+  authenticateWithTauriMobileSession,
+  isTauri,
+  isTauriMobile,
+} from "../../lib/tauri-bridge";
 
 type Props = {
   onLogin: (auth: AuthState) => void;
@@ -293,43 +297,6 @@ export function LoginScreen({
     [cognitoDomain, defaultTenantId, finalizeLogin, runtimeApiBaseUrl],
   );
 
-  const handleBrowserLogin = useCallback(async () => {
-    if (!hostedLoginReady) {
-      setError("Cognito のログイン設定が不足しています。");
-      return;
-    }
-
-    setError(null);
-
-    try {
-      const loginUrl = await buildOAuthLoginUrl({
-        domain: cognitoDomain,
-        clientId: cognitoClientId,
-        redirectUri,
-        scopes: cognitoScopes,
-      });
-      if (isTauri()) {
-        const { openUrl } = await import("@tauri-apps/plugin-opener");
-        await openUrl(loginUrl);
-      } else {
-        window.open(loginUrl, "_self");
-      }
-    } catch (e) {
-      clearPendingOAuthState();
-      setError(
-        e instanceof Error
-          ? e.message
-          : "ブラウザログインの開始に失敗しました。",
-      );
-    }
-  }, [
-    cognitoClientId,
-    cognitoDomain,
-    cognitoScopes,
-    hostedLoginReady,
-    redirectUri,
-  ]);
-
   const handleTenantLogin = useCallback(() => {
     if (!tenantId || !accessToken) return;
 
@@ -393,6 +360,51 @@ export function LoginScreen({
     },
     [cognitoClientId, cognitoDomain, redirectUri, resolveTenantAndLogin],
   );
+
+  const handleBrowserLogin = useCallback(async () => {
+    if (!hostedLoginReady) {
+      setError("Cognito のログイン設定が不足しています。");
+      return;
+    }
+
+    setError(null);
+
+    try {
+      const loginUrl = await buildOAuthLoginUrl({
+        domain: cognitoDomain,
+        clientId: cognitoClientId,
+        redirectUri,
+        scopes: cognitoScopes,
+      });
+
+      if (isTauriMobile()) {
+        const callbackUrl = await authenticateWithTauriMobileSession({
+          authUrl: loginUrl,
+          callbackScheme: "tachyon-cowork",
+        });
+        await handleOAuthCallbackUrl(callbackUrl);
+      } else if (isTauri()) {
+        const { openUrl } = await import("@tauri-apps/plugin-opener");
+        await openUrl(loginUrl);
+      } else {
+        window.open(loginUrl, "_self");
+      }
+    } catch (e) {
+      clearPendingOAuthState();
+      setError(
+        e instanceof Error
+          ? e.message
+          : "ブラウザログインの開始に失敗しました。",
+      );
+    }
+  }, [
+    cognitoClientId,
+    cognitoDomain,
+    cognitoScopes,
+    handleOAuthCallbackUrl,
+    hostedLoginReady,
+    redirectUri,
+  ]);
 
   const handleDeepLinkUrls = useCallback(
     async (urls: string[]) => {

@@ -110,6 +110,24 @@ export async function clearTauriRuntimeAuth(): Promise<void> {
   await tauriInvoke<void>("chat_clear_runtime_auth");
 }
 
+export async function authenticateWithTauriMobileSession(params: {
+  authUrl: string;
+  callbackScheme: string;
+}): Promise<string> {
+  if (!isTauriMobile()) {
+    throw new Error("native auth session is only available on Tauri mobile");
+  }
+
+  const response = await tauriInvoke<{ url: string }>(
+    "auth_session_authenticate",
+    {
+      authUrl: params.authUrl,
+      callbackScheme: params.callbackScheme,
+    },
+  );
+  return response.url;
+}
+
 // ── MCP Types ──────────────────────────────────────────────────────
 
 export type McpTransportConfig =

@@ -42,6 +42,7 @@ uuid = { version = "1", features = ["v4"] }
 urlencoding = "2"
 cpal = "0.15"
 hound = "3.5"
+tauri-plugin-oauth-session = "0.1"
 
 [target.'cfg(not(any(target_os = "ios", target_os = "android")))'.dependencies]
 microsandbox = "0.3"
