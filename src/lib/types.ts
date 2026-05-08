@@ -113,6 +113,20 @@ export type AuthConfig = {
   userId?: string;
 };
 
+export type RealtimeClientSecretRequest = {
+  voice?: string;
+  instruction_preset?: string;
+  transcription?: string;
+  vad?: string;
+};
+
+export type RealtimeClientSecretResponse = {
+  client_secret: string;
+  expires_at?: number;
+  model: string;
+  voice: string;
+};
+
 /** File attachment for upload */
 export type FileAttachment = {
   id: string;

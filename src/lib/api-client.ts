@@ -3,6 +3,8 @@ import type {
   AgentExecuteRequest,
   AuthConfig,
   ModelInfo,
+  RealtimeClientSecretRequest,
+  RealtimeClientSecretResponse,
   SessionSummary,
 } from "./types";
 import { fetchWithAuth } from "./fetch-with-auth";
@@ -13,9 +15,7 @@ export class ApiRequestError extends Error {
   body: string;
 
   constructor(status: number, statusText: string, body = "") {
-    super(
-      `Request failed: ${status} ${statusText}${body ? ` - ${body}` : ""}`,
-    );
+    super(`Request failed: ${status} ${statusText}${body ? ` - ${body}` : ""}`);
     this.name = "ApiRequestError";
     this.status = status;
     this.body = body;
@@ -274,6 +274,30 @@ export class AgentChatClient {
       const body = await response.text().catch(() => "");
       throw new ApiRequestError(response.status, response.statusText, body);
     }
+  }
+
+  async issueRealtimeClientSecret(
+    payload: RealtimeClientSecretRequest = {},
+  ): Promise<RealtimeClientSecretResponse> {
+    const data = await this.request<unknown>(
+      "/v1/llms/realtime/client-secret",
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+    );
+
+    if (!isRecord(data) || typeof data.client_secret !== "string") {
+      throw new Error("Unexpected realtime client secret response");
+    }
+
+    return {
+      client_secret: data.client_secret,
+      expires_at:
+        typeof data.expires_at === "number" ? data.expires_at : undefined,
+      model: typeof data.model === "string" ? data.model : "gpt-realtime-2",
+      voice: typeof data.voice === "string" ? data.voice : "marin",
+    };
   }
 
   // ── Agent API ──────────────────────────────────────────────────────

@@ -10,17 +10,17 @@ Golden Path:
 
 ## 1. Prerequisites on the exhibition PC
 
-| # | Item | How to verify |
-|---|---|---|
-| 1 | Node.js ≥ 20 | `node -v` |
-| 2 | Rust stable + `cargo` | `cargo --version` |
-| 3 | Tauri CLI (`cargo tauri`) | `cargo tauri --version` — install via `cargo install tauri-cli --locked` if missing |
-| 4 | Docker Desktop running | `docker version` |
-| 5 | `python:3.12-slim` image | `docker pull python:3.12-slim` |
-| 6 | microsandbox CLI (`msb`) | `curl -fsSL https://get.microsandbox.dev \| sh` then `msb --version` |
-| 7 | `.env` present at repo root (OpenAI / Anthropic / Cognito keys) | `ls .env` — see §1a |
-| 8 | Microphone permission granted for the app | §4 |
-| 9 | Cloudflare / AWS network reachable | `curl -I https://cognito-idp.<region>.amazonaws.com/` (expect 400 JSON — means reachable) |
+| #   | Item                                                            | How to verify                                                                             |
+| --- | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| 1   | Node.js ≥ 20                                                    | `node -v`                                                                                 |
+| 2   | Rust stable + `cargo`                                           | `cargo --version`                                                                         |
+| 3   | Tauri CLI (`cargo tauri`)                                       | `cargo tauri --version` — install via `cargo install tauri-cli --locked` if missing       |
+| 4   | Docker Desktop running                                          | `docker version`                                                                          |
+| 5   | `python:3.12-slim` image                                        | `docker pull python:3.12-slim`                                                            |
+| 6   | microsandbox CLI (`msb`)                                        | `curl -fsSL https://get.microsandbox.dev \| sh` then `msb --version`                      |
+| 7   | `.env` present at repo root (OpenAI / Anthropic / Cognito keys) | `ls .env` — see §1a                                                                       |
+| 8   | Microphone permission granted for the app                       | §4                                                                                        |
+| 9   | Cloudflare / AWS network reachable                              | `curl -I https://cognito-idp.<region>.amazonaws.com/` (expect 400 JSON — means reachable) |
 
 ### 1a. Required `.env` keys
 
@@ -35,7 +35,7 @@ Tachyon Cowork (frontend) — `tachyon-cowork/.env`:
 
 Agent API backend — `tachyon-apps/.env`:
 
-- `OPENAI_API_KEY` (required — Whisper transcription + gpt-4o summarization + auto-name)
+- OpenAI API key is no longer required in Tachyon Cowork. Realtime voice uses Tachyon API issued short-lived client secrets.
 - `ANTHROPIC_API_KEY` **not required for the 4/15 Golden Path** (PdM-confirmed 2026-04-13). Leave blank.
 - `COGNITO_JWK_URL`, `COGNITO_CLIENT_ID`, `COGNITO_CLIENT_SECRET`
 - **Exhibition-only overrides** — add the following so auto-generated session / chatroom names use OpenAI instead of the Anthropic default (requires tachyon-apps PR #2293 merged):
@@ -53,15 +53,15 @@ Sanitize rule: never copy `.env` from production; use the exhibition-issued keys
 
 CEO has approved unsigned operation for 2026-04-15; these residual risks remain and must be understood by the operator:
 
-| Risk | Impact | Mitigation on the day |
-|---|---|---|
-| First-run OS warning (Gatekeeper / SmartScreen) | Visitors see a security prompt mid-demo | Perform §3 bypass **before the exhibition opens**; never live-demo the first install |
-| No notarization (macOS) | macOS may re-quarantine after Sequoia updates or file re-download | Keep the `.dmg` locally; do not re-download on the day. Re-run `xattr -cr` if re-copied |
-| No EV cert (Windows) | SmartScreen "Unknown publisher" warning on every fresh user profile | Use a single pre-configured Windows user profile; don't switch accounts on the day |
-| Updater is disabled (P0-2 hotfix) | No in-app updates during exhibition | Lock the installed build; any hotfix must be a manual re-install, not OTA |
-| No code-signing integrity guarantee | If the `.dmg`/`.msi` is tampered with, nothing detects it | Build on a trusted engineer PC, transfer directly to exhibition PC (USB or SFTP); do not download via untrusted channels |
-| Anti-virus may quarantine `.msi` | Windows may silently block execution | Disable AV scan for the install folder before first run |
-| Browser download warnings | Chrome/Edge may block the `.dmg`/`.msi` download | Use `scp`/USB to transfer; avoid browser download for the installer |
+| Risk                                            | Impact                                                              | Mitigation on the day                                                                                                    |
+| ----------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| First-run OS warning (Gatekeeper / SmartScreen) | Visitors see a security prompt mid-demo                             | Perform §3 bypass **before the exhibition opens**; never live-demo the first install                                     |
+| No notarization (macOS)                         | macOS may re-quarantine after Sequoia updates or file re-download   | Keep the `.dmg` locally; do not re-download on the day. Re-run `xattr -cr` if re-copied                                  |
+| No EV cert (Windows)                            | SmartScreen "Unknown publisher" warning on every fresh user profile | Use a single pre-configured Windows user profile; don't switch accounts on the day                                       |
+| Updater is disabled (P0-2 hotfix)               | No in-app updates during exhibition                                 | Lock the installed build; any hotfix must be a manual re-install, not OTA                                                |
+| No code-signing integrity guarantee             | If the `.dmg`/`.msi` is tampered with, nothing detects it           | Build on a trusted engineer PC, transfer directly to exhibition PC (USB or SFTP); do not download via untrusted channels |
+| Anti-virus may quarantine `.msi`                | Windows may silently block execution                                | Disable AV scan for the install folder before first run                                                                  |
+| Browser download warnings                       | Chrome/Edge may block the `.dmg`/`.msi` download                    | Use `scp`/USB to transfer; avoid browser download for the installer                                                      |
 
 ## 2. Build (unsigned)
 
@@ -122,11 +122,11 @@ If the build fails on Linux with `glib-2.0 not found`, install: `sudo apt-get in
 
 ### 3UC demo (optional, time-permitting)
 
-| UC | Action | Fallback |
-|---|---|---|
-| UC2 (市場調査) | Chat: 「○○業界の最新トレンドを調査して」 → `web_search` tool auto-runs | none needed — external-dep-free |
-| UC1 (パワポ作成) | Chat: 「調査結果をスライドにまとめて」 → `file_manager` tool emits `.pptx` | If `msb` unavailable, skip UC1 |
-| UC3 (画像分類) | Drag-and-drop image into chat | Works offline; good fallback if network flaky |
+| UC               | Action                                                                     | Fallback                                      |
+| ---------------- | -------------------------------------------------------------------------- | --------------------------------------------- |
+| UC2 (市場調査)   | Chat: 「○○業界の最新トレンドを調査して」 → `web_search` tool auto-runs     | none needed — external-dep-free               |
+| UC1 (パワポ作成) | Chat: 「調査結果をスライドにまとめて」 → `file_manager` tool emits `.pptx` | If `msb` unavailable, skip UC1                |
+| UC3 (画像分類)   | Drag-and-drop image into chat                                              | Works offline; good fallback if network flaky |
 
 ### 5a. Credentials card (print and bring to the venue)
 
@@ -190,16 +190,16 @@ curl -s "$API/v1/sessions/$SID" \
 
 ## 6. Fallback & troubleshooting
 
-| Symptom | Action |
-|---|---|
-| Gatekeeper still blocks after `xattr -cr` | Right-click → Open; if "Open Anyway" absent, re-download the `.dmg` and retry |
-| SmartScreen won't let through on Windows | Try an Administrator PowerShell: `Unblock-File .\Tachyon*.msi` |
-| White screen on launch | Already fixed in commit `6595598` (P0-1 hooks violation) — confirm the build is from `main` ≥ that commit |
-| Auto-update prompt appears | Should not — updater disabled in P0-2. If seen, dismiss and file a bug; do **not** allow update |
-| Cognito login loops | Verify `VITE_COGNITO_REDIRECT_URI` matches the Cognito app-client callback list exactly |
-| Recording starts but no transcript | Verify Agent API reachable (`VITE_API_BASE_URL` ping) and `OPENAI_API_KEY` set in `tachyon-apps/.env` |
-| UC1 `msb` pipeline fails | Skip UC1; narrate "UC1 preview only" and pivot to UC2 + recording + UC3 |
-| Network flaky | Tether via phone; UC3 + local playback works offline |
+| Symptom                                   | Action                                                                                                    |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Gatekeeper still blocks after `xattr -cr` | Right-click → Open; if "Open Anyway" absent, re-download the `.dmg` and retry                             |
+| SmartScreen won't let through on Windows  | Try an Administrator PowerShell: `Unblock-File .\Tachyon*.msi`                                            |
+| White screen on launch                    | Already fixed in commit `6595598` (P0-1 hooks violation) — confirm the build is from `main` ≥ that commit |
+| Auto-update prompt appears                | Should not — updater disabled in P0-2. If seen, dismiss and file a bug; do **not** allow update           |
+| Cognito login loops                       | Verify `VITE_COGNITO_REDIRECT_URI` matches the Cognito app-client callback list exactly                   |
+| Recording starts but no transcript        | Verify Tachyon API reachable (`VITE_API_BASE_URL` ping) and the backend OpenAI secret is configured       |
+| UC1 `msb` pipeline fails                  | Skip UC1; narrate "UC1 preview only" and pivot to UC2 + recording + UC3                                   |
+| Network flaky                             | Tether via phone; UC3 + local playback works offline                                                      |
 
 ## 7. Hand-off checklist (tick on exhibition PC before 2026-04-14 EOD)
 

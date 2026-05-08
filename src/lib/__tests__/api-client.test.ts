@@ -73,3 +73,49 @@ describe("AgentChatClient.submitToolResult", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("AgentChatClient.issueRealtimeClientSecret", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("requests a backend-issued realtime client secret with Tachyon auth headers", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          client_secret: "ek_test",
+          expires_at: 123,
+          model: "gpt-realtime-2",
+          voice: "marin",
+        }),
+        {
+          status: 200,
+          statusText: "OK",
+          headers: { "Content-Type": "application/json" },
+        },
+      ),
+    );
+
+    const client = new AgentChatClient(authConfig);
+    await expect(client.issueRealtimeClientSecret()).resolves.toMatchObject({
+      client_secret: "ek_test",
+      model: "gpt-realtime-2",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    expect(url).toBe(
+      "https://api.test.local/v1/llms/realtime/client-secret",
+    );
+    const headers = new Headers(init?.headers);
+    expect(headers.get("Authorization")).toBe("Bearer token");
+    expect(headers.get("x-operator-id")).toBe("tenant");
+    expect(headers.get("Content-Type")).toBe("application/json");
+  });
+});
