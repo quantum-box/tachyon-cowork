@@ -11,7 +11,7 @@ type RealtimeVoiceState = {
   clearError: () => void;
 };
 
-const OPENAI_REALTIME_CALL_URL = "https://api.openai.com/v1/realtime/calls";
+const REALTIME_CALL_URL = "https://api.openai.com/v1/realtime/calls";
 
 function toUserFacingRealtimeError(error: unknown): string {
   if (!(error instanceof Error)) {
@@ -141,7 +141,7 @@ export function useRealtimeVoice(
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
 
-      const sdpResponse = await fetch(OPENAI_REALTIME_CALL_URL, {
+      const sdpResponse = await fetch(REALTIME_CALL_URL, {
         method: "POST",
         body: offer.sdp,
         headers: {
@@ -153,7 +153,7 @@ export function useRealtimeVoice(
       if (!sdpResponse.ok) {
         const body = await sdpResponse.text().catch(() => "");
         throw new Error(
-          `Realtime SDP exchange failed: ${sdpResponse.status} ${body}`,
+          `Voice SDP exchange failed: ${sdpResponse.status} ${body}`,
         );
       }
 
