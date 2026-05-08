@@ -738,6 +738,7 @@ export function useAgentChat(
   globalCustomInstructions = "",
   activeProjectPath?: string | null,
   activeProjectContext?: ProjectContext | null,
+  maxRequests = 10,
 ) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [chunks, setChunks] = useState<AgentChunk[]>([]);
@@ -1171,7 +1172,7 @@ export function useAgentChat(
           const args: AgentExecuteRequest = {
             task,
             model: selectedModel,
-            max_requests: 10,
+            max_requests: maxRequests,
             use_json_tool_calls: true,
             ...(customInstructions && {
               custom_instructions: customInstructions,
@@ -1236,6 +1237,7 @@ export function useAgentChat(
       globalCustomInstructions,
       activeProjectPath,
       activeProjectContext,
+      maxRequests,
     ],
   );
 

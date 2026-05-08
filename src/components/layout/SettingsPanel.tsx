@@ -34,6 +34,8 @@ type Props = {
   onRealtimeVoiceEnabledChange: (enabled: boolean) => void;
   globalCustomInstructions: string;
   onGlobalCustomInstructionsChange: (value: string) => void;
+  maxRequests: number;
+  onMaxRequestsChange: (value: number) => void;
 };
 
 function getShortcuts(sendKey: SendKeyMode) {
@@ -71,6 +73,8 @@ export function SettingsPanel({
   onRealtimeVoiceEnabledChange,
   globalCustomInstructions,
   onGlobalCustomInstructionsChange,
+  maxRequests,
+  onMaxRequestsChange,
 }: Props) {
   if (!isOpen) return null;
 
@@ -131,6 +135,32 @@ export function SettingsPanel({
                 </option>
               ))}
             </select>
+          </section>
+
+          <section>
+            <div className="flex items-center gap-2 mb-3">
+              <Bot size={14} className="text-stone-500 dark:text-stone-400" />
+              <h3 className="text-sm font-medium text-stone-800 dark:text-stone-200">
+                ループ数
+              </h3>
+            </div>
+            <p className="mb-3 text-xs text-stone-500 dark:text-stone-400">
+              Agent loop の最大反復回数です。調査や複数ファイル操作では大きめの値が必要になる場合があります。
+            </p>
+            <input
+              type="number"
+              min={1}
+              max={100}
+              step={1}
+              value={maxRequests}
+              onChange={(e) =>
+                onMaxRequestsChange(e.currentTarget.valueAsNumber)
+              }
+              className="notion-input w-full rounded-2xl px-3 py-2 text-sm"
+            />
+            <div className="mt-2 text-[11px] text-stone-400 dark:text-stone-500">
+              1〜100 の範囲で自動保存されます
+            </div>
           </section>
 
           <section>

@@ -39,6 +39,7 @@ import { useMcpTools } from "./hooks/useMcpTools";
 import { useProjectState } from "./hooks/useProjectState";
 import { useProjectContext } from "./hooks/useProjectContext";
 import { useGlobalCustomInstructions } from "./hooks/useGlobalCustomInstructions";
+import { useMaxRequests } from "./hooks/useMaxRequests";
 import { useRealtimeVoice } from "./hooks/useRealtimeVoice";
 import { Sidebar } from "./components/layout/Sidebar";
 import { ChatPanel } from "./components/chat/ChatPanel";
@@ -119,6 +120,7 @@ export default function App() {
     useRealtimeVoiceSettings();
   const { globalCustomInstructions, setGlobalCustomInstructions } =
     useGlobalCustomInstructions();
+  const { maxRequests, setMaxRequests } = useMaxRequests();
   const navigate = useNavigate();
   const location = useLocation();
   const showTools = location.pathname === "/tools";
@@ -354,6 +356,7 @@ export default function App() {
     globalCustomInstructions,
     activeProject?.path,
     projectContext,
+    maxRequests,
   );
   const realtimeVoice = useRealtimeVoice(client);
   const stopRealtimeVoice = realtimeVoice.stop;
@@ -953,6 +956,8 @@ export default function App() {
         onRealtimeVoiceEnabledChange={setRealtimeVoiceEnabled}
         globalCustomInstructions={globalCustomInstructions}
         onGlobalCustomInstructionsChange={setGlobalCustomInstructions}
+        maxRequests={maxRequests}
+        onMaxRequestsChange={setMaxRequests}
       />
     </div>
   );
