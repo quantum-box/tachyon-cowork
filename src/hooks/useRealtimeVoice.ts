@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { AgentChatClient } from "../lib/api-client";
+import { ApiRequestError, type AgentChatClient } from "../lib/api-client";
 
 export type RealtimeVoiceStatus = "idle" | "connecting" | "connected";
 
@@ -14,19 +14,34 @@ type RealtimeVoiceState = {
 const REALTIME_CALL_URL = "https://api.openai.com/v1/realtime/calls";
 
 function toUserFacingRealtimeError(error: unknown): string {
+  if (error instanceof ApiRequestError) {
+    if (error.status === 401 || error.status === 403) {
+      return "音声会話の認証に失敗しました。再ログインしてから再試行してください。";
+    }
+
+    return "音声会話の準備に失敗しました。時間をおいて再試行してください。";
+  }
+
   if (!(error instanceof Error)) {
     return "音声会話を開始できませんでした。少し待ってから再試行してください。";
   }
 
   const message = error.message.toLowerCase();
+  const errorName = error.name.toLowerCase();
   if (
+    errorName === "notallowederror" ||
+    errorName === "securityerror" ||
     message.includes("permission") ||
     message.includes("notallowed") ||
     message.includes("denied")
   ) {
     return "マイクの利用が許可されていません。端末の設定でマイク権限を許可してください。";
   }
-  if (message.includes("notfound") || message.includes("device")) {
+  if (
+    errorName === "notfounderror" ||
+    errorName === "devicesnotfounderror" ||
+    errorName === "overconstrainederror"
+  ) {
     return "利用できるマイクが見つかりませんでした。入力デバイスを確認してください。";
   }
   if (message.includes("401") || message.includes("403")) {
