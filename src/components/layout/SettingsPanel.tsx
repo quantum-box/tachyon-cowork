@@ -1,4 +1,13 @@
-import { X, Keyboard, Palette, Bot, Info, LogOut, Puzzle } from "lucide-react";
+import {
+  X,
+  Keyboard,
+  Palette,
+  Bot,
+  Info,
+  LogOut,
+  Puzzle,
+  Mic,
+} from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { McpSettingsSection } from "./McpSettingsSection";
 import type { SendKeyMode } from "../../hooks/useSendKey";
@@ -21,6 +30,8 @@ type Props = {
   showMcpSettings?: boolean;
   sendKey: SendKeyMode;
   onSendKeyChange: (mode: SendKeyMode) => void;
+  realtimeVoiceEnabled: boolean;
+  onRealtimeVoiceEnabledChange: (enabled: boolean) => void;
   globalCustomInstructions: string;
   onGlobalCustomInstructionsChange: (value: string) => void;
 };
@@ -56,6 +67,8 @@ export function SettingsPanel({
   showMcpSettings = true,
   sendKey,
   onSendKeyChange,
+  realtimeVoiceEnabled,
+  onRealtimeVoiceEnabledChange,
   globalCustomInstructions,
   onGlobalCustomInstructionsChange,
 }: Props) {
@@ -141,6 +154,26 @@ export function SettingsPanel({
             <div className="mt-2 text-[11px] text-stone-400 dark:text-stone-500">
               変更は自動保存されます
             </div>
+          </section>
+
+          <section>
+            <div className="flex items-center gap-2 mb-3">
+              <Mic size={14} className="text-stone-500 dark:text-stone-400" />
+              <h3 className="text-sm font-medium text-stone-800 dark:text-stone-200">
+                音声会話
+              </h3>
+            </div>
+            <label className="notion-input flex cursor-pointer items-center justify-between gap-3 rounded-2xl px-3 py-2.5">
+              <span className="min-w-0 text-sm text-stone-700 dark:text-stone-200">
+                チャット画面にマイクボタンを表示
+              </span>
+              <input
+                type="checkbox"
+                checked={realtimeVoiceEnabled}
+                onChange={(e) => onRealtimeVoiceEnabledChange(e.target.checked)}
+                className="h-4 w-4 accent-stone-900 dark:accent-stone-100"
+              />
+            </label>
           </section>
 
           {/* Send Key Mode */}

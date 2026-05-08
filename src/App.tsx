@@ -33,6 +33,7 @@ import { useFileHandler } from "./hooks/useFileHandler";
 import { useArtifact } from "./hooks/useArtifact";
 import { useTheme } from "./hooks/useTheme";
 import { useSendKey } from "./hooks/useSendKey";
+import { useRealtimeVoiceSettings } from "./hooks/useRealtimeVoiceSettings";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useMcpTools } from "./hooks/useMcpTools";
 import { useProjectState } from "./hooks/useProjectState";
@@ -114,6 +115,8 @@ export default function App() {
 
   const { theme, setTheme } = useTheme();
   const { sendKey, setSendKey } = useSendKey();
+  const { realtimeVoiceEnabled, setRealtimeVoiceEnabled } =
+    useRealtimeVoiceSettings();
   const { globalCustomInstructions, setGlobalCustomInstructions } =
     useGlobalCustomInstructions();
   const navigate = useNavigate();
@@ -353,6 +356,14 @@ export default function App() {
     projectContext,
   );
   const realtimeVoice = useRealtimeVoice(client);
+  const stopRealtimeVoice = realtimeVoice.stop;
+
+  useEffect(() => {
+    if (!realtimeVoiceEnabled) {
+      stopRealtimeVoice();
+    }
+  }, [realtimeVoiceEnabled, stopRealtimeVoice]);
+
   const {
     chunks,
     clearError,
@@ -840,7 +851,9 @@ export default function App() {
                       ? () => setSidebarCollapsed((prev) => !prev)
                       : undefined
                   }
-                  realtimeVoice={realtimeVoice}
+                  realtimeVoice={
+                    realtimeVoiceEnabled ? realtimeVoice : undefined
+                  }
                 />
               }
             />
@@ -936,6 +949,8 @@ export default function App() {
         showMcpSettings={supportsDesktopTools}
         sendKey={sendKey}
         onSendKeyChange={setSendKey}
+        realtimeVoiceEnabled={realtimeVoiceEnabled}
+        onRealtimeVoiceEnabledChange={setRealtimeVoiceEnabled}
         globalCustomInstructions={globalCustomInstructions}
         onGlobalCustomInstructionsChange={setGlobalCustomInstructions}
       />
