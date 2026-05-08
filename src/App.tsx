@@ -38,6 +38,7 @@ import { useMcpTools } from "./hooks/useMcpTools";
 import { useProjectState } from "./hooks/useProjectState";
 import { useProjectContext } from "./hooks/useProjectContext";
 import { useGlobalCustomInstructions } from "./hooks/useGlobalCustomInstructions";
+import { useRealtimeVoice } from "./hooks/useRealtimeVoice";
 import { Sidebar } from "./components/layout/Sidebar";
 import { ChatPanel } from "./components/chat/ChatPanel";
 import { ArtifactPanel } from "./components/artifact/ArtifactPanel";
@@ -351,6 +352,7 @@ export default function App() {
     activeProject?.path,
     projectContext,
   );
+  const realtimeVoice = useRealtimeVoice(client);
   const {
     chunks,
     clearError,
@@ -838,6 +840,7 @@ export default function App() {
                       ? () => setSidebarCollapsed((prev) => !prev)
                       : undefined
                   }
+                  realtimeVoice={realtimeVoice}
                 />
               }
             />

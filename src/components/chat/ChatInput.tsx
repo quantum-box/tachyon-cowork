@@ -6,10 +6,11 @@ import {
   type KeyboardEvent,
   type ClipboardEvent,
 } from "react";
-import { SendHorizonal, Paperclip } from "lucide-react";
+import { Loader2, Mic, MicOff, Paperclip, SendHorizonal } from "lucide-react";
 import { pickFiles } from "../../lib/tauri-bridge";
 import type { FileAttachment } from "../../lib/types";
 import type { SendKeyMode } from "../../hooks/useSendKey";
+import type { useRealtimeVoice } from "../../hooks/useRealtimeVoice";
 import { FilePreview } from "../file/FilePreview";
 import { PromptTemplates } from "./PromptTemplates";
 
@@ -25,6 +26,7 @@ type ChatInputProps = {
   onFileRemove: (id: string) => void;
   showPromptTemplates?: boolean;
   sendKey?: SendKeyMode;
+  realtimeVoice?: ReturnType<typeof useRealtimeVoice>;
 };
 
 export function ChatInput({
@@ -39,6 +41,7 @@ export function ChatInput({
   showPromptTemplates,
   sendKey = "enter",
   isDisabled = false,
+  realtimeVoice,
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -113,6 +116,18 @@ export function ChatInput({
   );
 
   const hasContent = input.trim() || files.length > 0;
+  const voiceStatus = realtimeVoice?.status ?? "idle";
+  const isVoiceConnecting = voiceStatus === "connecting";
+  const isVoiceConnected = voiceStatus === "connected";
+
+  const handleVoiceClick = useCallback(async () => {
+    if (!realtimeVoice || isDisabled) return;
+    if (isVoiceConnected || isVoiceConnecting) {
+      realtimeVoice.stop();
+      return;
+    }
+    await realtimeVoice.start();
+  }, [isDisabled, isVoiceConnected, isVoiceConnecting, realtimeVoice]);
 
   return (
     <form
@@ -141,6 +156,40 @@ export function ChatInput({
             >
               <Paperclip size={20} />
             </button>
+
+            {realtimeVoice && (
+              <button
+                type="button"
+                onClick={handleVoiceClick}
+                disabled={isDisabled}
+                className={[
+                  "notion-icon-button min-h-11 min-w-11 shrink-0 rounded-2xl p-3 disabled:cursor-not-allowed disabled:opacity-40",
+                  isVoiceConnected
+                    ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300"
+                    : "",
+                ].join(" ")}
+                aria-label={
+                  isVoiceConnected || isVoiceConnecting
+                    ? "音声会話を終了"
+                    : "音声会話を開始"
+                }
+                title={
+                  isVoiceConnected
+                    ? "音声会話を終了"
+                    : isVoiceConnecting
+                      ? "音声会話に接続中"
+                      : "音声会話を開始"
+                }
+              >
+                {isVoiceConnecting ? (
+                  <Loader2 size={20} className="animate-spin" />
+                ) : isVoiceConnected ? (
+                  <MicOff size={20} />
+                ) : (
+                  <Mic size={20} />
+                )}
+              </button>
+            )}
 
             <textarea
               ref={textareaRef}

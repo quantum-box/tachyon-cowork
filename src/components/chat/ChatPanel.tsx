@@ -7,6 +7,7 @@ import type {
   InlineAttachment,
 } from "../../lib/types";
 import type { SendKeyMode } from "../../hooks/useSendKey";
+import type { useRealtimeVoice } from "../../hooks/useRealtimeVoice";
 import type { ProjectContext } from "../../lib/tauri-bridge";
 import { FileDropZone } from "../file/FileDropZone";
 import { MessageList } from "./MessageList";
@@ -40,6 +41,7 @@ type Props = {
   onOpenTools?: () => void;
   projectContext?: ProjectContext | null;
   onToggleSidebar?: () => void;
+  realtimeVoice?: ReturnType<typeof useRealtimeVoice>;
 };
 
 function formatWorkspaceLabel(projectContext: ProjectContext): string {
@@ -73,6 +75,7 @@ export function ChatPanel({
   onOpenTools,
   projectContext,
   onToggleSidebar,
+  realtimeVoice,
 }: Props) {
   const [searchQuery] = useState("");
   const hasNetworkIssue = isOffline || chat.error?.kind === "network";
@@ -217,6 +220,21 @@ export function ChatPanel({
           </div>
         )}
 
+        {realtimeVoice?.error && (
+          <div className="notion-callout mx-4 mt-4 flex items-center gap-2 rounded-2xl border border-red-200/70 px-4 py-2.5 text-xs text-red-700 dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-400">
+            <AlertCircle size={14} className="shrink-0" />
+            <span className="flex-1">{realtimeVoice.error}</span>
+            <button
+              type="button"
+              onClick={realtimeVoice.clearError}
+              className="shrink-0 rounded-lg p-1 transition-colors hover:bg-red-200/80 dark:hover:bg-red-900/35"
+              aria-label="閉じる"
+            >
+              <X size={12} />
+            </button>
+          </div>
+        )}
+
         {/* File error banner */}
         {fileError && (
           <div className="notion-callout mx-4 mt-4 rounded-2xl border border-amber-200/70 px-4 py-2 text-xs text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-400">
@@ -230,8 +248,9 @@ export function ChatPanel({
               {projectContext.name}
             </span>
             {` を Workspace として使用中です。`}
-            Workspace Custom Instructions はまだありません。作業ディレクトリ画面から
-            `AGENTS.md` を保存すると、この Workspace 固有の指示を使えます。
+            Workspace Custom Instructions
+            はまだありません。作業ディレクトリ画面から `AGENTS.md`
+            を保存すると、この Workspace 固有の指示を使えます。
           </div>
         )}
 
@@ -271,6 +290,7 @@ export function ChatPanel({
           showPromptTemplates={chat.chunks.length === 0}
           sendKey={sendKey}
           isDisabled={isOffline}
+          realtimeVoice={realtimeVoice}
           placeholder={
             isOffline
               ? "オフライン中のためチャット送信はできません"

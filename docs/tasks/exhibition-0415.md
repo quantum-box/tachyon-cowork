@@ -37,15 +37,15 @@ Plan B (macOS CI runner for signed build artifact) is parked — requires PdM/CO
 
 ## Environment audit (2026-04-13, this VPS)
 
-| Item | Status | Notes |
-|---|---|---|
-| Node | v22.22.0 | ≥ 20 required ✅ |
-| Rust / cargo | 1.93.1 | ✅ |
-| Docker | 29.2.1 | ✅ |
-| `python:3.12-slim` image | pulled | ✅ |
-| microsandbox (`msb`) | v0.2.6 installed to `~/.local/bin` | ✅ |
-| `tachyon-cowork/.env` | present | `VITE_COGNITO_*`, `VITE_API_BASE_URL`, `VITE_DEFAULT_TENANT_ID` set |
-| `tachyon-apps/.env` | present | `OPENAI_API_KEY` set; **`ANTHROPIC_API_KEY` not set** (flag to PdM — is it required for 4/15 Golden Path?) |
+| Item                          | Status                             | Notes                                                                                                                                          |
+| ----------------------------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Node                          | v22.22.0                           | ≥ 20 required ✅                                                                                                                               |
+| Rust / cargo                  | 1.93.1                             | ✅                                                                                                                                             |
+| Docker                        | 29.2.1                             | ✅                                                                                                                                             |
+| `python:3.12-slim` image      | pulled                             | ✅                                                                                                                                             |
+| microsandbox (`msb`)          | v0.2.6 installed to `~/.local/bin` | ✅                                                                                                                                             |
+| `tachyon-cowork/.env`         | present                            | `VITE_COGNITO_*`, `VITE_API_BASE_URL`, `VITE_DEFAULT_TENANT_ID` set                                                                            |
+| `tachyon-apps backend secret` | present                            | OpenAI API key is configured only on Tachyon API backend; **`ANTHROPIC_API_KEY` not set** (flag to PdM — is it required for 4/15 Golden Path?) |
 
 ## Deliverables
 
@@ -74,8 +74,8 @@ The system library `glib-2.0` required by crate `glib-sys` was not found.
 System deps (`glib-2.0`, `webkit2gtk-4.1`, etc.) are not installed on this Sakura VPS and require `sudo apt-get install` which is outside this session's scope. Decision: **de-scope Linux build from exhibition critical path** — exhibition targets are macOS `.dmg` and Windows `.msi`, produced on the operator's own PC per the runbook. Pipeline correctness through `npm run build` + `tsc --noEmit` + `vite build` passed successfully before the Rust step, so the front-end portion is validated.
 
 Front-end result (from build log):
+
 - `npm install` ✅ (549 packages, 8 high-severity audit warnings — pre-existing)
 - `tsc --noEmit` ✅
 - `vite build` ✅
 - `cargo tauri build` ❌ (Linux system deps, see above)
-
