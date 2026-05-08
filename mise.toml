@@ -5,6 +5,7 @@ IOS_BUILD_NUMBER="${IOS_BUILD_NUMBER:-$(date +%m%d%H%M | sed 's/^0*//')}"
 if [ ! -d src-tauri/gen/apple ]; then
   npx tauri ios init --ci
 fi
+./scripts/sync-ios-icons.sh
 npx tauri ios build --ci --export-method app-store-connect --build-number "$IOS_BUILD_NUMBER"
 """
 

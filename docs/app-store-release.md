@@ -157,12 +157,19 @@ processing and refresh the build list.
 
 ## Icon Notes
 
+`tauri ios init` creates `src-tauri/gen/apple`, which is intentionally ignored.
+After initialization, `scripts/sync-ios-icons.sh` copies the tracked iOS
+`AppIcon.appiconset` into the generated Xcode asset catalog so TestFlight does
+not fall back to the default Tauri icon.
+
 The generated IPA should include iOS app icons through the generated Xcode asset
-catalog. When checking an icon issue, inspect the IPA instead of only relying on
-the App Store Connect screen:
+catalog. When checking an icon issue, inspect the IPA and App Store Connect build
+metadata instead of only relying on the App Store Connect screen:
 
 ```bash
+./scripts/sync-ios-icons.sh
 unzip -l "src-tauri/gen/apple/build/arm64/Tachyon Cowork.ipa" | rg 'AppIcon|Assets.car'
+./scripts/ci/verify-ios-icons.sh
 ```
 
 The marketing icon should come from the generated
