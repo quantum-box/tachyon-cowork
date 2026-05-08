@@ -132,6 +132,7 @@ jobs:
           if [ ! -d src-tauri/gen/apple ]; then
             npx tauri ios init --ci
           fi
+          ./scripts/sync-ios-icons.sh
 
       - name: Configure manual iOS signing
         run: |
@@ -199,7 +200,7 @@ jobs:
           mkdir -p "$(dirname "$IOS_IPA_PATH")"
           cp "$EXPORT_PATH/Tachyon Cowork.ipa" "$IOS_IPA_PATH"
 
-      - name: Verify export compliance key in IPA
+      - name: Verify export compliance key and icons in IPA
         id: ipa
         run: |
           set -euo pipefail
@@ -209,6 +210,7 @@ jobs:
           VERSION="$(plutil -extract CFBundleVersion raw "$TMPDIR/Payload/Tachyon Cowork.app/Info.plist")"
           rm -rf "$TMPDIR"
           test "$VALUE" = "false"
+          ./scripts/ci/verify-ios-icons.sh
           echo "Verified ITSAppUsesNonExemptEncryption=false in build $VERSION"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
