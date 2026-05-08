@@ -53,6 +53,9 @@
     "active": true,
     "targets": "all",
     "createUpdaterArtifacts": true,
+    "macOS": {
+      "infoPlist": "Info.macos.plist"
+    },
     "iOS": {
       "developmentTeam": "J8429VCGMR",
       "infoPlist": "Info.ios.plist"

@@ -4,6 +4,8 @@
 <dict>
   <key>ITSAppUsesNonExemptEncryption</key>
   <false/>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>音声会話であなたの声を入力するためにマイクを使用します。</string>
   <key>CFBundleURLTypes</key>
   <array>
     <dict>
