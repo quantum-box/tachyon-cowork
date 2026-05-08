@@ -127,6 +127,15 @@ export type RealtimeClientSecretResponse = {
   voice: string;
 };
 
+export type RealtimeTranscriptRole = "user" | "assistant";
+
+export type RealtimeTranscriptMessage = {
+  role: RealtimeTranscriptRole;
+  id: string;
+  text: string;
+  isFinal: boolean;
+};
+
 /** File attachment for upload */
 export type FileAttachment = {
   id: string;

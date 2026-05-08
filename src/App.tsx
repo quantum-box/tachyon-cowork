@@ -358,8 +358,52 @@ export default function App() {
     projectContext,
     maxRequests,
   );
-  const realtimeVoice = useRealtimeVoice(client);
+  const {
+    chunks,
+    clearError,
+    input: chatInput,
+    isLoading: isChatLoading,
+    newChat,
+    selectedModel,
+    sendMessage,
+    sessionId,
+    setInput: setChatInput,
+    setSelectedModel,
+    error: chatError,
+  } = chat;
+
+  const agentChatDraftRef = useRef(chatInput);
+  useEffect(() => {
+    agentChatDraftRef.current = chatInput;
+  }, [chatInput]);
+
+  const setAgentChatDraftFromRealtime = useCallback(
+    (text: string) => {
+      agentChatDraftRef.current = text;
+      setChatInput(text);
+    },
+    [setChatInput],
+  );
+
+  const submitAgentChatDraftFromRealtime = useCallback(
+    async (text: string) => {
+      const message = text.trim();
+      if (!message) return;
+      agentChatDraftRef.current = "";
+      setChatInput("");
+      await sendMessage(message);
+    },
+    [sendMessage, setChatInput],
+  );
+
+  const realtimeVoice = useRealtimeVoice(client, {
+    getAgentChatDraft: () => agentChatDraftRef.current,
+    onSetAgentChatDraft: setAgentChatDraftFromRealtime,
+    onSubmitAgentChatDraft: submitAgentChatDraftFromRealtime,
+  });
   const stopRealtimeVoice = realtimeVoice.stop;
+  const realtimeTranscripts = realtimeVoice.transcripts;
+  const appendRealtimeTranscript = realtimeVoice.appendTranscript;
 
   useEffect(() => {
     if (!realtimeVoiceEnabled) {
@@ -367,17 +411,6 @@ export default function App() {
     }
   }, [realtimeVoiceEnabled, stopRealtimeVoice]);
 
-  const {
-    chunks,
-    clearError,
-    isLoading: isChatLoading,
-    newChat,
-    selectedModel,
-    sendMessage,
-    sessionId,
-    setSelectedModel,
-    error: chatError,
-  } = chat;
   const modelOptions = useMemo(
     () => resolveModelOptions(availableModels),
     [availableModels],
@@ -457,6 +490,7 @@ export default function App() {
         selectedModel,
         availableModels,
         mcpToolNames: mcpTools.map((tool) => tool.name),
+        realtimeTranscripts,
         pathname: location.pathname,
         canvasOpen: artifactState.canvas.isOpen,
         artifactPanelOpen: artifactState.isPanelOpen,
@@ -473,6 +507,9 @@ export default function App() {
       },
       sendMessage: async (message, taskOverride) => {
         await sendMessage(message, undefined, taskOverride);
+      },
+      appendRealtimeVoiceTranscript: (message) => {
+        appendRealtimeTranscript(message);
       },
       newChat: () => {
         newChat();
@@ -510,6 +547,8 @@ export default function App() {
     newChat,
     projectContext,
     recentProjects,
+    appendRealtimeTranscript,
+    realtimeTranscripts,
     selectedModel,
     sendMessage,
     sessionId,
