@@ -72,6 +72,34 @@ describe("useAgentChat tool flow", () => {
     localStorage.clear();
   });
 
+  it("passes the configured max requests to agent execution", async () => {
+    const client = buildClient([]);
+
+    const { result } = renderHook(() =>
+      useAgentChat(
+        client,
+        undefined,
+        undefined,
+        undefined,
+        "",
+        undefined,
+        undefined,
+        42,
+      ),
+    );
+
+    await act(async () => {
+      await result.current.sendMessage("Use more loops");
+    });
+
+    expect(client.executeAgent).toHaveBeenCalledWith(
+      "session-1",
+      expect.objectContaining({
+        max_requests: 42,
+      }),
+    );
+  });
+
   it("executes a streamed client tool call and submits the tool result", async () => {
     vi.mocked(executeClientTool).mockResolvedValue({
       tool_id: "tool-1",
