@@ -75,7 +75,7 @@ describe("realtime agent chat tools", () => {
       ],
     });
     expect(sessionConfig.instructions).toContain("what tools you can use");
-    expect(sessionConfig.instructions).toContain("preserve the language");
+    expect(sessionConfig.instructions).toContain("in Japanese");
   });
 
   it("builds session tools for drafting, editing, and sending agent chat input", () => {
