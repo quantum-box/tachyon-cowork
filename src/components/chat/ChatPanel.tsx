@@ -324,7 +324,7 @@ function RealtimeTranscriptPanel({
   voice: NonNullable<Props["realtimeVoice"]>;
 }) {
   const isActive = voice.status === "connecting" || voice.status === "connected";
-  if (!isActive && voice.transcripts.length === 0) return null;
+  if (!isActive) return null;
 
   const recentTranscripts = voice.transcripts.slice(-4);
   const statusLabel = getRealtimeStatusLabel(voice.status);
