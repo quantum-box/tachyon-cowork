@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
-import { Loader2, RefreshCw, Trash2 } from "lucide-react";
+import { Loader2, Trash2 } from "lucide-react";
 import type { AgentChunk, Artifact } from "../../lib/types";
 import { MessageBubble } from "./MessageBubble";
 
@@ -20,6 +20,14 @@ type Props = {
 
 function getChunkKey(chunk: AgentChunk, index: number): string {
   return [chunk.type, chunk.id, chunk.created_at, index].join(":");
+}
+
+function isAssistantResponseChunk(chunk: AgentChunk): boolean {
+  return (
+    chunk.type === "say" ||
+    chunk.type === "assistant" ||
+    chunk.type === "attempt_completion"
+  );
 }
 
 export function MessageList({
@@ -70,6 +78,16 @@ export function MessageList({
     return result;
   }, [chunks]);
 
+  const retryChunkIndex = useMemo(() => {
+    if (isLoading || !onRetry) return -1;
+    for (let i = displayChunks.length - 1; i >= 0; i -= 1) {
+      if (isAssistantResponseChunk(displayChunks[i])) {
+        return i;
+      }
+    }
+    return -1;
+  }, [displayChunks, isLoading, onRetry]);
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chunks]);
@@ -107,6 +125,7 @@ export function MessageList({
                 onOptionSelect={onSendMessage}
                 onOpenCanvas={onOpenCanvas}
                 searchQuery={searchQuery}
+                onRetry={index === retryChunkIndex ? onRetry : undefined}
               />
               {isDeletable && (
                 <button
@@ -127,18 +146,6 @@ export function MessageList({
               <Loader2 size={12} className="animate-spin" />
               AIが応答中...
             </div>
-          </div>
-        )}
-        {!isLoading && displayChunks.length > 0 && onRetry && (
-          <div className="mb-2 flex justify-start gap-2">
-            <div className="w-8" />
-            <button
-              onClick={onRetry}
-              className="notion-button px-3 py-1.5 text-xs"
-            >
-              <RefreshCw size={12} />
-              再生成
-            </button>
           </div>
         )}
         <div ref={bottomRef} />

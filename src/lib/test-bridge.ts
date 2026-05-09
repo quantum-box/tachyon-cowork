@@ -1,5 +1,5 @@
 import type { AuthState } from "./auth";
-import type { AgentChunk, ModelInfo } from "./types";
+import type { AgentChunk, ModelInfo, RealtimeTranscriptMessage } from "./types";
 import type { ProjectContext, ProjectEntry } from "./tauri-bridge";
 
 export const TEST_MODE_STORAGE_KEY = "__tachyon_test_mode";
@@ -16,6 +16,7 @@ export type TachyonTestBridgeState = {
   selectedModel: string;
   availableModels: ModelInfo[] | null;
   mcpToolNames: string[];
+  realtimeTranscripts: RealtimeTranscriptMessage[];
   pathname: string;
   canvasOpen: boolean;
   artifactPanelOpen: boolean;
@@ -26,7 +27,12 @@ export type TachyonTestBridge = {
   getState: () => TachyonTestBridgeState;
   setAuth: (auth: AuthState | null) => void;
   activateProject: (path: string) => Promise<void>;
-  sendMessage: (message: string, taskOverride?: string) => Promise<void>;
+  sendMessage: (
+    message: string,
+    taskOverride?: string,
+    modelOverride?: string,
+  ) => Promise<void>;
+  appendRealtimeVoiceTranscript: (message: RealtimeTranscriptMessage) => void;
   newChat: () => void;
   setSelectedModel: (modelId: string) => void;
   clearError: () => void;

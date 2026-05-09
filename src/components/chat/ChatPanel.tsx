@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { AlertCircle, RefreshCw, X, Square, Menu } from "lucide-react";
+import { AlertCircle, Mic, MicOff, RefreshCw, X, Square, Menu } from "lucide-react";
 import type { useAgentChat } from "../../hooks/useAgentChat";
 import type {
   Artifact,
@@ -56,6 +56,30 @@ function formatWorkspaceLabel(projectContext: ProjectContext): string {
   return workspace;
 }
 
+function getRealtimeStatusLabel(
+  status: ReturnType<typeof useRealtimeVoice>["status"],
+): { text: string; className: string } {
+  if (status === "connected") {
+    return {
+      text: "準備完了",
+      className:
+        "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300",
+    };
+  }
+  if (status === "connecting") {
+    return {
+      text: "準備中",
+      className:
+        "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300",
+    };
+  }
+  return {
+    text: "停止中",
+    className:
+      "bg-white/70 text-sky-700 dark:bg-sky-900/40 dark:text-sky-200",
+  };
+}
+
 export function ChatPanel({
   chat,
   files,
@@ -99,7 +123,7 @@ export function ChatPanel({
 
   return (
     <FileDropZone onFilesDropped={onFilesAdd}>
-      <div className="flex h-full flex-col bg-transparent transition-colors duration-150">
+      <div className="relative flex h-full flex-col bg-transparent transition-colors duration-150">
         <div className="border-b border-stone-200/80 bg-white/55 pb-2.5 pt-[calc(env(safe-area-inset-top)+0.625rem)] backdrop-blur-md dark:border-stone-800/80 dark:bg-stone-950/25">
           <div className="flex w-full items-center justify-between gap-3 px-2.5 md:px-3">
             <div className="titlebar-safe-header flex min-w-0 items-center gap-3">
@@ -242,18 +266,6 @@ export function ChatPanel({
           </div>
         )}
 
-        {projectContext && !projectContext.has_agents_file && (
-          <div className="notion-callout mx-4 mt-4 rounded-2xl px-4 py-3 text-xs text-stone-600 dark:text-stone-300">
-            <span className="font-medium text-slate-700 dark:text-slate-200">
-              {projectContext.name}
-            </span>
-            {` を Workspace として使用中です。`}
-            Workspace Custom Instructions
-            はまだありません。作業ディレクトリ画面から `AGENTS.md`
-            を保存すると、この Workspace 固有の指示を使えます。
-          </div>
-        )}
-
         <MessageList
           chunks={chat.chunks}
           isLoading={chat.isLoading}
@@ -264,6 +276,8 @@ export function ChatPanel({
           onRetry={chat.retry}
           onDeleteMessage={chat.deleteMessage}
         />
+
+        {realtimeVoice && <RealtimeTranscriptPanel voice={realtimeVoice} />}
 
         {/* Stop generation button */}
         {chat.isLoading && (
@@ -301,5 +315,97 @@ export function ChatPanel({
         />
       </div>
     </FileDropZone>
+  );
+}
+
+function RealtimeTranscriptPanel({
+  voice,
+}: {
+  voice: NonNullable<Props["realtimeVoice"]>;
+}) {
+  const isActive = voice.status === "connecting" || voice.status === "connected";
+  if (!isActive) return null;
+
+  const recentTranscripts = voice.transcripts.slice(-4);
+  const statusLabel = getRealtimeStatusLabel(voice.status);
+
+  return (
+    <section
+      className="fixed right-3 top-1/2 z-30 w-[min(320px,calc(100vw-1.5rem))] -translate-y-1/2 rounded-xl border border-slate-400/20 bg-slate-200/20 px-2.5 py-2 text-[11px] text-slate-800 shadow-[0_18px_42px_rgba(15,23,42,0.12)] backdrop-blur-sm dark:border-white/15 dark:bg-slate-950/20 dark:text-slate-100 sm:right-5"
+      aria-label="Realtime"
+      aria-live="polite"
+    >
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-1.5 font-semibold text-sky-800 dark:text-sky-200">
+          <Mic size={12} />
+          <span>Realtime</span>
+          <span
+            className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold ${statusLabel.className}`}
+          >
+            {statusLabel.text}
+          </span>
+          <span className="rounded-full bg-white/20 px-1.5 py-0.5 text-[9px] font-medium text-sky-700 ring-1 ring-sky-100/35 dark:bg-sky-900/15 dark:text-sky-200 dark:ring-sky-700/25">
+            Agentチャットとは別
+          </span>
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          {isActive && (
+            <button
+              type="button"
+              onClick={voice.stop}
+              className="inline-flex items-center gap-1 rounded-lg border border-red-300/55 bg-red-50/30 px-2 py-1 text-[10px] font-semibold text-red-700 transition-colors hover:bg-red-100/45 dark:border-red-900/45 dark:bg-red-950/20 dark:text-red-300 dark:hover:bg-red-950/40"
+              aria-label="Realtimeを停止"
+              title="Realtimeを停止"
+            >
+              <MicOff size={11} />
+              停止
+            </button>
+          )}
+          {voice.transcripts.length > 0 && (
+            <button
+              type="button"
+              onClick={voice.clearTranscripts}
+              className="rounded-md p-0.5 text-sky-700 transition-colors hover:bg-sky-100/45 dark:text-sky-200 dark:hover:bg-sky-900/30"
+              aria-label="Realtimeをクリア"
+              title="Realtimeをクリア"
+            >
+              <X size={12} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {recentTranscripts.length === 0 ? (
+        <div className="flex items-center gap-1.5 text-sky-700/80 dark:text-sky-200/80">
+          {voice.status === "connecting" && (
+            <RefreshCw size={11} className="animate-spin" />
+          )}
+          {voice.status === "connected"
+            ? "話しかけるとここに表示されます"
+            : "マイクとRealtimeを準備しています..."}
+        </div>
+      ) : (
+        <div className="max-h-28 space-y-1 overflow-y-auto pr-1">
+          {recentTranscripts.map((item) => (
+            <div
+              key={item.id}
+              className="flex gap-1.5 rounded-lg bg-white/15 px-2 py-1 ring-1 ring-white/20 dark:bg-slate-950/15 dark:ring-white/10"
+            >
+              <span className="shrink-0 text-[9px] font-semibold uppercase text-sky-700 dark:text-sky-300">
+                {item.role === "user" ? "V" : "RT"}
+              </span>
+              <span className="min-w-0 whitespace-pre-wrap leading-4">
+                {item.text}
+                {!item.isFinal && (
+                  <span className="ml-1 text-sky-500 dark:text-sky-300">
+                    ...
+                  </span>
+                )}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }

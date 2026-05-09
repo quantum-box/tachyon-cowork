@@ -21,7 +21,8 @@ export type AgentChunk = {
     | "completion"
     | "usage"
     | "tool_job_started"
-    | "artifact";
+    | "artifact"
+    | "error";
   id: string;
   text?: string;
   created_at: string;
@@ -55,6 +56,7 @@ export type AgentChunk = {
   url?: string;
   size_bytes?: number;
   metadata?: Record<string, unknown>;
+  code?: string;
 };
 
 /** Inline attachment sent as base64 with the agent request */
@@ -116,8 +118,11 @@ export type AuthConfig = {
 export type RealtimeClientSecretRequest = {
   voice?: string;
   instruction_preset?: string;
+  instructions?: string;
   transcription?: string;
   vad?: string;
+  tools?: ReadonlyArray<Record<string, unknown>>;
+  tool_choice?: "auto" | "none" | "required";
 };
 
 export type RealtimeClientSecretResponse = {
@@ -125,6 +130,15 @@ export type RealtimeClientSecretResponse = {
   expires_at?: number;
   model: string;
   voice: string;
+};
+
+export type RealtimeTranscriptRole = "user" | "assistant";
+
+export type RealtimeTranscriptMessage = {
+  role: RealtimeTranscriptRole;
+  id: string;
+  text: string;
+  isFinal: boolean;
 };
 
 /** File attachment for upload */

@@ -40,16 +40,21 @@ import { useProjectState } from "./hooks/useProjectState";
 import { useProjectContext } from "./hooks/useProjectContext";
 import { useGlobalCustomInstructions } from "./hooks/useGlobalCustomInstructions";
 import { useMaxRequests } from "./hooks/useMaxRequests";
-import { useRealtimeVoice } from "./hooks/useRealtimeVoice";
+import {
+  buildRealtimeAgentChatContext,
+  playRealtimeCue,
+  useRealtimeVoice,
+} from "./hooks/useRealtimeVoice";
 import { Sidebar } from "./components/layout/Sidebar";
 import { ChatPanel } from "./components/chat/ChatPanel";
 import { ArtifactPanel } from "./components/artifact/ArtifactPanel";
 import { CanvasView } from "./components/canvas/CanvasView";
 import { LoginScreen } from "./components/layout/LoginScreen";
 import { ToolsPanel } from "./components/layout/ToolsPanel";
-import { SettingsPanel } from "./components/layout/SettingsPanel";
+import { SettingsPage } from "./components/layout/SettingsPage";
 import { WorkFolderListPanel } from "./components/layout/WorkFolderListPanel";
 import { WorkFolderPanel } from "./components/layout/WorkFolderPanel";
+import { HelpPanel } from "./components/layout/HelpPanel";
 import type { ModelInfo, SessionSummary } from "./lib/types";
 import {
   clearTauriRuntimeAuth,
@@ -98,7 +103,6 @@ export default function App() {
   const [oauthError, setOauthError] = useState<string | null>(null);
   const [isExchangingToken, setIsExchangingToken] = useState(false);
   const [offlineMode, setOfflineMode] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [availableModels, setAvailableModels] = useState<ModelInfo[] | null>(
@@ -125,6 +129,8 @@ export default function App() {
   const location = useLocation();
   const showTools = location.pathname === "/tools";
   const showWorkFolders = location.pathname.startsWith("/work-folders");
+  const showHelp = location.pathname === "/help";
+  const showSettings = location.pathname === "/settings";
   const isMacDesktop = isTauriMacOS();
   const supportsDesktopTools = isTauriDesktop();
   const desktopShellClass =
@@ -358,8 +364,157 @@ export default function App() {
     projectContext,
     maxRequests,
   );
-  const realtimeVoice = useRealtimeVoice(client);
+  const {
+    chunks,
+    clearError,
+    input: chatInput,
+    isLoading: isChatLoading,
+    newChat,
+    selectedModel,
+    sendMessage,
+    sessionId,
+    setInput: setChatInput,
+    setSelectedModel,
+    error: chatError,
+  } = chat;
+
+  const agentChatDraftRef = useRef(chatInput);
+  const selectedModelRef = useRef(selectedModel);
+  const agentChunksRef = useRef(chunks);
+  useEffect(() => {
+    agentChatDraftRef.current = chatInput;
+  }, [chatInput]);
+  useEffect(() => {
+    selectedModelRef.current = selectedModel;
+  }, [selectedModel]);
+  useEffect(() => {
+    agentChunksRef.current = chunks;
+  }, [chunks]);
+  const realtimePausedForAgentRef = useRef(false);
+  const realtimeControlRef = useRef<{
+    status: "idle" | "connecting" | "connected";
+    start: () => Promise<void>;
+    stop: () => void;
+  }>({
+    status: "idle",
+    start: async () => undefined,
+    stop: () => undefined,
+  });
+
+  const pauseRealtimeForAgentTurn = useCallback(() => {
+    const realtime = realtimeControlRef.current;
+    if (realtime.status !== "connecting" && realtime.status !== "connected") {
+      return;
+    }
+    realtimePausedForAgentRef.current = true;
+    realtime.stop();
+  }, []);
+
+  const setAgentChatDraftFromRealtime = useCallback(
+    (text: string) => {
+      agentChatDraftRef.current = text;
+      setChatInput(text);
+    },
+    [setChatInput],
+  );
+
+  const submitAgentChatDraftFromRealtime = useCallback(
+    (text: string) => {
+      const message = text.trim();
+      if (!message) return;
+      pauseRealtimeForAgentTurn();
+      agentChatDraftRef.current = "";
+      setChatInput("");
+      void sendMessage(message, undefined, undefined, selectedModelRef.current);
+    },
+    [pauseRealtimeForAgentTurn, sendMessage, setChatInput],
+  );
+
+  const realtimeVoice = useRealtimeVoice(client, {
+    getAgentChatDraft: () => agentChatDraftRef.current,
+    getAgentChatContext: () =>
+      buildRealtimeAgentChatContext(agentChunksRef.current),
+    onSetAgentChatDraft: setAgentChatDraftFromRealtime,
+    onSubmitAgentChatDraft: submitAgentChatDraftFromRealtime,
+  });
+  const realtimeVoiceStatus = realtimeVoice.status;
+  const startRealtimeVoice = realtimeVoice.start;
   const stopRealtimeVoice = realtimeVoice.stop;
+  const realtimeTranscripts = realtimeVoice.transcripts;
+  const appendRealtimeTranscript = realtimeVoice.appendTranscript;
+  const previousChatErrorRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    realtimeControlRef.current = {
+      status: realtimeVoiceStatus,
+      start: startRealtimeVoice,
+      stop: stopRealtimeVoice,
+    };
+  }, [realtimeVoiceStatus, startRealtimeVoice, stopRealtimeVoice]);
+
+  useEffect(() => {
+    if (!realtimeVoiceEnabled) {
+      realtimePausedForAgentRef.current = false;
+      return;
+    }
+    if (isChatLoading || !realtimePausedForAgentRef.current) return;
+
+    realtimePausedForAgentRef.current = false;
+    if (realtimeVoiceStatus === "idle") {
+      void startRealtimeVoice();
+    }
+  }, [
+    isChatLoading,
+    realtimeVoiceStatus,
+    realtimeVoiceEnabled,
+    startRealtimeVoice,
+  ]);
+
+  useEffect(() => {
+    if (!isChatLoading) return;
+
+    playRealtimeCue("thinking");
+    const interval = window.setInterval(() => {
+      playRealtimeCue("thinking");
+    }, 2800);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [isChatLoading]);
+
+  useEffect(() => {
+    const currentError = chatError?.message ?? null;
+    if (
+      realtimeVoiceEnabled &&
+      currentError &&
+      currentError !== previousChatErrorRef.current
+    ) {
+      playRealtimeCue("error");
+    }
+    previousChatErrorRef.current = currentError;
+  }, [chatError?.message, realtimeVoiceEnabled]);
+
+  const sendMessageWithRealtimePause = useCallback(
+    async (
+      message: string,
+      attachments?: Parameters<typeof sendMessage>[1],
+      taskOverride?: Parameters<typeof sendMessage>[2],
+      modelOverride?: Parameters<typeof sendMessage>[3],
+    ) => {
+      pauseRealtimeForAgentTurn();
+      await sendMessage(message, attachments, taskOverride, modelOverride);
+    },
+    [pauseRealtimeForAgentTurn, sendMessage],
+  );
+
+  const chatWithRealtimePause = useMemo(
+    () => ({
+      ...chat,
+      sendMessage: sendMessageWithRealtimePause,
+    }),
+    [chat, sendMessageWithRealtimePause],
+  );
 
   useEffect(() => {
     if (!realtimeVoiceEnabled) {
@@ -367,17 +522,6 @@ export default function App() {
     }
   }, [realtimeVoiceEnabled, stopRealtimeVoice]);
 
-  const {
-    chunks,
-    clearError,
-    isLoading: isChatLoading,
-    newChat,
-    selectedModel,
-    sendMessage,
-    sessionId,
-    setSelectedModel,
-    error: chatError,
-  } = chat;
   const modelOptions = useMemo(
     () => resolveModelOptions(availableModels),
     [availableModels],
@@ -457,6 +601,7 @@ export default function App() {
         selectedModel,
         availableModels,
         mcpToolNames: mcpTools.map((tool) => tool.name),
+        realtimeTranscripts,
         pathname: location.pathname,
         canvasOpen: artifactState.canvas.isOpen,
         artifactPanelOpen: artifactState.isPanelOpen,
@@ -471,8 +616,11 @@ export default function App() {
       activateProject: async (path) => {
         await activateProject(path);
       },
-      sendMessage: async (message, taskOverride) => {
-        await sendMessage(message, undefined, taskOverride);
+      sendMessage: async (message, taskOverride, modelOverride) => {
+        await sendMessage(message, undefined, taskOverride, modelOverride);
+      },
+      appendRealtimeVoiceTranscript: (message) => {
+        appendRealtimeTranscript(message);
       },
       newChat: () => {
         newChat();
@@ -510,6 +658,8 @@ export default function App() {
     newChat,
     projectContext,
     recentProjects,
+    appendRealtimeTranscript,
+    realtimeTranscripts,
     selectedModel,
     sendMessage,
     sessionId,
@@ -542,6 +692,20 @@ export default function App() {
   const handleBackToChat = useCallback(() => {
     navigate("/");
   }, [navigate]);
+
+  const handleOpenHelp = useCallback(() => {
+    navigate("/help");
+    if (isMobile) {
+      setSidebarCollapsed(true);
+    }
+  }, [isMobile, navigate]);
+
+  const handleOpenSettings = useCallback(() => {
+    navigate("/settings");
+    if (isMobile) {
+      setSidebarCollapsed(true);
+    }
+  }, [isMobile, navigate]);
 
   const handleStartChatFromWorkFolder = useCallback(() => {
     chat.newChat();
@@ -714,15 +878,12 @@ export default function App() {
           if (auth) setSearchOpen((prev) => !prev);
         },
         onSettings: () => {
-          // Escape closes settings or search
-          if (settingsOpen) {
-            setSettingsOpen(false);
-          } else if (searchOpen) {
+          if (searchOpen) {
             setSearchOpen(false);
           }
         },
       }),
-      [auth, chat, artifactState.closeCanvas, settingsOpen, searchOpen],
+      [auth, chat, artifactState.closeCanvas, searchOpen],
     ),
   );
 
@@ -797,11 +958,13 @@ export default function App() {
           }}
           onDeleteRoom={chat.deleteRoom}
           onTogglePin={chat.togglePin}
-          onLogout={handleLogout}
           onToggleTools={supportsDesktopTools ? handleToggleTools : undefined}
           showTools={showTools}
           showWorkFolders={showWorkFolders}
-          onOpenSettings={() => setSettingsOpen(true)}
+          showHelp={showHelp}
+          showSettings={showSettings}
+          onOpenHelp={handleOpenHelp}
+          onOpenSettings={handleOpenSettings}
           isCollapsed={isMobile ? false : sidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed((prev) => !prev)}
           activeProject={activeProject}
@@ -828,7 +991,7 @@ export default function App() {
               path="/"
               element={
                 <ChatPanel
-                  chat={chat}
+                  chat={chatWithRealtimePause}
                   files={fileHandler.files}
                   fileError={fileHandler.fileError}
                   onFilesAdd={fileHandler.addFiles}
@@ -871,6 +1034,50 @@ export default function App() {
                 }
               />
             )}
+            <Route
+              path="/help"
+              element={
+                <HelpPanel
+                  onBack={handleBackToChat}
+                  onOpenTools={
+                    supportsDesktopTools ? () => navigate("/tools") : undefined
+                  }
+                  onOpenWorkFolders={
+                    supportsDesktopTools
+                      ? () => openWorkFolderPage(activeProject?.path)
+                      : undefined
+                  }
+                />
+              }
+            />
+            <Route
+              path="/settings"
+              element={
+                <SettingsPage
+                  onBack={handleBackToChat}
+                  theme={theme}
+                  onThemeChange={setTheme}
+                  selectedModel={chat.selectedModel}
+                  modelOptions={modelOptions}
+                  onModelChange={chat.setSelectedModel}
+                  onLogout={handleLogout}
+                  apiBaseUrl={auth.apiBaseUrl}
+                  tenantId={auth.tenantId}
+                  onMcpConfigChanged={
+                    supportsDesktopTools ? refreshMcpTools : undefined
+                  }
+                  showMcpSettings={supportsDesktopTools}
+                  sendKey={sendKey}
+                  onSendKeyChange={setSendKey}
+                  realtimeVoiceEnabled={realtimeVoiceEnabled}
+                  onRealtimeVoiceEnabledChange={setRealtimeVoiceEnabled}
+                  globalCustomInstructions={globalCustomInstructions}
+                  onGlobalCustomInstructionsChange={setGlobalCustomInstructions}
+                  maxRequests={maxRequests}
+                  onMaxRequestsChange={setMaxRequests}
+                />
+              }
+            />
             {supportsDesktopTools && (
               <>
                 <Route
@@ -935,30 +1142,6 @@ export default function App() {
           />
         )}
       </div>
-
-      {/* Settings panel */}
-      <SettingsPanel
-        isOpen={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        theme={theme}
-        onThemeChange={setTheme}
-        selectedModel={chat.selectedModel}
-        modelOptions={modelOptions}
-        onModelChange={chat.setSelectedModel}
-        onLogout={handleLogout}
-        apiBaseUrl={auth.apiBaseUrl}
-        tenantId={auth.tenantId}
-        onMcpConfigChanged={supportsDesktopTools ? refreshMcpTools : undefined}
-        showMcpSettings={supportsDesktopTools}
-        sendKey={sendKey}
-        onSendKeyChange={setSendKey}
-        realtimeVoiceEnabled={realtimeVoiceEnabled}
-        onRealtimeVoiceEnabledChange={setRealtimeVoiceEnabled}
-        globalCustomInstructions={globalCustomInstructions}
-        onGlobalCustomInstructionsChange={setGlobalCustomInstructions}
-        maxRequests={maxRequests}
-        onMaxRequestsChange={setMaxRequests}
-      />
     </div>
   );
 }

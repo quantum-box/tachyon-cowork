@@ -103,7 +103,13 @@ describe("AgentChatClient.issueRealtimeClientSecret", () => {
     );
 
     const client = new AgentChatClient(authConfig);
-    await expect(client.issueRealtimeClientSecret()).resolves.toMatchObject({
+    await expect(
+      client.issueRealtimeClientSecret({
+        instructions: "Use the available tools.",
+        tool_choice: "auto",
+        tools: [{ type: "function", name: "set_agent_chat_draft" }],
+      }),
+    ).resolves.toMatchObject({
       client_secret: "ek_test",
       model: "gpt-realtime-2",
     });
@@ -117,5 +123,10 @@ describe("AgentChatClient.issueRealtimeClientSecret", () => {
     expect(headers.get("Authorization")).toBe("Bearer token");
     expect(headers.get("x-operator-id")).toBe("tenant");
     expect(headers.get("Content-Type")).toBe("application/json");
+    expect(JSON.parse(String(init?.body))).toEqual({
+      instructions: "Use the available tools.",
+      tool_choice: "auto",
+      tools: [{ type: "function", name: "set_agent_chat_draft" }],
+    });
   });
 });
