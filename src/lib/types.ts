@@ -116,8 +116,11 @@ export type AuthConfig = {
 export type RealtimeClientSecretRequest = {
   voice?: string;
   instruction_preset?: string;
+  instructions?: string;
   transcription?: string;
   vad?: string;
+  tools?: ReadonlyArray<Record<string, unknown>>;
+  tool_choice?: "auto" | "none" | "required";
 };
 
 export type RealtimeClientSecretResponse = {

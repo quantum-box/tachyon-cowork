@@ -1,6 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import {
+  buildRealtimeToolSessionConfig,
   buildRealtimeToolSessionUpdate,
   extractRealtimeTranscriptUpdate,
   extractRealtimeToolCall,
@@ -63,6 +64,19 @@ describe("extractRealtimeTranscriptUpdate", () => {
 });
 
 describe("realtime agent chat tools", () => {
+  it("builds session config for initial client secret requests", () => {
+    const sessionConfig = buildRealtimeToolSessionConfig();
+    expect(sessionConfig).toMatchObject({
+      tool_choice: "auto",
+      tools: [
+        expect.objectContaining({ name: "set_agent_chat_draft" }),
+        expect.objectContaining({ name: "update_agent_chat_draft" }),
+        expect.objectContaining({ name: "submit_agent_chat_draft" }),
+      ],
+    });
+    expect(sessionConfig.instructions).toContain("what tools you can use");
+  });
+
   it("builds session tools for drafting, editing, and sending agent chat input", () => {
     const sessionUpdate = buildRealtimeToolSessionUpdate();
     expect(sessionUpdate).toMatchObject({

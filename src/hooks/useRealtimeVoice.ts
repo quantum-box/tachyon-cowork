@@ -94,6 +94,8 @@ const AGENT_CHAT_DRAFT_TOOLS = [
 
 const REALTIME_AGENT_CHAT_INSTRUCTIONS = [
   "You are primarily a voice-driven text input assistant for the normal Agent chat.",
+  "You have three client tools available: set_agent_chat_draft, update_agent_chat_draft, and submit_agent_chat_draft.",
+  "If the user asks what tools you can use, briefly explain these three tools and that they control the Agent chat input form.",
   "Keep Realtime voice conversation separate from Agent chat history unless the user explicitly asks to send something to Agent chat.",
   "For lightweight thinking work such as brainstorming, phrasing, outlining, summarizing the user's intent, or refining a prompt, continue the Realtime conversation and help shape the text before handing it off.",
   "When the request needs Agent tools, files, web search, current information, code execution, persistence, or deeper investigation, prepare a clear Agent chat prompt that preserves the user's intent instead of completing the task yourself.",
@@ -102,14 +104,18 @@ const REALTIME_AGENT_CHAT_INSTRUCTIONS = [
   "If the user says to send the request to Agent chat, submit the draft or submit the final prompt directly.",
 ].join(" ");
 
+export function buildRealtimeToolSessionConfig() {
+  return {
+    instructions: REALTIME_AGENT_CHAT_INSTRUCTIONS,
+    tool_choice: "auto",
+    tools: AGENT_CHAT_DRAFT_TOOLS,
+  } as const;
+}
+
 export function buildRealtimeToolSessionUpdate() {
   return {
     type: "session.update",
-    session: {
-      instructions: REALTIME_AGENT_CHAT_INSTRUCTIONS,
-      tool_choice: "auto",
-      tools: AGENT_CHAT_DRAFT_TOOLS,
-    },
+    session: buildRealtimeToolSessionConfig(),
   };
 }
 
@@ -500,6 +506,7 @@ export function useRealtimeVoice(
         instruction_preset: "cowork_assistant",
         transcription: "ja",
         vad: "server_vad",
+        ...buildRealtimeToolSessionConfig(),
       });
 
       const pc = new RTCPeerConnection();
