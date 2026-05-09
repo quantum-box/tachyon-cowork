@@ -71,6 +71,7 @@ describe("realtime agent chat tools", () => {
       tool_choice: "auto",
       tools: [
         expect.objectContaining({ name: "read_agent_chat_context" }),
+        expect.objectContaining({ name: "stop_realtime_voice" }),
         expect.objectContaining({ name: "set_agent_chat_draft" }),
         expect.objectContaining({ name: "update_agent_chat_draft" }),
         expect.objectContaining({ name: "submit_agent_chat_draft" }),
@@ -97,6 +98,7 @@ describe("realtime agent chat tools", () => {
         tool_choice: "auto",
         tools: [
           expect.objectContaining({ name: "read_agent_chat_context" }),
+          expect.objectContaining({ name: "stop_realtime_voice" }),
           expect.objectContaining({ name: "set_agent_chat_draft" }),
           expect.objectContaining({ name: "update_agent_chat_draft" }),
           expect.objectContaining({ name: "submit_agent_chat_draft" }),

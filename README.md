@@ -1,6 +1,6 @@
 # Tachyon Cowork
 
-Tachyon Cowork は、Tauri + React で作られたデスクトップ向けの AI アシスタントです。チャット、ファイル操作、MCP ツール、成果物生成を 1 つの画面にまとめつつ、作業ディレクトリごとの文脈を切り替えながら仕事を進められます。
+Tachyon Cowork は、Tauri + React で作られたデスクトップ向けの AI アシスタントです。チャット、ファイル操作、MCP ツール、成果物生成を 1 つの画面にまとめつつ、Workspace ごとの文脈を切り替えながら仕事を進められます。
 
 ## できること
 
@@ -14,8 +14,8 @@ Tachyon Cowork は、Tauri + React で作られたデスクトップ向けの AI
   - AI が生成したコードや文書をアプリ内で確認し、そのまま保存できる
 - MCP 連携
   - Built-in app や外部 MCP サーバーのツールを会話から呼び出せる
-- 作業ディレクトリ切り替え
-  - 顧客別、案件別、テーマ別に作業フォルダを切り替え、文脈を分離できる
+- Workspace
+  - 顧客別、案件別、テーマ別に会話と指示を分け、PC ではローカルフォルダも紐づけられる
 
 ## 技術スタック
 
@@ -217,36 +217,40 @@ sudo dpkg -i tachyon-cowork_*.deb
 - **送信キー**: Cmd+Enter / Ctrl+Enter の選択
 - **MCP サーバー**: 外部 MCP サーバーの追加・管理
 
-## 作業ディレクトリ機能
+## Workspace
 
-このアプリでは、会話とファイル操作の前提を「作業ディレクトリ」単位で持てます。
+このアプリでは、会話、指示、成果物を `Workspace` 単位で持てます。PC では Workspace にローカルフォルダを紐づけると、ファイル操作や `AGENTS.md` 同期が便利になります。
 
 ### 何がうれしいか
 
-- 案件ごとに参照するファイル範囲を切り替えられる
-- `AGENTS.md` で workspace ごとの custom instructions を持てる
+- 案件ごとに会話と指示を分けられる
+- PC では Workspace にローカルフォルダを紐づけられる
+- `AGENTS.md` で Workspace ごとの custom instructions を持てる
 - 将来の agent 資産を `.agent/` 配下にまとめられる
-- 作業ディレクトリごとのチャット履歴を追いやすい
+- Workspace ごとのチャット履歴を追いやすい
 
 ### 初回の流れ
 
-1. アプリから作業ディレクトリを開く
+1. アプリから Workspace を作る
 2. 必要なら設定画面で Global Custom Instructions を書く
 3. Workspace ごとの指示は `AGENTS.md` と同期して保存する
-4. そのまま新しいチャットを始める
+4. PC では必要に応じてこのPCのフォルダを紐づける
+5. そのまま新しいチャットを始める
 
 ### Workspace の agent 関連ファイル
 
-workspace では、agent 向けの情報を次のように扱います。
+PC で Linked Folder を紐づけた Workspace では、agent 向けの情報を次のように扱います。
 
 ```text
 AGENTS.md
 .agent/
 ```
 
-- `AGENTS.md` — その workspace 固有の custom instructions
+- `AGENTS.md` — その Workspace 固有の custom instructions
 - `.agent/` — 将来の skills / prompts / templates など agent 資産置き場
-- 生成ファイルや通常のドキュメントは `.agent/` ではなく、通常の workspace 配下に置く
+- 生成ファイルや通常のドキュメントは `.agent/` ではなく、通常の Workspace 配下に置く
+
+Workspace IA の詳しい方針は [docs/workspace-ia.md](docs/workspace-ia.md) を参照してください。
 
 ## `projects/` ディレクトリ
 
@@ -304,7 +308,8 @@ xattr -cr /Applications/Tachyon\ Cowork.app
 
 ## 関連ドキュメント
 
-- [docs/project-workspace-guide.md](docs/project-workspace-guide.md) — Project workspace 運用ガイド
+- [docs/workspace-ia.md](docs/workspace-ia.md) — Workspace / Linked Folder の IA 方針
+- [docs/project-workspace-guide.md](docs/project-workspace-guide.md) — リポジトリ内の project workspace 運用ガイド
 - [docs/手動動作確認ガイド.md](docs/手動動作確認ガイド.md) — 手動 QA テスト手順
 - [docs/business-usecases.md](docs/business-usecases.md) — ビジネスユースケース
 - [docs/tauri-webdriver.md](docs/tauri-webdriver.md) — WebDriver 自動テスト

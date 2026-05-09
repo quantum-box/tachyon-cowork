@@ -305,11 +305,11 @@ export function SettingsPage({
                   {apiBaseUrl || "-"}
                 </span>
               </div>
-              <div className="flex items-center justify-between">
+              <div className="flex items-start justify-between gap-4">
                 <span className="text-stone-500 dark:text-stone-400">
                   テナントID
                 </span>
-                <span className="max-w-[200px] truncate text-xs font-mono text-stone-700 dark:text-stone-300">
+                <span className="max-w-[320px] break-all text-right text-xs font-mono text-stone-700 dark:text-stone-300">
                   {tenantId || "-"}
                 </span>
               </div>
