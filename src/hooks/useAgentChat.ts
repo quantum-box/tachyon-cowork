@@ -958,6 +958,7 @@ export function useAgentChat(
       task: string,
       newRoomTitle?: string,
       attachments?: InlineAttachment[],
+      modelOverride?: string,
     ) => {
       if (!client) return;
       setIsLoading(true);
@@ -1198,7 +1199,7 @@ export function useAgentChat(
           );
           const args: AgentExecuteRequest = {
             task,
-            model: selectedModel,
+            model: modelOverride ?? selectedModel,
             max_requests: maxRequests,
             use_json_tool_calls: true,
             ...(customInstructions && {
@@ -1273,6 +1274,7 @@ export function useAgentChat(
       message: string,
       attachments?: InlineAttachment[],
       taskOverride?: string,
+      modelOverride?: string,
     ) => {
       const trimmed = message.trim();
       const hasAttachments = attachments && attachments.length > 0;
@@ -1296,7 +1298,7 @@ export function useAgentChat(
         (taskOverride ?? trimmed) || "この画像について説明してください";
       lastMessageRef.current = { message, task: taskText, attachments };
       // Backend requires a non-empty task; use default for image-only sends
-      await startTask(taskText, undefined, attachments);
+      await startTask(taskText, undefined, attachments, modelOverride);
     },
     [isLoading, startTask],
   );

@@ -375,9 +375,13 @@ export default function App() {
   } = chat;
 
   const agentChatDraftRef = useRef(chatInput);
+  const selectedModelRef = useRef(selectedModel);
   useEffect(() => {
     agentChatDraftRef.current = chatInput;
   }, [chatInput]);
+  useEffect(() => {
+    selectedModelRef.current = selectedModel;
+  }, [selectedModel]);
 
   const setAgentChatDraftFromRealtime = useCallback(
     (text: string) => {
@@ -393,7 +397,7 @@ export default function App() {
       if (!message) return;
       agentChatDraftRef.current = "";
       setChatInput("");
-      void sendMessage(message);
+      void sendMessage(message, undefined, undefined, selectedModelRef.current);
     },
     [sendMessage, setChatInput],
   );
@@ -507,8 +511,8 @@ export default function App() {
       activateProject: async (path) => {
         await activateProject(path);
       },
-      sendMessage: async (message, taskOverride) => {
-        await sendMessage(message, undefined, taskOverride);
+      sendMessage: async (message, taskOverride, modelOverride) => {
+        await sendMessage(message, undefined, taskOverride, modelOverride);
       },
       appendRealtimeVoiceTranscript: (message) => {
         appendRealtimeTranscript(message);

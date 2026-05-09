@@ -100,6 +100,28 @@ describe("useAgentChat tool flow", () => {
     );
   });
 
+  it("uses an explicit model override when sending a message", async () => {
+    const client = buildClient([]);
+
+    const { result } = renderHook(() => useAgentChat(client));
+
+    await act(async () => {
+      await result.current.sendMessage(
+        "Use selected realtime handoff model",
+        undefined,
+        undefined,
+        "openai/gpt-5.4",
+      );
+    });
+
+    expect(client.executeAgent).toHaveBeenCalledWith(
+      "session-1",
+      expect.objectContaining({
+        model: "openai/gpt-5.4",
+      }),
+    );
+  });
+
   it("executes a streamed client tool call and submits the tool result", async () => {
     vi.mocked(executeClientTool).mockResolvedValue({
       tool_id: "tool-1",

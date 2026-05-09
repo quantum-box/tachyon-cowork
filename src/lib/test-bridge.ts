@@ -27,7 +27,11 @@ export type TachyonTestBridge = {
   getState: () => TachyonTestBridgeState;
   setAuth: (auth: AuthState | null) => void;
   activateProject: (path: string) => Promise<void>;
-  sendMessage: (message: string, taskOverride?: string) => Promise<void>;
+  sendMessage: (
+    message: string,
+    taskOverride?: string,
+    modelOverride?: string,
+  ) => Promise<void>;
   appendRealtimeVoiceTranscript: (message: RealtimeTranscriptMessage) => void;
   newChat: () => void;
   setSelectedModel: (modelId: string) => void;
