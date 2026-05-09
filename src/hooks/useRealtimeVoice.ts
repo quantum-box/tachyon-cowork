@@ -87,8 +87,10 @@ export function playRealtimeCue(kind: "start" | "stop" | "error" | "thinking") {
       oscillator.stop(audioContext.currentTime + tone.offset + tone.duration);
     }
 
+    const peakGain =
+      kind === "start" ? 0.3 : kind === "thinking" ? 0.055 : 0.04;
     gain.gain.exponentialRampToValueAtTime(
-      kind === "thinking" ? 0.055 : 0.04,
+      peakGain,
       audioContext.currentTime + 0.015,
     );
     gain.gain.exponentialRampToValueAtTime(
