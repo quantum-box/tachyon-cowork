@@ -471,21 +471,17 @@ export default function App() {
   ]);
 
   useEffect(() => {
-    if (!realtimeVoiceEnabled) return;
     if (!isChatLoading) return;
 
-    const startTimer = window.setTimeout(() => {
-      playRealtimeCue("thinking");
-    }, 1200);
+    playRealtimeCue("thinking");
     const interval = window.setInterval(() => {
       playRealtimeCue("thinking");
-    }, 5200);
+    }, 3600);
 
     return () => {
-      window.clearTimeout(startTimer);
       window.clearInterval(interval);
     };
-  }, [isChatLoading, realtimeVoiceEnabled]);
+  }, [isChatLoading]);
 
   useEffect(() => {
     const currentError = chatError?.message ?? null;

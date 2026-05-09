@@ -45,6 +45,9 @@ export function playRealtimeCue(kind: "start" | "stop" | "error" | "thinking") {
 
   try {
     const audioContext = new AudioContextConstructor();
+    if (audioContext.state === "suspended") {
+      void audioContext.resume().catch(() => undefined);
+    }
     const gain = audioContext.createGain();
     gain.gain.setValueAtTime(0.0001, audioContext.currentTime);
     gain.connect(audioContext.destination);
