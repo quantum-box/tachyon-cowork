@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiRequestError, type AgentChatClient } from "../lib/api-client";
 import type {
+  AgentChunk,
   RealtimeTranscriptMessage,
   RealtimeTranscriptRole,
 } from "../lib/types";
@@ -10,6 +11,7 @@ export type RealtimeVoiceStatus = "idle" | "connecting" | "connected";
 type RealtimeVoiceOptions = {
   onTranscript?: (message: RealtimeTranscriptMessage) => void;
   getAgentChatDraft?: () => string;
+  getAgentChatContext?: () => string;
   onSetAgentChatDraft?: (text: string) => void;
   onSubmitAgentChatDraft?: (text: string) => Promise<void> | void;
 };
@@ -30,7 +32,8 @@ const REALTIME_CALL_URL = "https://api.openai.com/v1/realtime/calls";
 type RealtimeToolName =
   | "set_agent_chat_draft"
   | "update_agent_chat_draft"
-  | "submit_agent_chat_draft";
+  | "submit_agent_chat_draft"
+  | "read_agent_chat_context";
 
 type RealtimeToolCall = {
   callId: string;
@@ -39,6 +42,17 @@ type RealtimeToolCall = {
 };
 
 const AGENT_CHAT_DRAFT_TOOLS = [
+  {
+    type: "function",
+    name: "read_agent_chat_context",
+    description:
+      "Read a compact summary of the current normal Agent chat conversation, including recent user requests, assistant answers, tool results, and errors. Use this after an Agent chat turn completes or when the user asks about what the Agent said.",
+    parameters: {
+      type: "object",
+      properties: {},
+      additionalProperties: false,
+    },
+  },
   {
     type: "function",
     name: "set_agent_chat_draft",
@@ -95,9 +109,10 @@ const AGENT_CHAT_DRAFT_TOOLS = [
 const REALTIME_AGENT_CHAT_INSTRUCTIONS = [
   "You are primarily a voice-driven text input assistant for the normal Agent chat.",
   "Always speak, transcribe, draft, revise, and submit in Japanese. Do not switch languages unless the user explicitly asks for translation or non-Japanese output.",
-  "You have three client tools available: set_agent_chat_draft, update_agent_chat_draft, and submit_agent_chat_draft.",
-  "If the user asks what tools you can use, briefly explain these three tools and that they control the Agent chat input form.",
+  "You have four client tools available: read_agent_chat_context, set_agent_chat_draft, update_agent_chat_draft, and submit_agent_chat_draft.",
+  "If the user asks what tools you can use, briefly explain these four tools: one reads the current Agent chat context and three control the Agent chat input form.",
   "Keep Realtime voice conversation separate from Agent chat history unless the user explicitly asks to send something to Agent chat.",
+  "When resuming after Agent chat work, use the provided Agent chat context or call read_agent_chat_context before explaining the result to the user.",
   "When you draft, revise, or submit text to Agent chat, write it in Japanese unless the user explicitly asks for translation or a different language.",
   "For lightweight thinking work such as brainstorming, phrasing, outlining, summarizing the user's intent, or refining a prompt, continue the Realtime conversation and help shape the text before handing it off.",
   "When the request needs Agent tools, files, web search, current information, code execution, persistence, or deeper investigation, prepare a clear Agent chat prompt that preserves the user's intent instead of completing the task yourself.",
@@ -106,18 +121,66 @@ const REALTIME_AGENT_CHAT_INSTRUCTIONS = [
   "If the user says to send the request to Agent chat, submit the draft or submit the final prompt directly.",
 ].join(" ");
 
-export function buildRealtimeToolSessionConfig() {
+function getAgentChunkText(chunk: AgentChunk): string {
+  return (
+    chunk.text ??
+    chunk.result ??
+    chunk.tool_result ??
+    chunk.content ??
+    chunk.thinking ??
+    ""
+  ).trim();
+}
+
+function getAgentChunkLabel(chunk: AgentChunk): string | null {
+  if (chunk.type === "user") return "User";
+  if (
+    chunk.type === "assistant" ||
+    chunk.type === "say" ||
+    chunk.type === "attempt_completion" ||
+    chunk.type === "completion"
+  ) {
+    return "Agent";
+  }
+  if (chunk.type === "tool_result")
+    return `Tool result${chunk.tool_name ? ` (${chunk.tool_name})` : ""}`;
+  if (chunk.type === "tool_call")
+    return `Tool call${chunk.tool_name ? ` (${chunk.tool_name})` : ""}`;
+  if (chunk.type === "error") return "Error";
+  return null;
+}
+
+export function buildRealtimeAgentChatContext(chunks: AgentChunk[]): string {
+  const lines = chunks
+    .map((chunk) => {
+      const label = getAgentChunkLabel(chunk);
+      const text = getAgentChunkText(chunk);
+      if (!label || !text) return null;
+      return `${label}: ${text.replace(/\s+/g, " ").slice(0, 900)}`;
+    })
+    .filter((line): line is string => Boolean(line))
+    .slice(-10);
+
+  return lines.length > 0
+    ? lines.join("\n")
+    : "Agentチャットにはまだ参照できる内容がありません。";
+}
+
+export function buildRealtimeToolSessionConfig(agentChatContext?: string) {
+  const trimmedContext = agentChatContext?.trim();
   return {
-    instructions: REALTIME_AGENT_CHAT_INSTRUCTIONS,
+    instructions: trimmedContext
+      ? `${REALTIME_AGENT_CHAT_INSTRUCTIONS}\n\nCurrent Agent chat context for this Realtime session:\n${trimmedContext.slice(0, 6000)}`
+      : REALTIME_AGENT_CHAT_INSTRUCTIONS,
     tool_choice: "auto",
     tools: AGENT_CHAT_DRAFT_TOOLS,
   } as const;
 }
 
-export function buildRealtimeToolSessionUpdate() {
+export function buildRealtimeToolSessionUpdate(agentChatContext?: string) {
   return {
     type: "session.update",
-    session: buildRealtimeToolSessionConfig(),
+    session: buildRealtimeToolSessionConfig(agentChatContext),
   };
 }
 
@@ -145,7 +208,8 @@ function isRealtimeToolName(value: unknown): value is RealtimeToolName {
   return (
     value === "set_agent_chat_draft" ||
     value === "update_agent_chat_draft" ||
-    value === "submit_agent_chat_draft"
+    value === "submit_agent_chat_draft" ||
+    value === "read_agent_chat_context"
   );
 }
 
@@ -243,7 +307,9 @@ export function extractRealtimeTranscriptUpdate(
   }
 }
 
-export function extractRealtimeToolCall(event: unknown): RealtimeToolCall | null {
+export function extractRealtimeToolCall(
+  event: unknown,
+): RealtimeToolCall | null {
   if (!isRecord(event)) return null;
   const type = readString(event.type);
 
@@ -376,24 +442,21 @@ export function useRealtimeVoice(
     setStatus("idle");
   }, []);
 
-  const appendTranscript = useCallback(
-    (message: RealtimeTranscriptMessage) => {
-      if (!message.text.trim()) return;
+  const appendTranscript = useCallback((message: RealtimeTranscriptMessage) => {
+    if (!message.text.trim()) return;
 
-      setTranscripts((prev) => {
-        const existingIndex = prev.findIndex((item) => item.id === message.id);
-        if (existingIndex === -1) {
-          return [...prev, message];
-        }
+    setTranscripts((prev) => {
+      const existingIndex = prev.findIndex((item) => item.id === message.id);
+      if (existingIndex === -1) {
+        return [...prev, message];
+      }
 
-        const next = [...prev];
-        next[existingIndex] = message;
-        return next;
-      });
-      optionsRef.current.onTranscript?.(message);
-    },
-    [],
-  );
+      const next = [...prev];
+      next[existingIndex] = message;
+      return next;
+    });
+    optionsRef.current.onTranscript?.(message);
+  }, []);
 
   const handleRealtimeToolCall = useCallback(
     async (toolCall: RealtimeToolCall) => {
@@ -406,7 +469,14 @@ export function useRealtimeVoice(
         const args = isRecord(parsedArgs) ? parsedArgs : {};
         const textArg = readString(args.text);
 
-        if (
+        if (toolCall.name === "read_agent_chat_context") {
+          output = {
+            ok: true,
+            context:
+              optionsRef.current.getAgentChatContext?.() ??
+              "Agentチャットにはまだ参照できる内容がありません。",
+          };
+        } else if (
           toolCall.name === "set_agent_chat_draft" ||
           toolCall.name === "update_agent_chat_draft"
         ) {
@@ -417,8 +487,11 @@ export function useRealtimeVoice(
             output = { ok: true, draft: textArg };
           }
         } else {
-          const draft = (textArg ?? optionsRef.current.getAgentChatDraft?.() ?? "")
-            .trim();
+          const draft = (
+            textArg ??
+            optionsRef.current.getAgentChatDraft?.() ??
+            ""
+          ).trim();
           if (!draft) {
             output = { ok: false, error: "agent chat draft is empty" };
           } else if (!optionsRef.current.onSubmitAgentChatDraft) {
@@ -453,38 +526,41 @@ export function useRealtimeVoice(
     [],
   );
 
-  const handleRealtimeEvent = useCallback((rawData: unknown) => {
-    let parsed: unknown = rawData;
-    if (typeof rawData === "string") {
-      try {
-        parsed = JSON.parse(rawData) as unknown;
-      } catch {
+  const handleRealtimeEvent = useCallback(
+    (rawData: unknown) => {
+      let parsed: unknown = rawData;
+      if (typeof rawData === "string") {
+        try {
+          parsed = JSON.parse(rawData) as unknown;
+        } catch {
+          return;
+        }
+      }
+
+      const toolCall = extractRealtimeToolCall(parsed);
+      if (toolCall) {
+        void handleRealtimeToolCall(toolCall);
         return;
       }
-    }
 
-    const toolCall = extractRealtimeToolCall(parsed);
-    if (toolCall) {
-      void handleRealtimeToolCall(toolCall);
-      return;
-    }
+      const update = extractRealtimeTranscriptUpdate(parsed);
+      if (!update) return;
 
-    const update = extractRealtimeTranscriptUpdate(parsed);
-    if (!update) return;
+      const current = transcriptTextByIdRef.current.get(update.id) ?? "";
+      const text =
+        update.mode === "append" ? `${current}${update.text}` : update.text;
+      if (!text.trim()) return;
 
-    const current = transcriptTextByIdRef.current.get(update.id) ?? "";
-    const text =
-      update.mode === "append" ? `${current}${update.text}` : update.text;
-    if (!text.trim()) return;
-
-    transcriptTextByIdRef.current.set(update.id, text);
-    appendTranscript({
-      role: update.role,
-      id: update.id,
-      text,
-      isFinal: update.isFinal,
-    });
-  }, [appendTranscript, handleRealtimeToolCall]);
+      transcriptTextByIdRef.current.set(update.id, text);
+      appendTranscript({
+        role: update.role,
+        id: update.id,
+        text,
+        isFinal: update.isFinal,
+      });
+    },
+    [appendTranscript, handleRealtimeToolCall],
+  );
 
   const start = useCallback(async () => {
     if (!client) {
@@ -503,12 +579,13 @@ export function useRealtimeVoice(
         throw new Error("media devices are not available");
       }
 
+      const agentChatContext = optionsRef.current.getAgentChatContext?.();
       const secret = await client.issueRealtimeClientSecret({
         voice: "marin",
         instruction_preset: "cowork_assistant",
         transcription: "ja",
         vad: "server_vad",
-        ...buildRealtimeToolSessionConfig(),
+        ...buildRealtimeToolSessionConfig(agentChatContext),
       });
 
       const pc = new RTCPeerConnection();
@@ -555,7 +632,9 @@ export function useRealtimeVoice(
       const dataChannel = pc.createDataChannel("oai-events");
       dataChannelRef.current = dataChannel;
       dataChannel.onopen = () => {
-        dataChannel.send(JSON.stringify(buildRealtimeToolSessionUpdate()));
+        dataChannel.send(
+          JSON.stringify(buildRealtimeToolSessionUpdate(agentChatContext)),
+        );
       };
       dataChannel.onerror = () => {
         setError("音声会話の接続でエラーが発生しました。再接続してください。");

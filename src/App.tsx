@@ -40,7 +40,10 @@ import { useProjectState } from "./hooks/useProjectState";
 import { useProjectContext } from "./hooks/useProjectContext";
 import { useGlobalCustomInstructions } from "./hooks/useGlobalCustomInstructions";
 import { useMaxRequests } from "./hooks/useMaxRequests";
-import { useRealtimeVoice } from "./hooks/useRealtimeVoice";
+import {
+  buildRealtimeAgentChatContext,
+  useRealtimeVoice,
+} from "./hooks/useRealtimeVoice";
 import { Sidebar } from "./components/layout/Sidebar";
 import { ChatPanel } from "./components/chat/ChatPanel";
 import { ArtifactPanel } from "./components/artifact/ArtifactPanel";
@@ -376,12 +379,16 @@ export default function App() {
 
   const agentChatDraftRef = useRef(chatInput);
   const selectedModelRef = useRef(selectedModel);
+  const agentChunksRef = useRef(chunks);
   useEffect(() => {
     agentChatDraftRef.current = chatInput;
   }, [chatInput]);
   useEffect(() => {
     selectedModelRef.current = selectedModel;
   }, [selectedModel]);
+  useEffect(() => {
+    agentChunksRef.current = chunks;
+  }, [chunks]);
   const realtimePausedForAgentRef = useRef(false);
   const realtimeControlRef = useRef<{
     status: "idle" | "connecting" | "connected";
@@ -424,6 +431,8 @@ export default function App() {
 
   const realtimeVoice = useRealtimeVoice(client, {
     getAgentChatDraft: () => agentChatDraftRef.current,
+    getAgentChatContext: () =>
+      buildRealtimeAgentChatContext(agentChunksRef.current),
     onSetAgentChatDraft: setAgentChatDraftFromRealtime,
     onSubmitAgentChatDraft: submitAgentChatDraftFromRealtime,
   });
@@ -1106,7 +1115,6 @@ export default function App() {
           />
         )}
       </div>
-
     </div>
   );
 }

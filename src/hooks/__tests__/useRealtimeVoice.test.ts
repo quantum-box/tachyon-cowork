@@ -1,6 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import {
+  buildRealtimeAgentChatContext,
   buildRealtimeToolSessionConfig,
   buildRealtimeToolSessionUpdate,
   extractRealtimeTranscriptUpdate,
@@ -69,6 +70,7 @@ describe("realtime agent chat tools", () => {
     expect(sessionConfig).toMatchObject({
       tool_choice: "auto",
       tools: [
+        expect.objectContaining({ name: "read_agent_chat_context" }),
         expect.objectContaining({ name: "set_agent_chat_draft" }),
         expect.objectContaining({ name: "update_agent_chat_draft" }),
         expect.objectContaining({ name: "submit_agent_chat_draft" }),
@@ -78,6 +80,15 @@ describe("realtime agent chat tools", () => {
     expect(sessionConfig.instructions).toContain("in Japanese");
   });
 
+  it("includes current agent chat context in realtime session config", () => {
+    const sessionConfig = buildRealtimeToolSessionConfig(
+      "User: 今日の天気を調べて\nAgent: 東京は晴れです",
+    );
+
+    expect(sessionConfig.instructions).toContain("Current Agent chat context");
+    expect(sessionConfig.instructions).toContain("東京は晴れです");
+  });
+
   it("builds session tools for drafting, editing, and sending agent chat input", () => {
     const sessionUpdate = buildRealtimeToolSessionUpdate();
     expect(sessionUpdate).toMatchObject({
@@ -85,13 +96,16 @@ describe("realtime agent chat tools", () => {
       session: {
         tool_choice: "auto",
         tools: [
+          expect.objectContaining({ name: "read_agent_chat_context" }),
           expect.objectContaining({ name: "set_agent_chat_draft" }),
           expect.objectContaining({ name: "update_agent_chat_draft" }),
           expect.objectContaining({ name: "submit_agent_chat_draft" }),
         ],
       },
     });
-    expect(sessionUpdate.session.instructions).toContain("text input assistant");
+    expect(sessionUpdate.session.instructions).toContain(
+      "text input assistant",
+    );
     expect(sessionUpdate.session.instructions).toContain("brainstorming");
     expect(sessionUpdate.session.instructions).toContain("today's weather");
   });
@@ -118,13 +132,13 @@ describe("realtime agent chat tools", () => {
         item: {
           type: "function_call",
           call_id: "call-2",
-          name: "submit_agent_chat_draft",
+          name: "read_agent_chat_context",
           arguments: "{}",
         },
       }),
     ).toEqual({
       callId: "call-2",
-      name: "submit_agent_chat_draft",
+      name: "read_agent_chat_context",
       argumentsJson: "{}",
     });
   });
@@ -149,6 +163,36 @@ describe("realtime agent chat tools", () => {
       name: "update_agent_chat_draft",
       argumentsJson: '{"text":"今日の東京の天気を調べて"}',
     });
+  });
+});
+
+describe("buildRealtimeAgentChatContext", () => {
+  it("builds compact context from recent agent chat chunks", () => {
+    expect(
+      buildRealtimeAgentChatContext([
+        {
+          type: "user",
+          id: "u1",
+          text: "今日の天気を調べて",
+          created_at: "2026-05-09T00:00:00.000Z",
+        },
+        {
+          type: "tool_result",
+          id: "t1",
+          tool_name: "web_search",
+          tool_result: "東京の天気は晴れ",
+          created_at: "2026-05-09T00:00:01.000Z",
+        },
+        {
+          type: "assistant",
+          id: "a1",
+          text: "東京は晴れです。",
+          created_at: "2026-05-09T00:00:02.000Z",
+        },
+      ]),
+    ).toBe(
+      "User: 今日の天気を調べて\nTool result (web_search): 東京の天気は晴れ\nAgent: 東京は晴れです。",
+    );
   });
 });
 
