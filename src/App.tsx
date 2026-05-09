@@ -382,6 +382,25 @@ export default function App() {
   useEffect(() => {
     selectedModelRef.current = selectedModel;
   }, [selectedModel]);
+  const realtimePausedForAgentRef = useRef(false);
+  const realtimeControlRef = useRef<{
+    status: "idle" | "connecting" | "connected";
+    start: () => Promise<void>;
+    stop: () => void;
+  }>({
+    status: "idle",
+    start: async () => undefined,
+    stop: () => undefined,
+  });
+
+  const pauseRealtimeForAgentTurn = useCallback(() => {
+    const realtime = realtimeControlRef.current;
+    if (realtime.status !== "connecting" && realtime.status !== "connected") {
+      return;
+    }
+    realtimePausedForAgentRef.current = true;
+    realtime.stop();
+  }, []);
 
   const setAgentChatDraftFromRealtime = useCallback(
     (text: string) => {
@@ -395,11 +414,12 @@ export default function App() {
     (text: string) => {
       const message = text.trim();
       if (!message) return;
+      pauseRealtimeForAgentTurn();
       agentChatDraftRef.current = "";
       setChatInput("");
       void sendMessage(message, undefined, undefined, selectedModelRef.current);
     },
-    [sendMessage, setChatInput],
+    [pauseRealtimeForAgentTurn, sendMessage, setChatInput],
   );
 
   const realtimeVoice = useRealtimeVoice(client, {
@@ -407,9 +427,58 @@ export default function App() {
     onSetAgentChatDraft: setAgentChatDraftFromRealtime,
     onSubmitAgentChatDraft: submitAgentChatDraftFromRealtime,
   });
+  const realtimeVoiceStatus = realtimeVoice.status;
+  const startRealtimeVoice = realtimeVoice.start;
   const stopRealtimeVoice = realtimeVoice.stop;
   const realtimeTranscripts = realtimeVoice.transcripts;
   const appendRealtimeTranscript = realtimeVoice.appendTranscript;
+
+  useEffect(() => {
+    realtimeControlRef.current = {
+      status: realtimeVoiceStatus,
+      start: startRealtimeVoice,
+      stop: stopRealtimeVoice,
+    };
+  }, [realtimeVoiceStatus, startRealtimeVoice, stopRealtimeVoice]);
+
+  useEffect(() => {
+    if (!realtimeVoiceEnabled) {
+      realtimePausedForAgentRef.current = false;
+      return;
+    }
+    if (isChatLoading || !realtimePausedForAgentRef.current) return;
+
+    realtimePausedForAgentRef.current = false;
+    if (realtimeVoiceStatus === "idle") {
+      void startRealtimeVoice();
+    }
+  }, [
+    isChatLoading,
+    realtimeVoiceStatus,
+    realtimeVoiceEnabled,
+    startRealtimeVoice,
+  ]);
+
+  const sendMessageWithRealtimePause = useCallback(
+    async (
+      message: string,
+      attachments?: Parameters<typeof sendMessage>[1],
+      taskOverride?: Parameters<typeof sendMessage>[2],
+      modelOverride?: Parameters<typeof sendMessage>[3],
+    ) => {
+      pauseRealtimeForAgentTurn();
+      await sendMessage(message, attachments, taskOverride, modelOverride);
+    },
+    [pauseRealtimeForAgentTurn, sendMessage],
+  );
+
+  const chatWithRealtimePause = useMemo(
+    () => ({
+      ...chat,
+      sendMessage: sendMessageWithRealtimePause,
+    }),
+    [chat, sendMessageWithRealtimePause],
+  );
 
   useEffect(() => {
     if (!realtimeVoiceEnabled) {
@@ -886,7 +955,7 @@ export default function App() {
               path="/"
               element={
                 <ChatPanel
-                  chat={chat}
+                  chat={chatWithRealtimePause}
                   files={fileHandler.files}
                   fileError={fileHandler.fileError}
                   onFilesAdd={fileHandler.addFiles}

@@ -130,13 +130,19 @@ export function ChatInput({
   const isVoiceConnected = voiceStatus === "connected";
 
   const handleVoiceClick = useCallback(async () => {
-    if (!realtimeVoice || isDisabled) return;
+    if (!realtimeVoice || isDisabled || isLoading) return;
     if (isVoiceConnected || isVoiceConnecting) {
       realtimeVoice.stop();
       return;
     }
     await realtimeVoice.start();
-  }, [isDisabled, isVoiceConnected, isVoiceConnecting, realtimeVoice]);
+  }, [
+    isDisabled,
+    isLoading,
+    isVoiceConnected,
+    isVoiceConnecting,
+    realtimeVoice,
+  ]);
 
   return (
     <form
@@ -185,7 +191,7 @@ export function ChatInput({
                 <button
                   type="button"
                   onClick={handleVoiceClick}
-                  disabled={isDisabled}
+                  disabled={isDisabled || isLoading}
                   className={[
                     "notion-icon-button min-h-10 min-w-10 shrink-0 rounded-2xl p-2.5 disabled:cursor-not-allowed disabled:opacity-40",
                     isVoiceConnected
