@@ -66,9 +66,9 @@ export function playRealtimeCue(kind: "start" | "stop" | "error" | "thinking") {
         { frequency: 185, offset: 0.13, duration: 0.14 },
       ],
       thinking: [
-        { frequency: 392, offset: 0, duration: 0.06 },
-        { frequency: 494, offset: 0.08, duration: 0.06 },
-        { frequency: 392, offset: 0.18, duration: 0.06 },
+        { frequency: 440, offset: 0, duration: 0.08 },
+        { frequency: 554, offset: 0.1, duration: 0.08 },
+        { frequency: 659, offset: 0.2, duration: 0.1 },
       ],
     } satisfies Record<
       "start" | "stop" | "error" | "thinking",
@@ -88,19 +88,19 @@ export function playRealtimeCue(kind: "start" | "stop" | "error" | "thinking") {
     }
 
     gain.gain.exponentialRampToValueAtTime(
-      kind === "thinking" ? 0.025 : 0.04,
+      kind === "thinking" ? 0.055 : 0.04,
       audioContext.currentTime + 0.015,
     );
     gain.gain.exponentialRampToValueAtTime(
       0.0001,
-      audioContext.currentTime + (kind === "thinking" ? 0.32 : 0.28),
+      audioContext.currentTime + (kind === "thinking" ? 0.42 : 0.28),
     );
 
     window.setTimeout(
       () => {
         void audioContext.close().catch(() => undefined);
       },
-      kind === "thinking" ? 420 : 360,
+      kind === "thinking" ? 520 : 360,
     );
   } catch {
     // Audio feedback is non-critical and may be blocked by the browser.

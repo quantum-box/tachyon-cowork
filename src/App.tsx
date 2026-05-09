@@ -476,7 +476,7 @@ export default function App() {
     playRealtimeCue("thinking");
     const interval = window.setInterval(() => {
       playRealtimeCue("thinking");
-    }, 3600);
+    }, 2800);
 
     return () => {
       window.clearInterval(interval);
