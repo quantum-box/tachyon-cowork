@@ -21,7 +21,8 @@ export type AgentChunk = {
     | "completion"
     | "usage"
     | "tool_job_started"
-    | "artifact";
+    | "artifact"
+    | "error";
   id: string;
   text?: string;
   created_at: string;
@@ -55,6 +56,7 @@ export type AgentChunk = {
   url?: string;
   size_bytes?: number;
   metadata?: Record<string, unknown>;
+  code?: string;
 };
 
 /** Inline attachment sent as base64 with the agent request */

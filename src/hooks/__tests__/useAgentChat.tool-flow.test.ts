@@ -281,6 +281,43 @@ describe("useAgentChat tool flow", () => {
     );
   });
 
+  it("surfaces typed SSE error events as chat errors", async () => {
+    const client = buildClient([]);
+    vi.mocked(client.executeAgent).mockResolvedValueOnce(
+      buildRawSseResponse([
+        `event: error\ndata: ${JSON.stringify({
+          code: "EXECUTION_ERROR",
+          message:
+            "Failed to start agent execution: BadRequest: Model is unavailable.",
+          type: "error",
+        })}\n\n`,
+      ]),
+    );
+
+    const { result } = renderHook(() => useAgentChat(client));
+
+    await act(async () => {
+      await result.current.sendMessage("Send from realtime");
+    });
+
+    expect(result.current.error).toEqual(
+      expect.objectContaining({
+        kind: "server",
+        message:
+          "Failed to start agent execution: BadRequest: Model is unavailable.",
+      }),
+    );
+    expect(result.current.chunks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "error",
+          text: "Failed to start agent execution: BadRequest: Model is unavailable.",
+          code: "EXECUTION_ERROR",
+        }),
+      ]),
+    );
+  });
+
   it("skips malformed continuation events and keeps consuming valid chunks", async () => {
     vi.mocked(executeClientTool).mockResolvedValue({
       tool_id: "tool-1",

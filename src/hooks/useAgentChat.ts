@@ -106,12 +106,15 @@ function toChatError(error: unknown): ChatErrorState {
     normalized.includes("502") ||
     normalized.includes("503") ||
     normalized.includes("504") ||
-    normalized.includes("agent execute failed")
+    normalized.includes("agent execute failed") ||
+    normalized.includes("execution_error") ||
+    normalized.includes("failed to start agent execution")
   ) {
     return {
       kind: "server",
-      message:
-        "Agent API が応答できませんでした。少し待ってから再試行してください。",
+      message: normalized.includes("failed to start agent execution")
+        ? message
+        : "Agent API が応答できませんでした。少し待ってから再試行してください。",
     };
   }
 
@@ -673,6 +676,18 @@ function stringifyToolPayload(value: unknown): string {
 }
 
 function normalizeIncomingChunk(chunk: AgentChunk): AgentChunk {
+  if (chunk.type === "error") {
+    const messageValue = (chunk as AgentChunk & { message?: unknown }).message;
+    const errorMessage =
+      typeof messageValue === "string" ? messageValue : undefined;
+    return {
+      ...chunk,
+      id: chunk.id || `error-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+      created_at: chunk.created_at || new Date().toISOString(),
+      text: chunk.text || errorMessage || "Agent API でエラーが発生しました。",
+    };
+  }
+
   if (chunk.type !== "tool_call_pending" || !chunk.args) {
     return chunk;
   }
@@ -1131,6 +1146,12 @@ export function useAgentChat(
                   setError(toChatError(new Error(msg)));
                   continue;
                 }
+                if (parsed.type === "error") {
+                  const normalized = normalizeIncomingChunk(parsed);
+                  setError(toChatError(new Error(normalized.text)));
+                  setChunks((prev) => upsertChunk(prev, normalized));
+                  continue;
+                }
                 await processIncomingChunk(parsed);
               } catch (error) {
                 if (error instanceof SyntaxError) {
@@ -1151,6 +1172,12 @@ export function useAgentChat(
             const parsed = JSON.parse(finalData) as AgentChunk & {
               args?: Record<string, unknown>;
             };
+            if (parsed.type === "error") {
+              const normalized = normalizeIncomingChunk(parsed);
+              setError(toChatError(new Error(normalized.text)));
+              setChunks((prev) => upsertChunk(prev, normalized));
+              return;
+            }
             await processIncomingChunk(parsed);
           } catch (error) {
             if (error instanceof SyntaxError) {

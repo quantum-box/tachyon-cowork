@@ -17,6 +17,7 @@ import {
   Check,
   RefreshCw,
   PanelRightOpen,
+  AlertCircle,
 } from "lucide-react";
 import type { AgentChunk, Artifact } from "../../lib/types";
 import {
@@ -100,6 +101,8 @@ export function MessageBubble({
       );
     case "artifact":
       return <ArtifactMessage chunk={chunk} onOpenArtifact={onOpenArtifact} />;
+    case "error":
+      return <ErrorMessage text={chunk.text || "エラーが発生しました。"} />;
     case "ask":
       return (
         <div className="flex justify-start mb-3">
@@ -125,6 +128,17 @@ export function MessageBubble({
     default:
       return null;
   }
+}
+
+function ErrorMessage({ text }: { text: string }) {
+  return (
+    <div className="mb-3 flex justify-start">
+      <div className="flex max-w-[80%] items-start gap-2 rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-sm leading-relaxed text-red-800 dark:border-red-900/60 dark:bg-red-950/25 dark:text-red-300">
+        <AlertCircle size={15} className="mt-0.5 shrink-0" />
+        <span className="whitespace-pre-wrap">{text}</span>
+      </div>
+    </div>
+  );
 }
 
 function UserMessage({
