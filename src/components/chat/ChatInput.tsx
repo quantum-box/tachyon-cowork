@@ -147,7 +147,7 @@ export function ChatInput({
   return (
     <form
       onSubmit={onSubmit}
-      className="sticky bottom-0 z-20 bg-transparent px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-1.5 transition-colors duration-150 backdrop-blur-none dark:bg-transparent sm:bg-white/95 sm:px-3 sm:pb-[calc(env(safe-area-inset-bottom)+0.625rem)] sm:pt-2 sm:backdrop-blur-md sm:dark:bg-slate-900/95"
+      className="sticky bottom-0 z-20 bg-transparent px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-1.5 transition-colors duration-150 backdrop-blur-none dark:bg-transparent sm:px-3 sm:pb-[calc(env(safe-area-inset-bottom)+0.625rem)] sm:pt-2"
     >
       <div className="mx-auto w-full max-w-none">
         {/* Prompt templates */}
