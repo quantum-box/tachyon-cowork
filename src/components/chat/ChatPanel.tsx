@@ -302,19 +302,19 @@ function RealtimeTranscriptPanel({
   const isActive = voice.status === "connecting" || voice.status === "connected";
   if (!isActive && voice.transcripts.length === 0) return null;
 
-  const recentTranscripts = voice.transcripts.slice(-6);
+  const recentTranscripts = voice.transcripts.slice(-4);
 
   return (
     <section
-      className="mx-2.5 mb-2 rounded-2xl border border-sky-200 bg-sky-50/90 px-3 py-2.5 text-xs text-slate-800 shadow-sm dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-slate-100 sm:mx-3"
+      className="mx-2.5 mb-1.5 rounded-xl border border-sky-200 bg-sky-50/80 px-2.5 py-2 text-[11px] text-slate-800 shadow-sm dark:border-sky-900/50 dark:bg-sky-950/25 dark:text-slate-100 sm:mx-3"
       aria-label="音声会話の文字起こし"
       aria-live="polite"
     >
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 font-semibold text-sky-800 dark:text-sky-200">
-          <Mic size={14} />
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-1.5 font-semibold text-sky-800 dark:text-sky-200">
+          <Mic size={12} />
           <span>音声会話の文字起こし</span>
-          <span className="rounded-full bg-white/70 px-2 py-0.5 text-[10px] font-medium text-sky-700 dark:bg-sky-900/40 dark:text-sky-200">
+          <span className="rounded-full bg-white/70 px-1.5 py-0.5 text-[9px] font-medium text-sky-700 dark:bg-sky-900/40 dark:text-sky-200">
             Agentチャットとは別
           </span>
         </div>
@@ -322,11 +322,11 @@ function RealtimeTranscriptPanel({
           <button
             type="button"
             onClick={voice.clearTranscripts}
-            className="rounded-lg p-1 text-sky-700 transition-colors hover:bg-sky-100 dark:text-sky-200 dark:hover:bg-sky-900/40"
+            className="rounded-md p-0.5 text-sky-700 transition-colors hover:bg-sky-100 dark:text-sky-200 dark:hover:bg-sky-900/40"
             aria-label="音声文字起こしをクリア"
             title="音声文字起こしをクリア"
           >
-            <X size={13} />
+            <X size={12} />
           </button>
         )}
       </div>
@@ -336,16 +336,16 @@ function RealtimeTranscriptPanel({
           音声会話に接続しています...
         </div>
       ) : (
-        <div className="max-h-36 space-y-1.5 overflow-y-auto pr-1">
+        <div className="max-h-24 space-y-1 overflow-y-auto pr-1">
           {recentTranscripts.map((item) => (
             <div
               key={item.id}
-              className="grid grid-cols-[4.5rem_1fr] gap-2 rounded-xl bg-white/75 px-2.5 py-2 dark:bg-slate-950/30"
+              className="flex gap-1.5 rounded-lg bg-white/65 px-2 py-1 dark:bg-slate-950/25"
             >
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">
-                {item.role === "user" ? "Voice" : "Realtime"}
+              <span className="shrink-0 text-[9px] font-semibold uppercase text-sky-700 dark:text-sky-300">
+                {item.role === "user" ? "V" : "RT"}
               </span>
-              <span className="whitespace-pre-wrap leading-5">
+              <span className="min-w-0 whitespace-pre-wrap leading-4">
                 {item.text}
                 {!item.isFinal && (
                   <span className="ml-1 text-sky-500 dark:text-sky-300">
