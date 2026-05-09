@@ -48,7 +48,7 @@ function formatWorkspaceLabel(projectContext: ProjectContext): string {
   const root = projectContext.root_path.replace(/\/+$/, "");
   const workspace = projectContext.workspace_path;
   if (workspace === root) {
-    return "作業ディレクトリ直下";
+    return "このPCのフォルダに連携済み";
   }
   if (workspace.startsWith(`${root}/`)) {
     return workspace.slice(root.length + 1);
@@ -141,7 +141,7 @@ export function ChatPanel({
                 className="titlebar-safe-start min-w-0"
                 data-tauri-drag-region
               >
-                <div className="notion-label mb-1">Workspace</div>
+                <div className="notion-label mb-1">ワークスペース</div>
                 <div className="truncate text-sm font-semibold text-stone-800 dark:text-stone-100">
                   {projectContext?.name ?? "Tachyon Cowork"}
                 </div>
@@ -164,7 +164,7 @@ export function ChatPanel({
               )}
               {isOffline && (
                 <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300">
-                  Offline
+                  オフライン
                 </span>
               )}
             </div>
@@ -184,7 +184,7 @@ export function ChatPanel({
               <div className="font-medium">
                 {isOffline
                   ? "オフラインです。チャット送信は停止しています。"
-                  : (chat.error?.message ?? "Agent API に接続できません。")}
+                  : (chat.error?.message ?? "エージェントAPI に接続できません。")}
               </div>
               <div className="text-[11px] text-amber-700 dark:text-amber-400">
                 オフラインでも `ファイル検索` `整理` `重複検出` `容量分析`
@@ -332,20 +332,20 @@ function RealtimeTranscriptPanel({
   return (
     <section
       className="fixed right-3 top-1/2 z-30 w-[min(320px,calc(100vw-1.5rem))] -translate-y-1/2 rounded-xl border border-slate-400/20 bg-slate-200/20 px-2.5 py-2 text-[11px] text-slate-800 shadow-[0_18px_42px_rgba(15,23,42,0.12)] backdrop-blur-sm dark:border-white/15 dark:bg-slate-950/20 dark:text-slate-100 sm:right-5"
-      aria-label="Realtime"
+      aria-label="リアルタイム音声"
       aria-live="polite"
     >
       <div className="mb-1.5 flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-1.5 font-semibold text-sky-800 dark:text-sky-200">
           <Mic size={12} />
-          <span>Realtime</span>
+          <span>リアルタイム</span>
           <span
             className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold ${statusLabel.className}`}
           >
             {statusLabel.text}
           </span>
           <span className="rounded-full bg-white/20 px-1.5 py-0.5 text-[9px] font-medium text-sky-700 ring-1 ring-sky-100/35 dark:bg-sky-900/15 dark:text-sky-200 dark:ring-sky-700/25">
-            Agentチャットとは別
+            エージェントチャットとは別
           </span>
         </div>
         <div className="flex shrink-0 items-center gap-1">
@@ -354,8 +354,8 @@ function RealtimeTranscriptPanel({
               type="button"
               onClick={voice.stop}
               className="inline-flex items-center gap-1 rounded-lg border border-red-300/55 bg-red-50/30 px-2 py-1 text-[10px] font-semibold text-red-700 transition-colors hover:bg-red-100/45 dark:border-red-900/45 dark:bg-red-950/20 dark:text-red-300 dark:hover:bg-red-950/40"
-              aria-label="Realtimeを停止"
-              title="Realtimeを停止"
+              aria-label="リアルタイム音声を停止"
+              title="リアルタイム音声を停止"
             >
               <MicOff size={11} />
               停止
@@ -366,8 +366,8 @@ function RealtimeTranscriptPanel({
               type="button"
               onClick={voice.clearTranscripts}
               className="rounded-md p-0.5 text-sky-700 transition-colors hover:bg-sky-100/45 dark:text-sky-200 dark:hover:bg-sky-900/30"
-              aria-label="Realtimeをクリア"
-              title="Realtimeをクリア"
+              aria-label="リアルタイム音声をクリア"
+              title="リアルタイム音声をクリア"
             >
               <X size={12} />
             </button>
@@ -382,7 +382,7 @@ function RealtimeTranscriptPanel({
           )}
           {voice.status === "connected"
             ? "話しかけるとここに表示されます"
-            : "マイクとRealtimeを準備しています..."}
+            : "マイクとリアルタイム音声を準備しています..."}
         </div>
       ) : (
         <div className="max-h-28 space-y-1 overflow-y-auto pr-1">

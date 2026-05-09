@@ -125,25 +125,25 @@ function buildClientTools(
   activeProjectPath?: string | null,
 ): ClientToolDefinition[] {
   const projectNote = activeProjectPath
-    ? ` Relative paths are resolved from the current project directory: ${activeProjectPath}. Use the selected project directory directly unless the user specifies another location.`
-    : " No current project directory is selected yet; prompt the user to choose one before filesystem work.";
+    ? ` 相対パスは現在の連携フォルダ ${activeProjectPath} から解決されます。ユーザーが別の場所を指定しない限り、選択中の連携フォルダをそのまま使ってください。`
+    : " 現在の連携フォルダは未選択です。ファイル操作にフォルダが必要で場所が不明な場合は、先にフォルダ選択を促してください。";
 
   return [
     {
       name: "canvas",
       description:
-        "Open a canvas to display and edit a document with live preview. Use this when creating HTML pages, React components, or any visual content the user wants to see rendered.",
+        "ライブプレビュー付きのキャンバスを開き、ドキュメントを表示・編集します。HTMLページ、Reactコンポーネント、その他ユーザーが表示確認したい視覚的な成果物を作るときに使ってください。",
       parameters: {
         type: "object",
         properties: {
           title: {
             type: "string",
-            description: "Document title.",
+            description: "ドキュメントのタイトル。",
           },
           content: {
             type: "string",
             description:
-              "Full document content. For HTML: a complete HTML document. For JSX: a React component with a default export.",
+              "ドキュメント本文全体。HTML の場合は完全な HTML ドキュメント、JSX の場合は default export を持つ React コンポーネントにしてください。",
           },
           content_type: {
             type: "string",
@@ -241,16 +241,16 @@ function buildClientTools(
           language: {
             type: "string",
             enum: ["python", "javascript", "shell"],
-            description: "Programming language to execute.",
+            description: "実行するプログラミング言語。",
           },
           code: {
             type: "string",
-            description: "Source code to execute.",
+            description: "実行するソースコード。",
           },
           timeout_secs: {
             type: "integer",
             description:
-              "Execution timeout in seconds (default: 30, max: 300).",
+              "実行タイムアウト秒数（デフォルト: 30、最大: 300）。",
           },
         },
         required: ["language", "code"],
@@ -260,7 +260,7 @@ function buildClientTools(
     {
       name: "generate_file",
       description:
-        "Generate a document file (PDF, DOCX, or PPTX) using Python libraries in a sandboxed environment. The data object specifies the document content structure. Any output_path must point to a real host path inside the current project; do not use sandbox-only paths like /workspace." +
+        "サンドボックス環境の Python ライブラリを使って、PDF、DOCX、PPTX などのドキュメントファイルを生成します。data オブジェクトで文書構造を指定します。output_path は現在の連携フォルダ内にある実際のホストパスを指定し、/workspace のようなサンドボックス専用パスは使わないでください。" +
         projectNote,
       parameters: {
         type: "object",
@@ -268,17 +268,17 @@ function buildClientTools(
           file_type: {
             type: "string",
             enum: ["pdf", "docx", "pptx"],
-            description: "Type of file to generate.",
+            description: "生成するファイル種別。",
           },
           data: {
             type: "object",
             description:
-              "Document content. Common fields: title (string), content (string), sections (array of {heading, body}). For PPTX: slides (array of {title, content, bullets}). For DOCX: tables (array of {headers, rows}).",
+              "文書内容。共通フィールドは title（文字列）、content（文字列）、sections（{heading, body} の配列）。PPTX は slides（{title, content, bullets} の配列）、DOCX は tables（{headers, rows} の配列）。",
           },
           output_path: {
             type: "string",
             description:
-              "Optional host filesystem path to save the generated file. Relative paths resolve from the current project workspace; never use sandbox-only paths like /workspace.",
+              "生成ファイルの保存先となる任意のホストファイルシステムパス。相対パスは現在の連携フォルダから解決されます。/workspace のようなサンドボックス専用パスは使わないでください。",
           },
         },
         required: ["file_type", "data"],
@@ -288,14 +288,14 @@ function buildClientTools(
     {
       name: "pdf_read",
       description:
-        "Read and extract text content from a PDF file on this device. Returns page-by-page text and metadata (title, author)." +
+        "この端末上の PDF ファイルを読み取り、テキストを抽出します。ページごとのテキストとメタデータ（タイトル、作成者）を返します。" +
         projectNote,
       parameters: {
         type: "object",
         properties: {
           path: {
             type: "string",
-            description: "Absolute path of the PDF file to read.",
+            description: "読み取る PDF ファイルの絶対パス。",
           },
         },
         required: ["path"],
@@ -305,25 +305,25 @@ function buildClientTools(
     {
       name: "docx_read",
       description:
-        "Read and extract content from a Word document (.docx) on this device. Returns paragraphs with styles, tables, and metadata." +
+        "この端末上の Word 文書（.docx）を読み取り、内容を抽出します。スタイル付き段落、表、メタデータを返します。" +
         projectNote,
       parameters: {
         type: "object",
         properties: {
           path: {
             type: "string",
-            description: "Absolute path of the DOCX file to read.",
+            description: "読み取る DOCX ファイルの絶対パス。",
           },
         },
         required: ["path"],
         additionalProperties: false,
       },
     },
-    // ── Host filesystem tools (runs on host OS, restricted to home dir) ──
+    // ホストファイルシステムツール（ホストOS上で実行、ホームディレクトリ内に制限）
     {
       name: "host_read_file",
       description:
-        "Read a file from the host filesystem inside the active project directory. Returns text content or base64-encoded binary. Use this for reading config files, scripts, data files, etc." +
+        "ホストファイルシステム上の現在の連携フォルダ内にあるファイルを読み取ります。テキスト内容または base64 エンコード済みバイナリを返します。設定ファイル、スクリプト、データファイルなどの読み取りに使ってください。" +
         projectNote,
       parameters: {
         type: "object",
@@ -331,7 +331,7 @@ function buildClientTools(
           path: {
             type: "string",
             description:
-              "Absolute path of the file to read (must be within home directory).",
+              "読み取るファイルの絶対パス（ホームディレクトリ内である必要があります）。",
           },
         },
         required: ["path"],
@@ -341,7 +341,7 @@ function buildClientTools(
     {
       name: "host_write_file",
       description:
-        "Write content to a file on the host filesystem inside the active project directory. Use this for saving config files, scripts, data files, etc." +
+        "ホストファイルシステム上の現在の連携フォルダ内にファイルを書き込みます。設定ファイル、スクリプト、データファイルなどの保存に使ってください。" +
         projectNote,
       parameters: {
         type: "object",
@@ -349,16 +349,16 @@ function buildClientTools(
           path: {
             type: "string",
             description:
-              "Absolute path to write the file (must be within home directory).",
+              "書き込むファイルの絶対パス（ホームディレクトリ内である必要があります）。",
           },
           content: {
             type: "string",
             description:
-              "File content as text, or base64-encoded string if is_base64 is true.",
+              "ファイル内容のテキスト。is_base64 が true の場合は base64 エンコード済み文字列。",
           },
           is_base64: {
             type: "boolean",
-            description: "If true, content is base64-encoded binary data.",
+            description: "true の場合、content は base64 エンコード済みバイナリデータです。",
           },
         },
         required: ["path", "content"],
@@ -368,7 +368,7 @@ function buildClientTools(
     {
       name: "host_list_dir",
       description:
-        "List the contents of a directory on the host filesystem inside the active project directory." +
+        "ホストファイルシステム上の現在の連携フォルダ内にあるディレクトリ内容を一覧表示します。" +
         projectNote,
       parameters: {
         type: "object",
@@ -376,11 +376,11 @@ function buildClientTools(
           path: {
             type: "string",
             description:
-              "Absolute path of the directory to list (must be within home directory).",
+              "一覧表示するディレクトリの絶対パス（ホームディレクトリ内である必要があります）。",
           },
           show_hidden: {
             type: "boolean",
-            description: "If true, include hidden files (starting with '.').",
+            description: "true の場合、ドットで始まる隠しファイルも含めます。",
           },
         },
         required: ["path"],
@@ -390,24 +390,24 @@ function buildClientTools(
     {
       name: "host_execute_command",
       description:
-        "Execute a safe, allow-listed command on the host OS. Only specific commands are permitted: ls, stat, file, du, wc, find, which, cat, head, tail, grep, sort, uniq, diff, tar, zip, unzip, date, echo, pwd, basename, dirname, realpath. The default working directory is the active project directory." +
+        "ホストOS上で安全な許可済みコマンドを実行します。許可されるのは ls, stat, file, du, wc, find, which, cat, head, tail, grep, sort, uniq, diff, tar, zip, unzip, date, echo, pwd, basename, dirname, realpath です。デフォルトの作業ディレクトリは現在の連携フォルダです。" +
         projectNote,
       parameters: {
         type: "object",
         properties: {
           command: {
             type: "string",
-            description: "Command name from the allow-list.",
+            description: "許可リスト内のコマンド名。",
           },
           args: {
             type: "array",
             items: { type: "string" },
-            description: "Command arguments.",
+            description: "コマンド引数。",
           },
           working_dir: {
             type: "string",
             description:
-              "Working directory for the command (must be within home directory, defaults to home).",
+              "コマンドの作業ディレクトリ（ホームディレクトリ内である必要があります。未指定時はホーム）。",
           },
         },
         required: ["command"],
@@ -423,24 +423,24 @@ function buildAgentCustomInstructions(
   activeProjectContext?: ProjectContext | null,
 ): string {
   const sections = [
-    "Use available client_tools proactively whenever they can reduce guessing or avoid asking the user for information you can inspect yourself.",
-    "Prefer client_tools for current local and project state: listing directories, searching files, reading files, inspecting metadata, reading PDFs or DOCX files, running safe host commands, and executing sandbox code.",
-    "Before answering questions about the current local environment, project contents, or generated files, inspect them with a relevant client tool whenever possible.",
-    "Do not claim you checked local files, folders, commands, or document contents unless you actually used a client tool to inspect them.",
+    "推測を減らせる場合や、ユーザーに聞かなくても自分で確認できる場合は、利用可能な client_tools を積極的に使ってください。",
+    "現在のローカル環境や連携フォルダの状態確認では、ディレクトリ一覧、ファイル検索、ファイル読み取り、メタデータ確認、PDF/DOCX 読み取り、安全なホストコマンド実行、サンドボックスコード実行などに client_tools を優先してください。",
+    "現在のローカル環境、ワークスペース内容、生成済みファイルについて答える前に、可能な限り関連する client tool で確認してください。",
+    "実際に client tool で確認していないローカルファイル、フォルダ、コマンド、文書内容について、確認済みだと述べないでください。",
     activeProjectPath
-      ? `Current project directory: ${activeProjectPath}`
-      : "No current project directory is selected. If project-relative filesystem work is needed and the path is unclear, ask the user to select a project first.",
+      ? `現在の連携フォルダ: ${activeProjectPath}`
+      : "現在の連携フォルダは未選択です。フォルダ相対のファイル操作が必要で場所が不明な場合は、先にフォルダ選択を促してください。",
     activeProjectPath
-      ? "Work directly in the selected project directory by default. Do not create or prefer a separate scratch workspace unless the user explicitly asks for one."
+      ? "ユーザーが明示しない限り、選択中の連携フォルダで直接作業してください。別の一時作業場所を優先して作らないでください。"
       : null,
     globalCustomInstructions.trim()
-      ? `Global custom instructions:\n${globalCustomInstructions.trim()}`
+      ? `共通指示:\n${globalCustomInstructions.trim()}`
       : null,
     activeProjectContext?.prompt_context?.trim()
-      ? "Workspace custom instructions from AGENTS.md take priority over the global instructions when they conflict."
+      ? "AGENTS.md 由来のワークスペース指示は、矛盾する場合に共通指示より優先されます。"
       : null,
     activeProjectContext?.prompt_context?.trim()
-      ? `Workspace custom instructions from AGENTS.md:\n${activeProjectContext.prompt_context.trim()}`
+      ? `AGENTS.md 由来のワークスペース指示:\n${activeProjectContext.prompt_context.trim()}`
       : null,
   ].filter(Boolean);
 

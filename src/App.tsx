@@ -127,7 +127,6 @@ export default function App() {
   const { maxRequests, setMaxRequests } = useMaxRequests();
   const navigate = useNavigate();
   const location = useLocation();
-  const showTools = location.pathname === "/tools";
   const showWorkFolders = location.pathname.startsWith("/work-folders");
   const showHelp = location.pathname === "/help";
   const showSettings = location.pathname === "/settings";
@@ -674,10 +673,6 @@ export default function App() {
     [addArtifact, openArtifact],
   );
 
-  const handleToggleTools = useCallback(() => {
-    navigate(showTools ? "/" : "/tools");
-  }, [navigate, showTools]);
-
   const openWorkFolderPage = useCallback(
     (path?: string | null) => {
       if (path) {
@@ -896,7 +891,7 @@ export default function App() {
               onBack={() => setOfflineMode(false)}
               backLabel="サインインへ戻る"
               title="ローカルファイルツール"
-              description="オフラインでも使える機能だけを表示しています"
+              description="オフラインでも、選択したフォルダの検索・整理・重複検出・容量分析を使えます"
             />
           </div>
         </div>
@@ -958,8 +953,6 @@ export default function App() {
           }}
           onDeleteRoom={chat.deleteRoom}
           onTogglePin={chat.togglePin}
-          onToggleTools={supportsDesktopTools ? handleToggleTools : undefined}
-          showTools={showTools}
           showWorkFolders={showWorkFolders}
           showHelp={showHelp}
           showSettings={showSettings}
@@ -1085,6 +1078,7 @@ export default function App() {
                   element={
                     <WorkFolderListPanel
                       onBack={handleBackToChat}
+                      onStartChat={handleStartChatFromWorkFolder}
                       onPickProject={handlePickProject}
                       recentProjects={recentProjects}
                       activeProject={activeProject}

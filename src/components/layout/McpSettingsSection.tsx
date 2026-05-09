@@ -25,7 +25,7 @@ export function McpSettingsSection({ onConfigChanged }: Props) {
   const [loading, setLoading] = useState(false);
   const [expandedApps, setExpandedApps] = useState<Set<string>>(new Set());
 
-  // Form state
+  // フォーム状態
   const [name, setName] = useState("");
   const [transportType, setTransportType] = useState<"stdio" | "sse">("stdio");
   const [command, setCommand] = useState("");
@@ -152,25 +152,25 @@ export function McpSettingsSection({ onConfigChanged }: Props) {
   if (!isTauri()) {
     return (
       <p className="text-xs text-gray-500 dark:text-gray-400">
-        MCP servers are only available in the desktop app.
+        MCP サーバーはデスクトップアプリでのみ利用できます。
       </p>
     );
   }
 
   return (
     <div className="space-y-4">
-      {/* Built-in Apps */}
+      {/* 組み込みアプリ */}
       {builtinApps.length > 0 && (
         <div className="space-y-2">
           <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
             <Package size={12} />
-            Built-in Apps
+            組み込みアプリ
           </div>
 
           {builtinApps.map((app) => (
             <div key={app.id} className="space-y-0">
               <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700">
-                {/* Expand toggle */}
+                {/* 展開切り替え */}
                 <button
                   onClick={() => toggleExpanded(app.id)}
                   className="shrink-0 p-0.5 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
@@ -182,14 +182,14 @@ export function McpSettingsSection({ onConfigChanged }: Props) {
                   )}
                 </button>
 
-                {/* Status dot */}
+                {/* 状態表示 */}
                 <span
                   className={`shrink-0 w-2 h-2 rounded-full ${
                     app.enabled ? "bg-emerald-500" : "bg-gray-400 dark:bg-slate-500"
                   }`}
                 />
 
-                {/* Name + description */}
+                {/* 名前と説明 */}
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
                     {app.name}
@@ -201,12 +201,12 @@ export function McpSettingsSection({ onConfigChanged }: Props) {
                   )}
                 </div>
 
-                {/* Tool count */}
+                {/* ツール数 */}
                 <span className="shrink-0 text-xs text-gray-400 dark:text-gray-500">
-                  {app.tool_count} tools
+                  ツール {app.tool_count} 件
                 </span>
 
-                {/* Toggle */}
+                {/* 切り替え */}
                 <button
                   onClick={() => handleToggleBuiltin(app.id, !app.enabled)}
                   className={`shrink-0 relative w-8 h-[18px] rounded-full transition-colors ${
@@ -221,7 +221,7 @@ export function McpSettingsSection({ onConfigChanged }: Props) {
                 </button>
               </div>
 
-              {/* Expanded tool list */}
+              {/* 展開時のツール一覧 */}
               {expandedApps.has(app.id) &&
                 (() => {
                   const appInfo = builtinAppInfos.find((a) => a.id === app.id);
@@ -251,18 +251,18 @@ export function McpSettingsSection({ onConfigChanged }: Props) {
         </div>
       )}
 
-      {/* External Servers */}
+      {/* 外部サーバー */}
       <div className="space-y-2">
         {builtinApps.length > 0 && (
           <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
             <Globe size={12} />
-            External Servers
+            外部サーバー
           </div>
         )}
 
         {externalServers.length === 0 && !showForm && (
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            No external MCP servers configured.
+            外部 MCP サーバーはまだ設定されていません。
           </p>
         )}
 
@@ -271,7 +271,7 @@ export function McpSettingsSection({ onConfigChanged }: Props) {
             key={s.id}
             className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700"
           >
-            {/* Status dot */}
+            {/* 状態表示 */}
             <span
               className={`shrink-0 w-2 h-2 rounded-full ${
                 s.connected
@@ -282,14 +282,14 @@ export function McpSettingsSection({ onConfigChanged }: Props) {
               }`}
             />
 
-            {/* Name + info */}
+            {/* 名前と情報 */}
             <div className="flex-1 min-w-0">
               <div className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
                 {s.name}
               </div>
               {s.connected && (
                 <div className="text-xs text-gray-500 dark:text-gray-400">
-                  {s.tool_count} tool{s.tool_count !== 1 ? "s" : ""}
+                  ツール {s.tool_count} 件
                 </div>
               )}
               {s.error && (
@@ -297,7 +297,7 @@ export function McpSettingsSection({ onConfigChanged }: Props) {
               )}
             </div>
 
-            {/* Toggle */}
+            {/* 切り替え */}
             <button
               onClick={() => handleToggle(s.id, !s.enabled)}
               className={`shrink-0 relative w-8 h-[18px] rounded-full transition-colors ${
@@ -311,7 +311,7 @@ export function McpSettingsSection({ onConfigChanged }: Props) {
               />
             </button>
 
-            {/* Delete */}
+            {/* 削除 */}
             <button
               onClick={() => handleRemove(s.id)}
               className="shrink-0 p-1 rounded hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-400 hover:text-red-500 transition-colors"
@@ -321,18 +321,18 @@ export function McpSettingsSection({ onConfigChanged }: Props) {
           </div>
         ))}
 
-        {/* Add server form */}
+        {/* サーバー追加フォーム */}
         {showForm ? (
           <div className="space-y-2 px-3 py-3 rounded-lg bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700">
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Server name"
+              placeholder="サーバー名"
               className="w-full text-sm px-2.5 py-1.5 rounded-md border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-gray-900 dark:text-gray-100 outline-none focus:border-indigo-500 transition-colors"
             />
 
-            {/* Transport type selector */}
+            {/* 接続方式の選択 */}
             <div className="flex gap-2">
               <button
                 onClick={() => setTransportType("stdio")}
@@ -364,14 +364,14 @@ export function McpSettingsSection({ onConfigChanged }: Props) {
                   type="text"
                   value={command}
                   onChange={(e) => setCommand(e.target.value)}
-                  placeholder="Command (e.g. npx)"
+                  placeholder="コマンド（例: npx）"
                   className="w-full text-sm px-2.5 py-1.5 rounded-md border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-gray-900 dark:text-gray-100 outline-none focus:border-indigo-500 transition-colors font-mono"
                 />
                 <input
                   type="text"
                   value={args}
                   onChange={(e) => setArgs(e.target.value)}
-                  placeholder="Arguments (space-separated)"
+                  placeholder="引数（スペース区切り）"
                   className="w-full text-sm px-2.5 py-1.5 rounded-md border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-gray-900 dark:text-gray-100 outline-none focus:border-indigo-500 transition-colors font-mono"
                 />
               </>
@@ -380,7 +380,7 @@ export function McpSettingsSection({ onConfigChanged }: Props) {
                 type="text"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                placeholder="Server URL (e.g. http://localhost:3001/mcp)"
+                placeholder="サーバーURL（例: http://localhost:3001/mcp）"
                 className="w-full text-sm px-2.5 py-1.5 rounded-md border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-gray-900 dark:text-gray-100 outline-none focus:border-indigo-500 transition-colors font-mono"
               />
             )}
@@ -391,13 +391,13 @@ export function McpSettingsSection({ onConfigChanged }: Props) {
                 disabled={loading}
                 className="px-3 py-1.5 rounded-md text-xs font-medium bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"
               >
-                {loading ? "Connecting..." : "Add"}
+                {loading ? "接続中..." : "追加"}
               </button>
               <button
                 onClick={resetForm}
                 className="px-3 py-1.5 rounded-md text-xs font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors"
               >
-                Cancel
+                キャンセル
               </button>
             </div>
           </div>
@@ -407,7 +407,7 @@ export function McpSettingsSection({ onConfigChanged }: Props) {
             className="flex items-center gap-1.5 text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors"
           >
             <Plus size={14} />
-            Add MCP Server
+            MCP サーバーを追加
           </button>
         )}
       </div>

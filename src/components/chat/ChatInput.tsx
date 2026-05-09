@@ -147,7 +147,7 @@ export function ChatInput({
   return (
     <form
       onSubmit={onSubmit}
-      className="sticky bottom-0 z-20 bg-white/95 px-2.5 pb-[calc(env(safe-area-inset-bottom)+0.625rem)] pt-2 transition-colors duration-150 backdrop-blur-md dark:bg-slate-900/95 sm:px-3 sm:pb-[calc(env(safe-area-inset-bottom)+0.625rem)]"
+      className="sticky bottom-0 z-20 bg-transparent px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-1.5 transition-colors duration-150 backdrop-blur-none dark:bg-transparent sm:px-3 sm:pb-[calc(env(safe-area-inset-bottom)+0.625rem)] sm:pt-2"
     >
       <div className="mx-auto w-full max-w-none">
         {/* Prompt templates */}
@@ -159,7 +159,7 @@ export function ChatInput({
         {/* File preview chips */}
         <FilePreview files={files} onRemove={onFileRemove} />
 
-        <div className="rounded-[26px] border border-stone-200/85 bg-white/92 p-2 shadow-[0_12px_28px_rgba(15,23,42,0.05)] dark:border-stone-700/80 dark:bg-stone-900/90">
+        <div className="rounded-[24px] border border-stone-200/85 bg-white/92 p-1.5 shadow-[0_12px_28px_rgba(15,23,42,0.05)] dark:border-stone-700/80 dark:bg-stone-900/90 sm:rounded-[26px] sm:p-2">
           <textarea
             ref={textareaRef}
             value={input}
@@ -169,7 +169,7 @@ export function ChatInput({
             placeholder={placeholder ?? "メッセージを入力..."}
             disabled={isDisabled}
             rows={1}
-            className="max-h-[220px] min-h-[52px] w-full resize-none overflow-y-auto rounded-[20px] bg-transparent px-4 py-3 text-[16px] leading-6 text-stone-900 outline-none ring-0 placeholder:text-stone-400 disabled:opacity-50 dark:text-stone-100 dark:placeholder:text-stone-500 sm:min-h-[58px] sm:text-[15px]"
+            className="max-h-[220px] min-h-[44px] w-full resize-none overflow-y-auto rounded-[18px] bg-transparent px-3 py-2.5 text-[16px] leading-6 text-stone-900 outline-none ring-0 placeholder:text-stone-400 disabled:opacity-50 dark:text-stone-100 dark:placeholder:text-stone-500 sm:min-h-[58px] sm:rounded-[20px] sm:px-4 sm:py-3 sm:text-[15px]"
           />
 
           <div className="mt-1 flex items-center justify-between gap-2 px-0.5">
@@ -179,7 +179,7 @@ export function ChatInput({
                 onClick={handlePickFiles}
                 disabled={isLoading || isDisabled}
                 className={[
-                  "notion-icon-button min-h-10 min-w-10 shrink-0 rounded-2xl p-2.5 disabled:cursor-not-allowed disabled:opacity-40",
+                  "notion-icon-button min-h-9 min-w-9 shrink-0 rounded-2xl p-2 disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-10 sm:min-w-10 sm:p-2.5",
                 ].join(" ")}
                 aria-label="ファイルを添付"
                 title="ファイルを添付"
@@ -193,7 +193,7 @@ export function ChatInput({
                   onClick={handleVoiceClick}
                   disabled={isDisabled || isLoading}
                   className={[
-                    "notion-icon-button min-h-10 min-w-10 shrink-0 rounded-2xl p-2.5 disabled:cursor-not-allowed disabled:opacity-40",
+                    "notion-icon-button min-h-9 min-w-9 shrink-0 rounded-2xl p-2 disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-10 sm:min-w-10 sm:p-2.5",
                     isVoiceConnected
                       ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300"
                       : "",
@@ -231,7 +231,7 @@ export function ChatInput({
               <button
                 type="submit"
                 disabled={!hasContent || isLoading || isDisabled}
-                className="notion-button-primary min-h-10 min-w-10 shrink-0 rounded-full p-2.5 disabled:cursor-not-allowed disabled:opacity-40"
+                className="notion-button-primary min-h-9 min-w-9 shrink-0 rounded-full p-2 disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-10 sm:min-w-10 sm:p-2.5"
                 aria-label="送信"
               >
                 <SendHorizonal size={19} />

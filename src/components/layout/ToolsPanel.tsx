@@ -26,7 +26,7 @@ export function ToolsPanel({
   onBack,
   backLabel = "チャットに戻る",
   title = "ファイルツール",
-  description = "ローカルの検索・整理・重複検出・容量分析",
+  description = "連携フォルダまたは選択したフォルダの検索・整理・重複検出・容量分析",
   projectDirectory,
 }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>("search");
@@ -47,7 +47,7 @@ export function ToolsPanel({
             className="titlebar-safe-header titlebar-safe-start"
             data-tauri-drag-region
           >
-            <div className="notion-label mb-1">Tools</div>
+            <div className="notion-label mb-1">ツール</div>
             <h2 className="text-sm font-semibold text-stone-800 dark:text-stone-100">
               {title}
             </h2>

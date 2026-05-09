@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @import "highlight.js/styles/github-dark.css";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --color-primary: #3562d7;
   --color-primary-hover: #274eb2;

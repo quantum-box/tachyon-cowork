@@ -52,12 +52,12 @@ export function WorkFolderPanel({
             className="titlebar-safe-header min-w-0 flex-1"
             data-tauri-drag-region
           >
-            <div className="notion-label mb-1">Workspace</div>
+            <div className="notion-label mb-1">ワークスペース</div>
             <h2 className="truncate text-sm font-semibold text-stone-900 dark:text-stone-100">
-              作業ディレクトリ
+              ワークスペース
             </h2>
             <p className="mt-0.5 text-[11px] text-stone-500 dark:text-stone-400">
-              Workspace のファイルと agent 設定です
+              会話、指示、連携フォルダの設定です
             </p>
           </div>
           <button
@@ -65,7 +65,7 @@ export function WorkFolderPanel({
             onClick={onPickProject}
             className="notion-button relative z-10 shrink-0 px-3 py-1.5 text-xs"
           >
-            別のフォルダを開く
+            フォルダを紐づける
           </button>
         </div>
       </div>
@@ -82,19 +82,19 @@ export function WorkFolderPanel({
                   {activeProject?.name ?? "未選択"}
                 </div>
                 <div className="mt-1 break-all text-xs text-stone-500 dark:text-stone-400">
-                  {activeProject?.path ?? "作業ディレクトリを選択してください"}
+                  {activeProject?.path ?? "フォルダ未連携"}
                 </div>
                 <div className="mt-3 space-y-2 text-xs text-stone-500 dark:text-stone-400">
                   <div>
                     {projectContext?.workspace_path
-                      ? "この Workspace を基準に会話とファイル作業を進めます"
+                      ? "このPCのフォルダに連携済みです。ファイルツールとローカル操作の基準になります"
                       : isLoading
-                        ? "この Workspace を読み込み中..."
-                        : "この Workspace に合わせて会話とファイル作業を進めます"}
+                        ? "このワークスペースを読み込み中..."
+                        : "フォルダ未連携でも、チャットとワークスペース指示は使えます"}
                   </div>
                   <div className="rounded-2xl bg-stone-50/80 px-3 py-3 dark:bg-stone-950/40">
                     <div className="font-medium text-stone-700 dark:text-stone-200">
-                      Custom Instructions
+                      ワークスペース指示
                     </div>
                     <div className="mt-1 break-all">
                       {projectContext?.agents_path ??
@@ -103,11 +103,11 @@ export function WorkFolderPanel({
                   </div>
                   <div className="rounded-2xl bg-stone-50/80 px-3 py-3 dark:bg-stone-950/40">
                     <div className="font-medium text-stone-700 dark:text-stone-200">
-                      Agent Assets
+                      エージェント資産
                     </div>
                     <div className="mt-1 break-all">
                       {projectContext?.agent_dir ??
-                        "将来の skill / prompt 資産は .agent/ に置きます"}
+                        "将来のスキルやプロンプトなどの資産は .agent/ に置きます"}
                     </div>
                     <div className="mt-1 text-[11px] text-stone-400 dark:text-stone-500">
                       {projectContext?.has_agent_dir
@@ -127,17 +127,18 @@ export function WorkFolderPanel({
                 className="text-stone-500 dark:text-stone-400"
               />
               <h3 className="text-sm font-medium text-stone-800 dark:text-stone-100">
-                Workspace Custom Instructions
+                ワークスペース指示
               </h3>
             </div>
             <p className="mb-3 text-xs text-stone-500 dark:text-stone-400">
-              この内容は workspace 直下の `AGENTS.md` と同期します。Global
-              の指示より、この Workspace の指示が優先されます。
+              この内容はワークスペース固有の指示です。連携フォルダがある場合は
+              `AGENTS.md` と同期します。共通指示より、このワークスペース
+              の指示が優先されます。
             </p>
             <textarea
               value={customInstructions}
               onChange={(e) => setCustomInstructions(e.target.value)}
-              placeholder="この Workspace 固有のルール、完了条件、禁止事項、期待する進め方を書く"
+              placeholder="このワークスペース固有のルール、完了条件、禁止事項、期待する進め方を書く"
               className="notion-input min-h-[160px] w-full resize-y rounded-[22px] px-4 py-3 text-sm text-stone-700 outline-none dark:text-stone-200"
             />
             {error && (
@@ -154,7 +155,7 @@ export function WorkFolderPanel({
                 className="text-stone-500 dark:text-stone-400"
               />
               <h3 className="text-sm font-medium text-stone-800 dark:text-stone-100">
-                この作業ディレクトリのチャット
+                このワークスペースのチャット
               </h3>
             </div>
             {sessions.length === 0 ? (
@@ -189,8 +190,7 @@ export function WorkFolderPanel({
           <button
             type="button"
             onClick={onStartChat}
-            disabled={!activeProject}
-            className="notion-button px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+            className="notion-button px-3 py-2 text-sm"
           >
             新しいチャット
           </button>
