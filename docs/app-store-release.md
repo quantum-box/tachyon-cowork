@@ -47,11 +47,14 @@ APP_STORE_CONNECT_KEY_ID=... APP_STORE_CONNECT_ISSUER_ID=... APP_STORE_CONNECT_K
 
 ### GitHub Actions
 
+The workflow runs automatically on every `main` push and uploads the generated
+IPA to App Store Connect for TestFlight distribution.
+
 Use **Actions -> iOS TestFlight Release -> Run workflow** to build the iOS IPA
-on a macOS runner and upload it to App Store Connect. Leave `build_number`
-blank for the default `MMDDHHMM` suffix, or set it explicitly when retrying a
-failed upload. Turn `upload` off to produce and download the IPA without sending
-it to TestFlight.
+on a macOS runner and upload it to App Store Connect manually. Leave
+`build_number` blank for the default `MMDDHHMM` suffix, or set it explicitly
+when retrying a failed upload. Turn `upload` off to produce and download the IPA
+without sending it to TestFlight.
 
 The same workflow also runs automatically on non-draft pull requests targeting
 `main` when the PR branch is in this repository. Fork PRs are skipped because
@@ -71,6 +74,11 @@ Signing secrets, usually required on GitHub-hosted macOS runners:
 - `IOS_PROVISIONING_PROFILE_BASE64` - base64-encoded App Store distribution
   `.mobileprovision`
 - `IOS_BUILD_KEYCHAIN_PASSWORD` - optional temporary keychain password
+
+Failure notifications:
+
+- `PLATFORM_ALERTS_SLACK_WEBHOOK` - optional Slack incoming webhook used to
+  notify release failures.
 
 Create the base64 values on macOS with:
 

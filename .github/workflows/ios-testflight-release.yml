@@ -1,6 +1,8 @@
 name: iOS TestFlight Release
 
 on:
+  push:
+    branches: [main]
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
@@ -148,8 +150,8 @@ jobs:
       - name: Set iOS build number
         run: |
           set -euo pipefail
-          if [ -n "${{ inputs.build_number }}" ]; then
-            BUILD_NUMBER="${{ inputs.build_number }}"
+          if [ -n "${{ github.event.inputs.build_number }}" ]; then
+            BUILD_NUMBER="${{ github.event.inputs.build_number }}"
           elif [ "${{ github.event_name }}" = "pull_request" ]; then
             BUILD_NUMBER="$(date +%m%d%H%M)${GITHUB_RUN_ATTEMPT}"
           else
@@ -221,7 +223,7 @@ jobs:
           path: ${{ env.IOS_IPA_PATH }}
 
       - name: Upload to App Store Connect
-        if: github.event_name == 'pull_request' || inputs.upload
+        if: github.event_name == 'push' || github.event_name == 'pull_request' || github.event.inputs.upload == 'true'
         env:
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
@@ -244,3 +246,34 @@ jobs:
               issue_number: context.issue.number,
               body: `Uploaded TestFlight build \`${version}\` for this PR.`
             });
+
+      - name: Notify Slack on failure
+        if: failure()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.PLATFORM_ALERTS_SLACK_WEBHOOK }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SLACK_WEBHOOK_URL:-}" ]; then
+            echo "PLATFORM_ALERTS_SLACK_WEBHOOK is not configured; skipping Slack alert."
+            exit 0
+          fi
+
+          python3 - <<'PY' > "$RUNNER_TEMP/slack-payload.json"
+          import json
+          import os
+
+          payload = {
+              "text": (
+                  ":x: iOS TestFlight Release failed\n"
+                  f"Repository: {os.environ['GITHUB_REPOSITORY']}\n"
+                  f"Ref: {os.environ['GITHUB_REF_NAME']}\n"
+                  f"Run: {os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}"
+              )
+          }
+          print(json.dumps(payload))
+          PY
+
+          curl -fsS \
+            -H 'Content-Type: application/json' \
+            --data @"$RUNNER_TEMP/slack-payload.json" \
+            "$SLACK_WEBHOOK_URL"
