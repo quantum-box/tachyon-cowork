@@ -143,7 +143,7 @@ export function ChatInput({
       onSubmit={onSubmit}
       className="sticky bottom-0 z-20 bg-white/95 px-2.5 pb-[calc(env(safe-area-inset-bottom)+0.625rem)] pt-2 transition-colors duration-150 backdrop-blur-md dark:bg-slate-900/95 sm:px-3 sm:pb-[calc(env(safe-area-inset-bottom)+0.625rem)]"
     >
-      <div className="mx-auto max-w-[920px]">
+      <div className="mx-auto w-full max-w-none">
         {/* Prompt templates */}
         <PromptTemplates
           onSelect={handleTemplateSelect}
@@ -153,80 +153,84 @@ export function ChatInput({
         {/* File preview chips */}
         <FilePreview files={files} onRemove={onFileRemove} />
 
-        <div className="rounded-[20px] border border-stone-200/80 bg-white/92 p-1.5 shadow-[0_10px_24px_rgba(15,23,42,0.045)] dark:border-stone-700/80 dark:bg-stone-900/90 sm:rounded-[22px]">
-          <div className="flex items-end gap-1.5">
-            {/* Paperclip button */}
-            <button
-              type="button"
-              onClick={handlePickFiles}
-              disabled={isLoading || isDisabled}
-              className="notion-icon-button min-h-11 min-w-11 shrink-0 rounded-2xl p-3 disabled:cursor-not-allowed disabled:opacity-40"
-              aria-label="ファイルを添付"
-            >
-              <Paperclip size={20} />
-            </button>
+        <div className="rounded-[26px] border border-stone-200/85 bg-white/92 p-2 shadow-[0_12px_28px_rgba(15,23,42,0.05)] dark:border-stone-700/80 dark:bg-stone-900/90">
+          <textarea
+            ref={textareaRef}
+            value={input}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
+            placeholder={placeholder ?? "メッセージを入力..."}
+            disabled={isDisabled}
+            rows={1}
+            className="max-h-[220px] min-h-[52px] w-full resize-none overflow-y-auto rounded-[20px] bg-transparent px-4 py-3 text-[16px] leading-6 text-stone-900 outline-none ring-0 placeholder:text-stone-400 disabled:opacity-50 dark:text-stone-100 dark:placeholder:text-stone-500 sm:min-h-[58px] sm:text-[15px]"
+          />
 
-            {realtimeVoice && (
+          <div className="mt-1 flex items-center justify-between gap-2 px-0.5">
+            <div className="flex min-w-0 items-center gap-1.5">
               <button
                 type="button"
-                onClick={handleVoiceClick}
-                disabled={isDisabled}
+                onClick={handlePickFiles}
+                disabled={isLoading || isDisabled}
                 className={[
-                  "notion-icon-button min-h-11 min-w-11 shrink-0 rounded-2xl p-3 disabled:cursor-not-allowed disabled:opacity-40",
-                  isVoiceConnected
-                    ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300"
-                    : "",
+                  "notion-icon-button min-h-10 min-w-10 shrink-0 rounded-2xl p-2.5 disabled:cursor-not-allowed disabled:opacity-40",
                 ].join(" ")}
-                aria-label={
-                  isVoiceConnected || isVoiceConnecting
-                    ? "音声会話を終了"
-                    : "音声会話を開始"
-                }
-                title={
-                  isVoiceConnected
-                    ? "音声会話を終了"
-                    : isVoiceConnecting
-                      ? "音声会話に接続中"
-                      : "音声会話を開始"
-                }
+                aria-label="ファイルを添付"
+                title="ファイルを添付"
               >
-                {isVoiceConnecting ? (
-                  <Loader2 size={20} className="animate-spin" />
-                ) : isVoiceConnected ? (
-                  <MicOff size={20} />
-                ) : (
-                  <Mic size={20} />
-                )}
+                <Paperclip size={19} />
               </button>
-            )}
 
-            <textarea
-              ref={textareaRef}
-              value={input}
-              onChange={handleChange}
-              onKeyDown={handleKeyDown}
-              onPaste={handlePaste}
-              placeholder={placeholder ?? "メッセージを入力..."}
-              disabled={isDisabled}
-              rows={1}
-              className="max-h-[200px] min-h-[44px] flex-1 resize-none overflow-y-auto rounded-2xl bg-transparent px-2.5 py-2.5 text-[16px] leading-6 text-stone-900 outline-none ring-0 placeholder:text-stone-400 disabled:opacity-50 dark:text-stone-100 dark:placeholder:text-stone-500 sm:min-h-[46px] sm:px-3 sm:text-[15px]"
-            />
-            <button
-              type="submit"
-              disabled={!hasContent || isLoading || isDisabled}
-              className="notion-button-primary min-h-11 min-w-11 shrink-0 rounded-2xl p-3 disabled:cursor-not-allowed disabled:opacity-40"
-              aria-label="送信"
-            >
-              <SendHorizonal size={20} />
-            </button>
-          </div>
-          <div className="hidden items-center justify-between px-2.5 pb-0.5 pt-1.5 text-[11px] text-stone-400 dark:text-stone-500 sm:flex">
-            <span>
-              {sendKey === "cmd-enter"
-                ? "⌘/Ctrl + Enter で送信"
-                : "Enter で送信"}
-            </span>
-            <span>Shift + Enter で改行</span>
+              {realtimeVoice && (
+                <button
+                  type="button"
+                  onClick={handleVoiceClick}
+                  disabled={isDisabled}
+                  className={[
+                    "notion-icon-button min-h-10 min-w-10 shrink-0 rounded-2xl p-2.5 disabled:cursor-not-allowed disabled:opacity-40",
+                    isVoiceConnected
+                      ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300"
+                      : "",
+                  ].join(" ")}
+                  aria-label={
+                    isVoiceConnected || isVoiceConnecting
+                      ? "音声会話を終了"
+                      : "音声会話を開始"
+                  }
+                  title={
+                    isVoiceConnected
+                      ? "音声会話を終了"
+                      : isVoiceConnecting
+                        ? "音声会話に接続中"
+                        : "音声会話を開始"
+                  }
+                >
+                  {isVoiceConnecting ? (
+                    <Loader2 size={19} className="animate-spin" />
+                  ) : isVoiceConnected ? (
+                    <MicOff size={19} />
+                  ) : (
+                    <Mic size={19} />
+                  )}
+                </button>
+              )}
+            </div>
+
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="hidden truncate text-[11px] text-stone-400 dark:text-stone-500 sm:inline">
+                {sendKey === "cmd-enter"
+                  ? "⌘/Ctrl + Enter で送信 / Shift + Enter で改行"
+                  : "Enter で送信 / Shift + Enter で改行"}
+              </span>
+              <button
+                type="submit"
+                disabled={!hasContent || isLoading || isDisabled}
+                className="notion-button-primary min-h-10 min-w-10 shrink-0 rounded-full p-2.5 disabled:cursor-not-allowed disabled:opacity-40"
+                aria-label="送信"
+              >
+                <SendHorizonal size={19} />
+              </button>
+            </div>
           </div>
         </div>
       </div>
