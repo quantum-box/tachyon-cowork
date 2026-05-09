@@ -56,6 +56,30 @@ function formatWorkspaceLabel(projectContext: ProjectContext): string {
   return workspace;
 }
 
+function getRealtimeStatusLabel(
+  status: ReturnType<typeof useRealtimeVoice>["status"],
+): { text: string; className: string } {
+  if (status === "connected") {
+    return {
+      text: "準備完了",
+      className:
+        "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300",
+    };
+  }
+  if (status === "connecting") {
+    return {
+      text: "準備中",
+      className:
+        "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300",
+    };
+  }
+  return {
+    text: "停止中",
+    className:
+      "bg-white/70 text-sky-700 dark:bg-sky-900/40 dark:text-sky-200",
+  };
+}
+
 export function ChatPanel({
   chat,
   files,
@@ -303,6 +327,7 @@ function RealtimeTranscriptPanel({
   if (!isActive && voice.transcripts.length === 0) return null;
 
   const recentTranscripts = voice.transcripts.slice(-4);
+  const statusLabel = getRealtimeStatusLabel(voice.status);
 
   return (
     <section
@@ -314,6 +339,11 @@ function RealtimeTranscriptPanel({
         <div className="flex min-w-0 items-center gap-1.5 font-semibold text-sky-800 dark:text-sky-200">
           <Mic size={12} />
           <span>音声会話の文字起こし</span>
+          <span
+            className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold ${statusLabel.className}`}
+          >
+            {statusLabel.text}
+          </span>
           <span className="rounded-full bg-white/70 px-1.5 py-0.5 text-[9px] font-medium text-sky-700 dark:bg-sky-900/40 dark:text-sky-200">
             Agentチャットとは別
           </span>
@@ -332,8 +362,13 @@ function RealtimeTranscriptPanel({
       </div>
 
       {recentTranscripts.length === 0 ? (
-        <div className="text-sky-700/80 dark:text-sky-200/80">
-          音声会話に接続しています...
+        <div className="flex items-center gap-1.5 text-sky-700/80 dark:text-sky-200/80">
+          {voice.status === "connecting" && (
+            <RefreshCw size={11} className="animate-spin" />
+          )}
+          {voice.status === "connected"
+            ? "話しかけるとここに表示されます"
+            : "マイクとRealtimeを準備しています..."}
         </div>
       ) : (
         <div className="max-h-24 space-y-1 overflow-y-auto pr-1">
