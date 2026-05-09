@@ -331,7 +331,7 @@ function RealtimeTranscriptPanel({
 
   return (
     <section
-      className="fixed right-3 top-1/2 z-30 w-[min(320px,calc(100vw-1.5rem))] -translate-y-1/2 rounded-xl border border-sky-200/80 bg-sky-50/70 px-2.5 py-2 text-[11px] text-slate-800 shadow-[0_18px_42px_rgba(15,23,42,0.18)] backdrop-blur-xl dark:border-sky-800/70 dark:bg-sky-950/55 dark:text-slate-100 sm:right-5"
+      className="fixed right-3 top-1/2 z-30 w-[min(320px,calc(100vw-1.5rem))] -translate-y-1/2 rounded-xl border border-sky-200/55 bg-white/35 px-2.5 py-2 text-[11px] text-slate-800 shadow-[0_18px_42px_rgba(15,23,42,0.16)] backdrop-blur-lg dark:border-sky-700/45 dark:bg-slate-950/35 dark:text-slate-100 sm:right-5"
       aria-label="Realtime"
       aria-live="polite"
     >
@@ -344,7 +344,7 @@ function RealtimeTranscriptPanel({
           >
             {statusLabel.text}
           </span>
-          <span className="rounded-full bg-white/70 px-1.5 py-0.5 text-[9px] font-medium text-sky-700 dark:bg-sky-900/40 dark:text-sky-200">
+          <span className="rounded-full bg-white/35 px-1.5 py-0.5 text-[9px] font-medium text-sky-700 ring-1 ring-sky-100/50 dark:bg-sky-900/25 dark:text-sky-200 dark:ring-sky-700/30">
             Agentチャットとは別
           </span>
         </div>
@@ -353,7 +353,7 @@ function RealtimeTranscriptPanel({
             <button
               type="button"
               onClick={voice.stop}
-              className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-[10px] font-semibold text-red-700 transition-colors hover:bg-red-100 dark:border-red-900/60 dark:bg-red-950/45 dark:text-red-300 dark:hover:bg-red-950/70"
+              className="inline-flex items-center gap-1 rounded-lg border border-red-200/70 bg-red-50/55 px-2 py-1 text-[10px] font-semibold text-red-700 transition-colors hover:bg-red-100/70 dark:border-red-900/55 dark:bg-red-950/30 dark:text-red-300 dark:hover:bg-red-950/55"
               aria-label="Realtimeを停止"
               title="Realtimeを停止"
             >
@@ -365,7 +365,7 @@ function RealtimeTranscriptPanel({
             <button
               type="button"
               onClick={voice.clearTranscripts}
-              className="rounded-md p-0.5 text-sky-700 transition-colors hover:bg-sky-100 dark:text-sky-200 dark:hover:bg-sky-900/40"
+              className="rounded-md p-0.5 text-sky-700 transition-colors hover:bg-sky-100/45 dark:text-sky-200 dark:hover:bg-sky-900/30"
               aria-label="Realtimeをクリア"
               title="Realtimeをクリア"
             >
@@ -389,7 +389,7 @@ function RealtimeTranscriptPanel({
           {recentTranscripts.map((item) => (
             <div
               key={item.id}
-              className="flex gap-1.5 rounded-lg bg-white/65 px-2 py-1 dark:bg-slate-950/25"
+              className="flex gap-1.5 rounded-lg bg-white/30 px-2 py-1 ring-1 ring-white/25 dark:bg-slate-950/20 dark:ring-white/10"
             >
               <span className="shrink-0 text-[9px] font-semibold uppercase text-sky-700 dark:text-sky-300">
                 {item.role === "user" ? "V" : "RT"}
