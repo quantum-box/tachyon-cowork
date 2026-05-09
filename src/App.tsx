@@ -42,6 +42,7 @@ import { useGlobalCustomInstructions } from "./hooks/useGlobalCustomInstructions
 import { useMaxRequests } from "./hooks/useMaxRequests";
 import {
   buildRealtimeAgentChatContext,
+  playRealtimeCue,
   useRealtimeVoice,
 } from "./hooks/useRealtimeVoice";
 import { Sidebar } from "./components/layout/Sidebar";
@@ -441,6 +442,7 @@ export default function App() {
   const stopRealtimeVoice = realtimeVoice.stop;
   const realtimeTranscripts = realtimeVoice.transcripts;
   const appendRealtimeTranscript = realtimeVoice.appendTranscript;
+  const previousChatErrorRef = useRef<string | null>(null);
 
   useEffect(() => {
     realtimeControlRef.current = {
@@ -467,6 +469,35 @@ export default function App() {
     realtimeVoiceEnabled,
     startRealtimeVoice,
   ]);
+
+  useEffect(() => {
+    if (!realtimeVoiceEnabled) return;
+    if (!isChatLoading) return;
+
+    const startTimer = window.setTimeout(() => {
+      playRealtimeCue("thinking");
+    }, 1200);
+    const interval = window.setInterval(() => {
+      playRealtimeCue("thinking");
+    }, 5200);
+
+    return () => {
+      window.clearTimeout(startTimer);
+      window.clearInterval(interval);
+    };
+  }, [isChatLoading, realtimeVoiceEnabled]);
+
+  useEffect(() => {
+    const currentError = chatError?.message ?? null;
+    if (
+      realtimeVoiceEnabled &&
+      currentError &&
+      currentError !== previousChatErrorRef.current
+    ) {
+      playRealtimeCue("error");
+    }
+    previousChatErrorRef.current = currentError;
+  }, [chatError?.message, realtimeVoiceEnabled]);
 
   const sendMessageWithRealtimePause = useCallback(
     async (

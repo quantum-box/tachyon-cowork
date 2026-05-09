@@ -39,7 +39,7 @@ function getBrowserAudioContext(): BrowserAudioContextConstructor | null {
   return audioWindow.AudioContext ?? audioWindow.webkitAudioContext ?? null;
 }
 
-function playRealtimeCue(kind: "start" | "stop") {
+export function playRealtimeCue(kind: "start" | "stop" | "error" | "thinking") {
   const AudioContextConstructor = getBrowserAudioContext();
   if (!AudioContextConstructor) return;
 
@@ -49,18 +49,30 @@ function playRealtimeCue(kind: "start" | "stop") {
     gain.gain.setValueAtTime(0.0001, audioContext.currentTime);
     gain.connect(audioContext.destination);
 
-    const tones =
-      kind === "start"
-        ? [
-            { frequency: 660, offset: 0 },
-            { frequency: 880, offset: 0.09 },
-          ]
-        : [
-            { frequency: 520, offset: 0 },
-            { frequency: 330, offset: 0.1 },
-          ];
+    const tonesByKind = {
+      start: [
+        { frequency: 660, offset: 0, duration: 0.08 },
+        { frequency: 880, offset: 0.09, duration: 0.08 },
+      ],
+      stop: [
+        { frequency: 520, offset: 0, duration: 0.08 },
+        { frequency: 330, offset: 0.1, duration: 0.08 },
+      ],
+      error: [
+        { frequency: 220, offset: 0, duration: 0.11 },
+        { frequency: 185, offset: 0.13, duration: 0.14 },
+      ],
+      thinking: [
+        { frequency: 392, offset: 0, duration: 0.06 },
+        { frequency: 494, offset: 0.08, duration: 0.06 },
+        { frequency: 392, offset: 0.18, duration: 0.06 },
+      ],
+    } satisfies Record<
+      "start" | "stop" | "error" | "thinking",
+      Array<{ frequency: number; offset: number; duration: number }>
+    >;
 
-    for (const tone of tones) {
+    for (const tone of tonesByKind[kind]) {
       const oscillator = audioContext.createOscillator();
       oscillator.type = "sine";
       oscillator.frequency.setValueAtTime(
@@ -69,21 +81,24 @@ function playRealtimeCue(kind: "start" | "stop") {
       );
       oscillator.connect(gain);
       oscillator.start(audioContext.currentTime + tone.offset);
-      oscillator.stop(audioContext.currentTime + tone.offset + 0.08);
+      oscillator.stop(audioContext.currentTime + tone.offset + tone.duration);
     }
 
     gain.gain.exponentialRampToValueAtTime(
-      0.04,
+      kind === "thinking" ? 0.025 : 0.04,
       audioContext.currentTime + 0.015,
     );
     gain.gain.exponentialRampToValueAtTime(
       0.0001,
-      audioContext.currentTime + 0.24,
+      audioContext.currentTime + (kind === "thinking" ? 0.32 : 0.28),
     );
 
-    window.setTimeout(() => {
-      void audioContext.close().catch(() => undefined);
-    }, 320);
+    window.setTimeout(
+      () => {
+        void audioContext.close().catch(() => undefined);
+      },
+      kind === "thinking" ? 420 : 360,
+    );
   } catch {
     // Audio feedback is non-critical and may be blocked by the browser.
   }
@@ -633,6 +648,7 @@ export function useRealtimeVoice(
   const start = useCallback(async () => {
     if (!client) {
       setError("ログイン後に音声会話を開始できます。");
+      playRealtimeCue("error");
       return;
     }
     if (status !== "idle") return;
@@ -710,6 +726,7 @@ export function useRealtimeVoice(
       };
       dataChannel.onerror = () => {
         setError("音声会話の接続でエラーが発生しました。再接続してください。");
+        playRealtimeCue("error");
       };
       dataChannel.onmessage = (event) => {
         handleRealtimeEvent(event.data);
@@ -740,6 +757,7 @@ export function useRealtimeVoice(
       });
     } catch (err) {
       stop();
+      playRealtimeCue("error");
       setError(toUserFacingRealtimeError(err));
     }
   }, [client, handleRealtimeEvent, status, stop]);
