@@ -29,11 +29,11 @@ const guideSections = [
   },
   {
     icon: FolderOpen,
-    title: "Workspace",
+    title: "ワークスペース",
     items: [
-      "作業ディレクトリを選ぶと、そのフォルダを前提に会話できます。",
-      "`AGENTS.md` を保存すると Workspace 固有の指示として使われます。",
-      "作業ディレクトリ一覧から、過去に使ったフォルダへ切り替えられます。",
+      "ワークスペースは会話、指示、成果物を束ねる作業文脈です。",
+      "PC ではワークスペースにこのPCのフォルダを紐づけると便利です。",
+      "連携フォルダがある場合、`AGENTS.md` をワークスペース固有の指示として同期できます。",
     ],
   },
   {
@@ -47,11 +47,11 @@ const guideSections = [
   },
   {
     icon: FileText,
-    title: "Artifact と Canvas",
+    title: "成果物とキャンバス",
     items: [
-      "生成されたコードやドキュメントは右側の Artifact で確認できます。",
-      "HTML や JSX は Canvas でプレビューしながら調整できます。",
-      "コードブロックは回答下のボタンから Artifact として開けます。",
+      "生成されたコードやドキュメントは右側の成果物パネルで確認できます。",
+      "HTML や JSX はキャンバスでプレビューしながら調整できます。",
+      "コードブロックは回答下のボタンから成果物として開けます。",
     ],
   },
 ];
@@ -59,7 +59,7 @@ const guideSections = [
 const quickTips = [
   { icon: Search, text: "会話検索はヘッダーの検索から開けます。" },
   { icon: Keyboard, text: "送信キーや表示テーマは設定で変更できます。" },
-  { icon: Mic, text: "Realtime Voice を有効にすると音声入力を使えます。" },
+  { icon: Mic, text: "リアルタイム音声を有効にすると音声入力を使えます。" },
   { icon: Settings, text: "MCP やモデル設定は設定パネルにまとまっています。" },
 ];
 
@@ -80,12 +80,12 @@ export function HelpPanel({ onBack, onOpenTools, onOpenWorkFolders }: Props) {
             className="titlebar-safe-header min-w-0 flex-1"
             data-tauri-drag-region
           >
-            <div className="notion-label mb-1">Help</div>
+            <div className="notion-label mb-1">ヘルプ</div>
             <h2 className="truncate text-sm font-semibold text-stone-900 dark:text-stone-100">
               使い方
             </h2>
             <p className="mt-0.5 text-[11px] text-stone-500 dark:text-stone-400">
-              Tachyon Cowork の基本操作と Workspace の考え方
+              Tachyon Cowork の基本操作とワークスペースの考え方
             </p>
           </div>
         </div>
@@ -97,14 +97,14 @@ export function HelpPanel({ onBack, onOpenTools, onOpenWorkFolders }: Props) {
             <div>
               <div className="inline-flex items-center gap-2 text-xs font-medium text-stone-500 dark:text-stone-400">
                 <BookOpen size={14} />
-                Product guide
+                製品ガイド
               </div>
               <h1 className="mt-2 text-2xl font-semibold text-stone-900 dark:text-stone-100">
                 会話から作業までを一つの流れで進める
               </h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-600 dark:text-stone-300">
-                Workspace を選び、チャットで意図を伝え、必要に応じてローカルツールや
-                Artifact を使って結果を確認します。
+                ワークスペースを選び、チャットで意図を伝え、必要に応じて
+                連携フォルダ、ローカルツール、成果物を使って結果を確認します。
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -115,7 +115,7 @@ export function HelpPanel({ onBack, onOpenTools, onOpenWorkFolders }: Props) {
                   className="notion-button px-3 py-2 text-xs font-medium"
                 >
                   <FolderOpen size={14} />
-                  Workspace
+                  ワークスペース
                 </button>
               )}
               {onOpenTools && (

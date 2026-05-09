@@ -1,119 +1,119 @@
-# Workspace IA
+# ワークスペース IA
 
 ## 目的
 
-Tachyon Cowork の情報設計では、ユーザーの作業文脈を `Workspace` として扱う。
+Tachyon Cowork の情報設計では、ユーザーの作業文脈を「ワークスペース」として扱う。
 
-これまで UI や資料で使っていた `作業ディレクトリ` は、PC で Workspace に紐づけられるローカルフォルダを指す言葉として整理し直す。ユーザー向けの主語は `Workspace` に統一する。
+これまで UI や資料で使っていた「作業ディレクトリ」は、PC でワークスペースに紐づけられるローカルフォルダを指す言葉として整理し直す。ユーザー向けの主語は「ワークスペース」に統一する。
 
 ## 決定
 
-`Workspace` は会話、指示、成果物、必要に応じたローカルフォルダ連携を束ねる作業文脈の単位とする。
+「ワークスペース」は会話、指示、成果物、必要に応じたローカルフォルダ連携を束ねる作業文脈の単位とする。
 
-ローカルフォルダは Workspace の必須条件ではない。PC ではフォルダを紐づけるとファイル検索、整理、容量分析、`AGENTS.md` 同期、ローカル MCP ツールの前提指定が便利になる。一方で、Web や mobile ではフォルダ未連携の Workspace でもチャットや指示、成果物管理を使える状態を目指す。
+ローカルフォルダはワークスペースの必須条件ではない。PC ではフォルダを紐づけるとファイル検索、整理、容量分析、`AGENTS.md` 同期、ローカル MCP ツールの前提指定が便利になる。一方で、Web やモバイルではフォルダ未連携のワークスペースでもチャットや指示、成果物管理を使える状態を目指す。
 
 ```text
-Workspace
-├─ Name
-├─ Chats
-├─ Workspace Instructions
-├─ Artifacts / Canvas
-└─ Linked Folder (optional)
-   ├─ Local file tools
-   ├─ AGENTS.md sync
-   └─ Project-relative tool context
+ワークスペース
+├─ 名前
+├─ チャット
+├─ ワークスペース指示
+├─ 成果物・キャンバス
+└─ 連携フォルダ（任意）
+   ├─ ローカルファイルツール
+   ├─ AGENTS.md 同期
+   └─ プロジェクト相対のツール文脈
 ```
 
 ## 用語
 
 | 用語 | 意味 | UI での扱い |
 |------|------|-------------|
-| Workspace | 作業文脈の箱。会話、指示、成果物、任意のフォルダ連携を束ねる | 主語として使う |
-| Linked Folder | PC で Workspace に紐づけるローカルフォルダ | `このPCのフォルダ` と説明してよい |
-| Workspace Instructions | Workspace 固有の agent 指示 | `AGENTS.md` と同期できる |
-| Global Instructions | すべての Workspace に共通する指示 | 設定に置く |
-| Files / Tools | ファイル検索、整理、重複検出、容量分析など | Linked Folder があると強くなる機能 |
-| Artifact / Canvas | 生成物とプレビュー編集面 | Workspace の成果物として扱う |
+| ワークスペース | 作業文脈の箱。会話、指示、成果物、任意のフォルダ連携を束ねる | 主語として使う |
+| 連携フォルダ | PC でワークスペースに紐づけるローカルフォルダ | `このPCのフォルダ` と説明してよい |
+| ワークスペース指示 | ワークスペース固有のエージェント指示 | `AGENTS.md` と同期できる |
+| 共通指示 | すべてのワークスペースに共通する指示 | 設定に置く |
+| ファイル・ツール | ファイル検索、整理、重複検出、容量分析など | 連携フォルダがあると強くなる機能 |
+| 成果物・キャンバス | 生成物とプレビュー編集面 | ワークスペースの成果物として扱う |
 
 避けたい表現:
 
 - `作業ディレクトリ一覧`
-- `Project`
-- `Work Folder`
-- `フォルダを開く` を Workspace 作成や Workspace 選択の意味で使うこと
+- `プロジェクト`
+- `ワークフォルダ`
+- `フォルダを開く` をワークスペース作成やワークスペース選択の意味で使うこと
 
 使いたい表現:
 
-- `Workspace`
-- `Workspace一覧`
-- `Workspaceを作成`
-- `Workspaceを開く`
+- `ワークスペース`
+- `ワークスペース一覧`
+- `ワークスペースを作成`
+- `ワークスペースを開く`
 - `フォルダを紐づける`
 - `フォルダ未連携`
 - `このPCのフォルダに連携済み`
 
 ## IA 方針
 
-### Workspace-first / Chat-centered
+### ワークスペース中心・チャット起点
 
-体験の中心は引き続きチャットに置く。ただし、チャットは常に何らかの Workspace 文脈の中で使うものとして整理する。
+体験の中心は引き続きチャットに置く。ただし、チャットは常に何らかのワークスペース文脈の中で使うものとして整理する。
 
 ```text
-App
-├─ Workspace switcher
-├─ Chat
-│  ├─ Sessions
-│  ├─ Attachments
-│  └─ Realtime Voice
-├─ Workspace
-│  ├─ Overview
-│  ├─ Instructions
-│  ├─ Linked Folder
-│  ├─ Related Chats
-│  └─ Files / Tools
-├─ Artifacts / Canvas
-└─ Settings
-   ├─ Account
-   ├─ Model / Agent behavior
+アプリ
+├─ ワークスペース切り替え
+├─ チャット
+│  ├─ セッション
+│  ├─ 添付ファイル
+│  └─ リアルタイム音声
+├─ ワークスペース
+│  ├─ 概要
+│  ├─ 指示
+│  ├─ 連携フォルダ
+│  ├─ 関連チャット
+│  └─ ファイル・ツール
+├─ 成果物・キャンバス
+└─ 設定
+   ├─ アカウント
+   ├─ モデル・エージェント動作
    ├─ MCP
-   ├─ Appearance
-   └─ Shortcuts / Voice
+   ├─ 表示
+   └─ ショートカット・音声
 ```
 
-### Linked Folder は能力拡張
+### 連携フォルダは能力拡張
 
-Workspace の identity はフォルダパスではなく Workspace 自身に持たせる。フォルダは任意の能力拡張として扱う。
+ワークスペースの識別子はフォルダパスではなくワークスペース自身に持たせる。フォルダは任意の能力拡張として扱う。
 
 PC でフォルダ連携がある場合:
 
 - ファイルツールの初期ディレクトリになる
-- agent に相対パスの基準として渡せる
-- `AGENTS.md` を Workspace Instructions と同期できる
-- ローカルファイル参照や生成物保存の UX が自然になる
+- エージェントに相対パスの基準として渡せる
+- `AGENTS.md` をワークスペース指示と同期できる
+- ローカルファイル参照や生成物保存の体験が自然になる
 
 フォルダ未連携の場合:
 
 - チャットは開始できる
-- Workspace Instructions は保存できる
-- Artifact / Canvas は Workspace の成果物として扱える
+- ワークスペース指示は保存できる
+- 成果物・キャンバスはワークスペースの成果物として扱える
 - ファイルツールはフォルダ選択を促す
 
 ## 現状整理
 
-現在の実装は `作業ディレクトリ` を Workspace に近いものとして扱っている。
+現在の実装は `作業ディレクトリ` をワークスペースに近いものとして扱っている。
 
 - UI ではサイドバー上部に `作業ディレクトリ一覧` がある
 - ルートは `/work-folders` と `/work-folders/:folderPath`
 - Tauri 側の状態は `active_project` と `recent_projects`
-- `ProjectEntry` は `path` を identity としている
+- `ProjectEntry` は `path` を識別子としている
 - `AGENTS.md` と `.agent/` は選択中フォルダ直下に作られる
 - チャットセッションとフォルダの紐づきは localStorage の `tachyon-cowork-session-projects` で補完している
 
-この状態は PC ローカル中心の MVP としては自然だが、Web/mobile やフォルダ未連携 Workspace へ広げるには、Workspace と Linked Folder を分離する必要がある。
+この状態は PC ローカル中心の MVP としては自然だが、Web・モバイルやフォルダ未連携ワークスペースへ広げるには、ワークスペースと連携フォルダを分離する必要がある。
 
 ## 目標モデル
 
-将来的には Workspace を独立した概念として持ち、Linked Folder は任意属性にする。
+将来的にはワークスペースを独立した概念として持ち、連携フォルダは任意属性にする。
 
 ```ts
 type Workspace = {
@@ -136,22 +136,22 @@ type ChatSession = {
 
 実装上のポイント:
 
-- session は `project_path` ではなく `workspace_id` に紐づく
+- セッションは `project_path` ではなく `workspace_id` に紐づく
 - `linkedFolderPath` は null を許容する
-- Workspace Instructions はフォルダ未連携でも保存できる
-- PC で Linked Folder がある場合のみ、`AGENTS.md` 同期を有効にする
-- 既存の folder path ベース履歴は移行レイヤーで Workspace に変換する
+- ワークスペース指示はフォルダ未連携でも保存できる
+- PC で連携フォルダがある場合のみ、`AGENTS.md` 同期を有効にする
+- 既存のフォルダパスベース履歴は移行レイヤーでワークスペースに変換する
 
 ## 画面別の整理
 
 ### サイドバー
 
-現在の `作業ディレクトリ一覧` は `Workspace` に変更する。
+現在の `作業ディレクトリ一覧` は `ワークスペース` に変更する。
 
 表示例:
 
 ```text
-Workspace
+ワークスペース
   tachyon-cowork
   moverent
   フォルダ未連携の企画メモ
@@ -163,21 +163,21 @@ Workspace
 
 サイドバーではフォルダパスを主役にしすぎない。必要なら小さく `このPCのフォルダに連携済み` を出す。
 
-### Workspace 詳細
+### ワークスペース詳細
 
-Workspace 詳細画面は以下を持つ。
+ワークスペース詳細画面は以下を持つ。
 
-- Workspace 名
-- Linked Folder の状態
-- Workspace Instructions
-- この Workspace のチャット
+- ワークスペース名
+- 連携フォルダの状態
+- ワークスペース指示
+- このワークスペースのチャット
 - ファイルツールへの導線
 
 状態表示:
 
 ```text
 フォルダ未連携
-この Workspace はチャットと指示だけで利用できます。
+このワークスペースはチャットと指示だけで利用できます。
 PC のフォルダを紐づけると、ファイル検索や AGENTS.md 同期が使えます。
 ```
 
@@ -188,17 +188,17 @@ PC のフォルダを紐づけると、ファイル検索や AGENTS.md 同期が
 
 ### ファイルツール
 
-`ファイルツール` はトップレベルに残してよいが、説明は Linked Folder 前提に寄せる。
+`ファイルツール` はトップレベルに残してよいが、説明は連携フォルダ前提に寄せる。
 
-- Linked Folder がある Workspace では、そのフォルダを初期値にする
-- Linked Folder がない Workspace では、フォルダ選択を促す
+- 連携フォルダがあるワークスペースでは、そのフォルダを初期値にする
+- 連携フォルダがないワークスペースでは、フォルダ選択を促す
 - オフライン時は `ローカルファイルツール` として使える
 
 ### 設定
 
-設定は Workspace の外側にある全体設定として扱う。
+設定はワークスペースの外側にある全体設定として扱う。
 
-- Global Instructions
+- 共通指示
 - デフォルトモデル
 - ループ数
 - MCP
@@ -207,50 +207,50 @@ PC のフォルダを紐づけると、ファイル検索や AGENTS.md 同期が
 - 音声
 - アカウント
 
-Workspace Instructions は設定ではなく Workspace 詳細に置く。
+ワークスペース指示は設定ではなくワークスペース詳細に置く。
 
 ## 段階移行
 
-### Phase 1: UI 文言の統一
+### フェーズ 1: UI 文言の統一
 
-- `作業ディレクトリ` を `Workspace` に置換する
+- `作業ディレクトリ` を `ワークスペース` に置換する
 - フォルダ操作の文脈だけ `フォルダを紐づける` と表現する
-- README とヘルプの説明を Workspace 中心に直す
+- README とヘルプの説明をワークスペース中心に直す
 - `/work-folders` の内部ルートは一旦そのままでもよい
 
-### Phase 2: Workspace と Linked Folder のモデル分離
+### フェーズ 2: ワークスペースと連携フォルダのモデル分離
 
 - `ProjectEntry` 相当を `WorkspaceEntry` に置き換える
-- `path` identity から `workspaceId` identity に移行する
-- `linkedFolderPath` を optional にする
-- フォルダ未連携 Workspace 作成を可能にする
+- `path` 識別子から `workspaceId` 識別子に移行する
+- `linkedFolderPath` を任意にする
+- フォルダ未連携ワークスペース作成を可能にする
 
-### Phase 3: セッション紐づけの正式化
+### フェーズ 3: セッション紐づけの正式化
 
 - localStorage の `sessionId -> project_path` ではなく、API または永続 store で `sessionId -> workspaceId` を持つ
-- Workspace 詳細の `この Workspace のチャット` を正式データから表示する
-- 別端末や Web/mobile でも Workspace とセッションが崩れない状態にする
+- ワークスペース詳細の `このワークスペースのチャット` を正式データから表示する
+- 別端末や Web・モバイルでもワークスペースとセッションが崩れない状態にする
 
-### Phase 4: Artifact の Workspace 化
+### フェーズ 4: 成果物のワークスペース化
 
-- Artifact / Canvas の成果物を Workspace に紐づける
-- 右ペインの一時表示だけでなく、Workspace 詳細から再オープンできるようにする
-- 生成物保存時に Linked Folder があれば保存先候補として使う
+- 成果物・キャンバスの成果物をワークスペースに紐づける
+- 右ペインの一時表示だけでなく、ワークスペース詳細から再オープンできるようにする
+- 生成物保存時に連携フォルダがあれば保存先候補として使う
 
 ## コピー指針
 
 ### 初回利用
 
 ```text
-Workspaceを作成
-まず作業の文脈を作ります。PC では後からこの Workspace にフォルダを紐づけられます。
+ワークスペースを作成
+まず作業の文脈を作ります。PC では後からこのワークスペースにフォルダを紐づけられます。
 ```
 
 ### フォルダ未連携
 
 ```text
 フォルダ未連携
-チャットと Workspace Instructions はこのまま使えます。
+チャットとワークスペース指示はこのまま使えます。
 このPCのフォルダを紐づけると、ファイル検索や AGENTS.md 同期が利用できます。
 ```
 
@@ -265,13 +265,13 @@ Workspaceを作成
 
 ```text
 ファイルツール
-Linked Folder または選択したフォルダを対象に、検索、整理、重複検出、容量分析を実行します。
+連携フォルダまたは選択したフォルダを対象に、検索、整理、重複検出、容量分析を実行します。
 ```
 
 ## 未決事項
 
-- Workspace を API 側の正式リソースにするか、当面 Tauri store に持つか
-- Workspace Instructions をサーバー同期するか、ローカル優先にするか
-- `AGENTS.md` と Workspace Instructions が競合した場合の優先順位
-- Artifact 履歴をどの粒度で Workspace に保存するか
+- ワークスペースを API 側の正式リソースにするか、当面 Tauri store に持つか
+- ワークスペース指示をサーバー同期するか、ローカル優先にするか
+- `AGENTS.md` とワークスペース指示が競合した場合の優先順位
+- 成果物履歴をどの粒度でワークスペースに保存するか
 - 既存 `/work-folders` ルートをいつ `/workspaces` に移行するか

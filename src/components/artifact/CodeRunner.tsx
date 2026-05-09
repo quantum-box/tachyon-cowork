@@ -92,7 +92,7 @@ export function CodeRunner({ code, language }: CodeRunnerProps) {
             <pre className="text-red-400 whitespace-pre-wrap">{result.stderr}</pre>
           )}
           {result && !result.stdout && !result.stderr && !error && (
-            <span className="text-gray-500">(no output)</span>
+            <span className="text-gray-500">(出力なし)</span>
           )}
         </div>
       )}

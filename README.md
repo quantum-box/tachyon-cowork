@@ -1,6 +1,6 @@
 # Tachyon Cowork
 
-Tachyon Cowork は、Tauri + React で作られたデスクトップ向けの AI アシスタントです。チャット、ファイル操作、MCP ツール、成果物生成を 1 つの画面にまとめつつ、Workspace ごとの文脈を切り替えながら仕事を進められます。
+Tachyon Cowork は、Tauri + React で作られたデスクトップ向けの AI アシスタントです。チャット、ファイル操作、MCP ツール、成果物生成を 1 つの画面にまとめつつ、ワークスペースごとの文脈を切り替えながら仕事を進められます。
 
 ## できること
 
@@ -10,11 +10,11 @@ Tachyon Cowork は、Tauri + React で作られたデスクトップ向けの AI
   - PDF / DOCX / XLSX / PPTX / テキスト系ファイルを添付して要約や相談ができる
 - ファイルツール
   - 検索、整理プラン、重複検出、容量分析などをローカル環境で扱える
-- Artifact / Canvas
+- 成果物・キャンバス
   - AI が生成したコードや文書をアプリ内で確認し、そのまま保存できる
 - MCP 連携
-  - Built-in app や外部 MCP サーバーのツールを会話から呼び出せる
-- Workspace
+  - 組み込みアプリや外部 MCP サーバーのツールを会話から呼び出せる
+- ワークスペース
   - 顧客別、案件別、テーマ別に会話と指示を分け、PC ではローカルフォルダも紐づけられる
 
 ## 技術スタック
@@ -217,44 +217,44 @@ sudo dpkg -i tachyon-cowork_*.deb
 - **送信キー**: Cmd+Enter / Ctrl+Enter の選択
 - **MCP サーバー**: 外部 MCP サーバーの追加・管理
 
-## Workspace
+## ワークスペース
 
-このアプリでは、会話、指示、成果物を `Workspace` 単位で持てます。PC では Workspace にローカルフォルダを紐づけると、ファイル操作や `AGENTS.md` 同期が便利になります。
+このアプリでは、会話、指示、成果物をワークスペース単位で持てます。PC ではワークスペースにローカルフォルダを紐づけると、ファイル操作や `AGENTS.md` 同期が便利になります。
 
 ### 何がうれしいか
 
 - 案件ごとに会話と指示を分けられる
-- PC では Workspace にローカルフォルダを紐づけられる
-- `AGENTS.md` で Workspace ごとの custom instructions を持てる
-- 将来の agent 資産を `.agent/` 配下にまとめられる
-- Workspace ごとのチャット履歴を追いやすい
+- PC ではワークスペースにローカルフォルダを紐づけられる
+- `AGENTS.md` でワークスペースごとのカスタム指示を持てる
+- 将来のエージェント資産を `.agent/` 配下にまとめられる
+- ワークスペースごとのチャット履歴を追いやすい
 
 ### 初回の流れ
 
-1. アプリから Workspace を作る
-2. 必要なら設定画面で Global Custom Instructions を書く
-3. Workspace ごとの指示は `AGENTS.md` と同期して保存する
+1. アプリからワークスペースを作る
+2. 必要なら設定画面で共通指示を書く
+3. ワークスペースごとの指示は `AGENTS.md` と同期して保存する
 4. PC では必要に応じてこのPCのフォルダを紐づける
 5. そのまま新しいチャットを始める
 
-### Workspace の agent 関連ファイル
+### ワークスペースのエージェント関連ファイル
 
-PC で Linked Folder を紐づけた Workspace では、agent 向けの情報を次のように扱います。
+PC で連携フォルダを紐づけたワークスペースでは、エージェント向けの情報を次のように扱います。
 
 ```text
 AGENTS.md
 .agent/
 ```
 
-- `AGENTS.md` — その Workspace 固有の custom instructions
-- `.agent/` — 将来の skills / prompts / templates など agent 資産置き場
-- 生成ファイルや通常のドキュメントは `.agent/` ではなく、通常の Workspace 配下に置く
+- `AGENTS.md` — そのワークスペース固有のカスタム指示
+- `.agent/` — 将来のスキル、プロンプト、テンプレートなどのエージェント資産置き場
+- 生成ファイルや通常のドキュメントは `.agent/` ではなく、通常のワークスペース配下に置く
 
-Workspace IA の詳しい方針は [docs/workspace-ia.md](docs/workspace-ia.md) を参照してください。
+ワークスペース IA の詳しい方針は [docs/workspace-ia.md](docs/workspace-ia.md) を参照してください。
 
 ## `projects/` ディレクトリ
 
-このリポジトリには、project 単位の運用テンプレートも含めています。
+このリポジトリには、開発テーマ単位の運用テンプレートも含めています。
 
 ```text
 projects/
@@ -272,7 +272,7 @@ projects/
 src/          React フロントエンド
 src-tauri/    Tauri / Rust バックエンド
 docs/         運用ガイド、動作確認手順
-projects/     project workspace テンプレート
+projects/     開発テーマ用テンプレート
 scripts/      ビルド・ユーティリティスクリプト
 ```
 
@@ -308,10 +308,10 @@ xattr -cr /Applications/Tachyon\ Cowork.app
 
 ## 関連ドキュメント
 
-- [docs/workspace-ia.md](docs/workspace-ia.md) — Workspace / Linked Folder の IA 方針
-- [docs/project-workspace-guide.md](docs/project-workspace-guide.md) — リポジトリ内の project workspace 運用ガイド
+- [docs/workspace-ia.md](docs/workspace-ia.md) — ワークスペース / 連携フォルダ の IA 方針
+- [docs/project-workspace-guide.md](docs/project-workspace-guide.md) — リポジトリ内の開発テーマ運用ガイド
 - [docs/手動動作確認ガイド.md](docs/手動動作確認ガイド.md) — 手動 QA テスト手順
 - [docs/business-usecases.md](docs/business-usecases.md) — ビジネスユースケース
 - [docs/tauri-webdriver.md](docs/tauri-webdriver.md) — WebDriver 自動テスト
 - [docs/release-notes-v0.1.0.md](docs/release-notes-v0.1.0.md) — v0.1.0 リリースノート
-- [projects/_template/README.md](projects/_template/README.md) — Project テンプレート
+- [projects/_template/README.md](projects/_template/README.md) — プロジェクト テンプレート

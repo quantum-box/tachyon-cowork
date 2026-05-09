@@ -94,7 +94,7 @@ export function MessageBubble({
       return (
         <div className="flex justify-start mb-2">
           <div className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/25 dark:text-amber-400">
-            Tool Job: {chunk.provider || "unknown"} ({chunk.job_id?.slice(0, 8)}
+            ツールジョブ: {chunk.provider || "不明"} ({chunk.job_id?.slice(0, 8)}
             ...)
           </div>
         </div>
@@ -157,7 +157,7 @@ function UserMessage({
     <>
       <div className="flex justify-end mb-4 gap-2">
         <div className="max-w-[75%] rounded-[22px] rounded-br-md border border-stone-300/80 bg-stone-200/80 px-4 py-3 text-sm leading-relaxed text-stone-800 shadow-[0_8px_20px_rgba(15,23,42,0.04)] dark:border-stone-700 dark:bg-stone-800/90 dark:text-stone-100">
-          {/* Image thumbnails */}
+          {/* 画像サムネイル */}
           {hasImages && (
             <div className="flex flex-wrap gap-2 mb-2">
               {imageUrls.map((url, i) => (
@@ -430,7 +430,7 @@ function AssistantMessage({
             </button>
           )}
 
-          {/* Artifact buttons for code blocks */}
+          {/* Code block artifact buttons */}
           {codeBlocks.map((block, i) => (
             <button
               key={i}
@@ -439,7 +439,7 @@ function AssistantMessage({
               className="rounded-xl border border-stone-200 bg-white/80 px-2.5 py-1 text-xs font-medium text-stone-700 transition-colors hover:bg-white hover:text-stone-900 dark:border-stone-700 dark:bg-stone-900/70 dark:text-stone-200 dark:hover:bg-stone-900"
             >
               <Code size={12} />
-              Artifactで開く
+              成果物で開く
               {codeBlocks.length > 1 && (
                 <span className="text-stone-400 dark:text-stone-500">
                   ({block.language})
@@ -476,7 +476,7 @@ function ThinkingMessage({
             <Loader2 size={12} className="animate-spin" />
           )}
           {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-          Thinking...
+          思考中...
         </button>
         {expanded && text && (
           <div className="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap rounded-2xl border border-stone-200/80 bg-white/70 px-3 py-2 text-xs text-stone-600 dark:border-stone-700 dark:bg-stone-900/70 dark:text-stone-300">
@@ -514,7 +514,7 @@ function ToolCallMessage({
       content_type?: "html" | "jsx";
     };
     onOpenCanvas(
-      args.title || "Canvas",
+      args.title || "キャンバス",
       args.content || "",
       args.content_type || "html",
     );
@@ -550,7 +550,7 @@ function ToolCallMessage({
               <Wrench size={12} />
             )}
             {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-            {chunk.tool_name || "tool_call"}
+            {chunk.tool_name || "ツール実行"}
           </button>
           {isCanvas && !isPending && onOpenCanvas && chunk.args && (
             <button
@@ -558,7 +558,7 @@ function ToolCallMessage({
               className="rounded-xl border border-stone-200 bg-white/80 px-2 py-1 text-xs text-stone-700 transition-colors hover:bg-white dark:border-stone-700 dark:bg-stone-900/70 dark:text-stone-200 dark:hover:bg-stone-900"
             >
               <PanelRightOpen size={12} />
-              Canvasを開く
+              キャンバスを開く
             </button>
           )}
           {isFileWrite &&
@@ -570,7 +570,7 @@ function ToolCallMessage({
                 className="rounded-xl border border-stone-200 bg-white/80 px-2 py-1 text-xs text-stone-700 transition-colors hover:bg-white dark:border-stone-700 dark:bg-stone-900/70 dark:text-stone-200 dark:hover:bg-stone-900"
               >
                 <PanelRightOpen size={12} />
-                Artifactで開く
+                成果物で開く
               </button>
             )}
         </div>

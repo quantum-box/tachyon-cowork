@@ -78,7 +78,7 @@ export function SettingsPage({
 
   return (
     <div className="flex h-full flex-col bg-transparent transition-colors duration-150">
-      <div className="border-b border-stone-200/80 bg-white/55 px-4 py-3 backdrop-blur-md dark:border-stone-800/80 dark:bg-stone-950/25">
+      <div className="border-b border-stone-200/80 bg-white/55 px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] backdrop-blur-md dark:border-stone-800/80 dark:bg-stone-950/25">
         <div className="flex items-center gap-3">
           <button
             type="button"
@@ -92,7 +92,7 @@ export function SettingsPage({
             className="titlebar-safe-header min-w-0 flex-1"
             data-tauri-drag-region
           >
-            <div className="notion-label mb-1">Settings</div>
+            <div className="notion-label mb-1">設定</div>
             <h2 className="truncate text-sm font-semibold text-stone-900 dark:text-stone-100">
               設定
             </h2>
@@ -170,12 +170,12 @@ export function SettingsPage({
             <div className="flex items-center gap-2 mb-3">
               <Bot size={14} className="text-stone-500 dark:text-stone-400" />
               <h3 className="text-sm font-medium text-stone-800 dark:text-stone-200">
-                Global Custom Instructions
+                共通指示
               </h3>
             </div>
             <p className="mb-3 text-xs text-stone-500 dark:text-stone-400">
-              ここに書いた内容は、すべての Workspace
-              に共通で適用されます。Workspace 側の `AGENTS.md`
+              ここに書いた内容は、すべてのワークスペース
+              に共通で適用されます。ワークスペース側の `AGENTS.md`
               に書いた内容がある場合は、そちらを優先します。
             </p>
             <textarea

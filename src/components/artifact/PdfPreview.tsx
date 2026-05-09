@@ -26,8 +26,8 @@ export function PdfPreview({ data, title: _title }: PdfPreviewProps) {
       {/* Metadata */}
       {(data.metadata.title || data.metadata.author) && (
         <div className="text-xs text-gray-500 dark:text-slate-400 space-y-0.5">
-          {data.metadata.title && <div>Title: {data.metadata.title}</div>}
-          {data.metadata.author && <div>Author: {data.metadata.author}</div>}
+          {data.metadata.title && <div>タイトル: {data.metadata.title}</div>}
+          {data.metadata.author && <div>作成者: {data.metadata.author}</div>}
         </div>
       )}
 

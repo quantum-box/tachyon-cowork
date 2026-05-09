@@ -4,7 +4,6 @@ import {
   Search,
   Trash2,
   Settings,
-  FolderOpen,
   CircleHelp,
   Pin,
   PinOff,
@@ -41,8 +40,6 @@ type Props = {
   onSelectSession: (id: string) => void;
   onDeleteRoom: (id: string) => void;
   onTogglePin: (id: string) => void;
-  onToggleTools?: () => void;
-  showTools: boolean;
   showWorkFolders: boolean;
   showHelp: boolean;
   showSettings: boolean;
@@ -66,8 +63,6 @@ export function Sidebar({
   onSelectSession,
   onDeleteRoom,
   onTogglePin,
-  onToggleTools,
-  showTools,
   showWorkFolders,
   showHelp,
   showSettings,
@@ -202,7 +197,7 @@ export function Sidebar({
         {canUseWorkFolders && (
           <div className="mt-2.5">
             <div className="flex items-center justify-between px-1 pb-0.5">
-              <div className="notion-label">作業ディレクトリ一覧</div>
+              <div className="notion-label">ワークスペース</div>
               <div className="flex shrink-0 items-center gap-1">
                 <button
                   type="button"
@@ -221,7 +216,7 @@ export function Sidebar({
                     onClick={onPickProject}
                     className="rounded-md px-1.5 py-1 text-[11px] text-stone-500 transition-colors hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-100"
                   >
-                    {isProjectLoading ? "..." : "開く"}
+                    {isProjectLoading ? "..." : "紐づけ"}
                   </button>
                 )}
               </div>
@@ -258,9 +253,6 @@ export function Sidebar({
                           </span>
                         )}
                       </div>
-                      <div className="truncate pt-0.5 text-[11px] text-stone-400 dark:text-stone-500">
-                        {project.path}
-                      </div>
                     </button>
                   );
                 })}
@@ -268,37 +260,20 @@ export function Sidebar({
             ) : (
               <button
                 type="button"
-                onClick={onPickProject ?? (() => onOpenWorkFolderList())}
+                onClick={() => onOpenWorkFolderList()}
                 className="mt-1.5 w-full border-l border-transparent px-3 py-1.5 text-left text-stone-500 transition-colors hover:border-stone-200 hover:text-stone-900 dark:text-stone-400 dark:hover:border-stone-800 dark:hover:text-stone-100"
               >
                 <div className="truncate text-xs font-medium">
-                  作業ディレクトリを選ぶ
+                  ワークスペースを始める
                 </div>
                 <div className="truncate pt-0.5 text-[11px] text-stone-400 dark:text-stone-500">
-                  未選択でもチャットは開始できます
+                  PCではフォルダ連携もできます
                 </div>
               </button>
             )}
           </div>
         )}
       </div>
-
-      {/* Primary navigation */}
-      {onToggleTools && (
-        <div className="px-3 pt-2.5">
-          <button
-            onClick={onToggleTools}
-            className={`w-full flex items-center gap-2 rounded-2xl border px-3 py-2 text-xs font-medium transition-colors ${
-              showTools
-                ? "border-stone-300 bg-white/95 text-stone-900 shadow-[0_8px_18px_rgba(15,23,42,0.06)] dark:border-stone-700 dark:bg-stone-900/90 dark:text-stone-100"
-                : "border-stone-200 bg-white/70 text-stone-600 hover:bg-white/90 dark:border-stone-800 dark:bg-stone-900/50 dark:text-stone-300 dark:hover:bg-stone-900/80"
-            }`}
-          >
-            <FolderOpen size={14} />
-            ファイルツール
-          </button>
-        </div>
-      )}
 
       {/* Chat list */}
       <div className="flex-1 overflow-y-auto pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2">
