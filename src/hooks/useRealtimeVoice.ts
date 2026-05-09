@@ -29,6 +29,66 @@ type RealtimeVoiceState = {
 
 const REALTIME_CALL_URL = "https://api.openai.com/v1/realtime/calls";
 
+type BrowserAudioContextConstructor = new () => AudioContext;
+
+function getBrowserAudioContext(): BrowserAudioContextConstructor | null {
+  const audioWindow = window as Window &
+    typeof globalThis & {
+      webkitAudioContext?: BrowserAudioContextConstructor;
+    };
+  return audioWindow.AudioContext ?? audioWindow.webkitAudioContext ?? null;
+}
+
+function playRealtimeCue(kind: "start" | "stop") {
+  const AudioContextConstructor = getBrowserAudioContext();
+  if (!AudioContextConstructor) return;
+
+  try {
+    const audioContext = new AudioContextConstructor();
+    const gain = audioContext.createGain();
+    gain.gain.setValueAtTime(0.0001, audioContext.currentTime);
+    gain.connect(audioContext.destination);
+
+    const tones =
+      kind === "start"
+        ? [
+            { frequency: 660, offset: 0 },
+            { frequency: 880, offset: 0.09 },
+          ]
+        : [
+            { frequency: 520, offset: 0 },
+            { frequency: 330, offset: 0.1 },
+          ];
+
+    for (const tone of tones) {
+      const oscillator = audioContext.createOscillator();
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(
+        tone.frequency,
+        audioContext.currentTime + tone.offset,
+      );
+      oscillator.connect(gain);
+      oscillator.start(audioContext.currentTime + tone.offset);
+      oscillator.stop(audioContext.currentTime + tone.offset + 0.08);
+    }
+
+    gain.gain.exponentialRampToValueAtTime(
+      0.04,
+      audioContext.currentTime + 0.015,
+    );
+    gain.gain.exponentialRampToValueAtTime(
+      0.0001,
+      audioContext.currentTime + 0.24,
+    );
+
+    window.setTimeout(() => {
+      void audioContext.close().catch(() => undefined);
+    }, 320);
+  } catch {
+    // Audio feedback is non-critical and may be blocked by the browser.
+  }
+}
+
 type RealtimeToolName =
   | "set_agent_chat_draft"
   | "update_agent_chat_draft"
@@ -415,12 +475,15 @@ export function useRealtimeVoice(
   const optionsRef = useRef(options);
   const transcriptTextByIdRef = useRef<Map<string, string>>(new Map());
   const handledToolCallIdsRef = useRef<Set<string>>(new Set());
+  const playedConnectedCueRef = useRef(false);
 
   useEffect(() => {
     optionsRef.current = options;
   }, [options]);
 
   const stop = useCallback(() => {
+    const shouldPlayStopCue = playedConnectedCueRef.current;
+
     dataChannelRef.current?.close();
     dataChannelRef.current = null;
 
@@ -439,7 +502,12 @@ export function useRealtimeVoice(
     }
     transcriptTextByIdRef.current.clear();
     handledToolCallIdsRef.current.clear();
+    playedConnectedCueRef.current = false;
     setStatus("idle");
+
+    if (shouldPlayStopCue) {
+      playRealtimeCue("stop");
+    }
   }, []);
 
   const appendTranscript = useCallback((message: RealtimeTranscriptMessage) => {
@@ -605,6 +673,10 @@ export function useRealtimeVoice(
 
       pc.onconnectionstatechange = () => {
         if (pc.connectionState === "connected") {
+          if (!playedConnectedCueRef.current) {
+            playedConnectedCueRef.current = true;
+            playRealtimeCue("start");
+          }
           setStatus("connected");
           return;
         }
