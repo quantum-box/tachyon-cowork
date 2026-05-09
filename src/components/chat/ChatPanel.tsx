@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { AlertCircle, Mic, RefreshCw, X, Square, Menu } from "lucide-react";
+import { AlertCircle, Mic, MicOff, RefreshCw, X, Square, Menu } from "lucide-react";
 import type { useAgentChat } from "../../hooks/useAgentChat";
 import type {
   Artifact,
@@ -123,7 +123,7 @@ export function ChatPanel({
 
   return (
     <FileDropZone onFilesDropped={onFilesAdd}>
-      <div className="flex h-full flex-col bg-transparent transition-colors duration-150">
+      <div className="relative flex h-full flex-col bg-transparent transition-colors duration-150">
         <div className="border-b border-stone-200/80 bg-white/55 pb-2.5 pt-[calc(env(safe-area-inset-top)+0.625rem)] backdrop-blur-md dark:border-stone-800/80 dark:bg-stone-950/25">
           <div className="flex w-full items-center justify-between gap-3 px-2.5 md:px-3">
             <div className="titlebar-safe-header flex min-w-0 items-center gap-3">
@@ -331,14 +331,14 @@ function RealtimeTranscriptPanel({
 
   return (
     <section
-      className="mx-2.5 mb-1.5 rounded-xl border border-sky-200 bg-sky-50/80 px-2.5 py-2 text-[11px] text-slate-800 shadow-sm dark:border-sky-900/50 dark:bg-sky-950/25 dark:text-slate-100 sm:mx-3"
-      aria-label="音声会話の文字起こし"
+      className="fixed right-3 top-1/2 z-30 w-[min(320px,calc(100vw-1.5rem))] -translate-y-1/2 rounded-xl border border-sky-200/80 bg-sky-50/70 px-2.5 py-2 text-[11px] text-slate-800 shadow-[0_18px_42px_rgba(15,23,42,0.18)] backdrop-blur-xl dark:border-sky-800/70 dark:bg-sky-950/55 dark:text-slate-100 sm:right-5"
+      aria-label="Realtime"
       aria-live="polite"
     >
       <div className="mb-1.5 flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-1.5 font-semibold text-sky-800 dark:text-sky-200">
           <Mic size={12} />
-          <span>音声会話の文字起こし</span>
+          <span>Realtime</span>
           <span
             className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold ${statusLabel.className}`}
           >
@@ -348,17 +348,31 @@ function RealtimeTranscriptPanel({
             Agentチャットとは別
           </span>
         </div>
-        {voice.transcripts.length > 0 && (
-          <button
-            type="button"
-            onClick={voice.clearTranscripts}
-            className="rounded-md p-0.5 text-sky-700 transition-colors hover:bg-sky-100 dark:text-sky-200 dark:hover:bg-sky-900/40"
-            aria-label="音声文字起こしをクリア"
-            title="音声文字起こしをクリア"
-          >
-            <X size={12} />
-          </button>
-        )}
+        <div className="flex shrink-0 items-center gap-1">
+          {isActive && (
+            <button
+              type="button"
+              onClick={voice.stop}
+              className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-[10px] font-semibold text-red-700 transition-colors hover:bg-red-100 dark:border-red-900/60 dark:bg-red-950/45 dark:text-red-300 dark:hover:bg-red-950/70"
+              aria-label="Realtimeを停止"
+              title="Realtimeを停止"
+            >
+              <MicOff size={11} />
+              停止
+            </button>
+          )}
+          {voice.transcripts.length > 0 && (
+            <button
+              type="button"
+              onClick={voice.clearTranscripts}
+              className="rounded-md p-0.5 text-sky-700 transition-colors hover:bg-sky-100 dark:text-sky-200 dark:hover:bg-sky-900/40"
+              aria-label="Realtimeをクリア"
+              title="Realtimeをクリア"
+            >
+              <X size={12} />
+            </button>
+          )}
+        </div>
       </div>
 
       {recentTranscripts.length === 0 ? (
@@ -371,7 +385,7 @@ function RealtimeTranscriptPanel({
             : "マイクとRealtimeを準備しています..."}
         </div>
       ) : (
-        <div className="max-h-24 space-y-1 overflow-y-auto pr-1">
+        <div className="max-h-28 space-y-1 overflow-y-auto pr-1">
           {recentTranscripts.map((item) => (
             <div
               key={item.id}

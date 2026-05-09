@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useLayoutEffect,
   useRef,
   type ChangeEvent,
   type FormEvent,
@@ -45,6 +46,17 @@ export function ChatInput({
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  const resizeTextarea = useCallback((el: HTMLTextAreaElement) => {
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+  }, []);
+
+  useLayoutEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    resizeTextarea(el);
+  }, [input, resizeTextarea]);
+
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.key !== "Enter") return;
@@ -74,11 +86,9 @@ export function ChatInput({
   const handleChange = useCallback(
     (e: ChangeEvent<HTMLTextAreaElement>) => {
       onInputChange(e.target.value);
-      const el = e.target;
-      el.style.height = "auto";
-      el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+      resizeTextarea(e.target);
     },
-    [onInputChange],
+    [onInputChange, resizeTextarea],
   );
 
   const handlePaste = useCallback(
@@ -107,12 +117,11 @@ export function ChatInput({
         const el = textareaRef.current;
         if (el) {
           el.focus();
-          el.style.height = "auto";
-          el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+          resizeTextarea(el);
         }
       });
     },
-    [onInputChange],
+    [onInputChange, resizeTextarea],
   );
 
   const hasContent = input.trim() || files.length > 0;
@@ -200,7 +209,7 @@ export function ChatInput({
               placeholder={placeholder ?? "メッセージを入力..."}
               disabled={isDisabled}
               rows={1}
-              className="min-h-[44px] flex-1 resize-none rounded-2xl bg-transparent px-2.5 py-2.5 text-[16px] leading-6 text-stone-900 outline-none ring-0 placeholder:text-stone-400 disabled:opacity-50 dark:text-stone-100 dark:placeholder:text-stone-500 sm:min-h-[46px] sm:px-3 sm:text-[15px]"
+              className="max-h-[200px] min-h-[44px] flex-1 resize-none overflow-y-auto rounded-2xl bg-transparent px-2.5 py-2.5 text-[16px] leading-6 text-stone-900 outline-none ring-0 placeholder:text-stone-400 disabled:opacity-50 dark:text-stone-100 dark:placeholder:text-stone-500 sm:min-h-[46px] sm:px-3 sm:text-[15px]"
             />
             <button
               type="submit"
