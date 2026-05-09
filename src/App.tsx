@@ -47,9 +47,10 @@ import { ArtifactPanel } from "./components/artifact/ArtifactPanel";
 import { CanvasView } from "./components/canvas/CanvasView";
 import { LoginScreen } from "./components/layout/LoginScreen";
 import { ToolsPanel } from "./components/layout/ToolsPanel";
-import { SettingsPanel } from "./components/layout/SettingsPanel";
+import { SettingsPage } from "./components/layout/SettingsPage";
 import { WorkFolderListPanel } from "./components/layout/WorkFolderListPanel";
 import { WorkFolderPanel } from "./components/layout/WorkFolderPanel";
+import { HelpPanel } from "./components/layout/HelpPanel";
 import type { ModelInfo, SessionSummary } from "./lib/types";
 import {
   clearTauriRuntimeAuth,
@@ -98,7 +99,6 @@ export default function App() {
   const [oauthError, setOauthError] = useState<string | null>(null);
   const [isExchangingToken, setIsExchangingToken] = useState(false);
   const [offlineMode, setOfflineMode] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [availableModels, setAvailableModels] = useState<ModelInfo[] | null>(
@@ -125,6 +125,8 @@ export default function App() {
   const location = useLocation();
   const showTools = location.pathname === "/tools";
   const showWorkFolders = location.pathname.startsWith("/work-folders");
+  const showHelp = location.pathname === "/help";
+  const showSettings = location.pathname === "/settings";
   const isMacDesktop = isTauriMacOS();
   const supportsDesktopTools = isTauriDesktop();
   const desktopShellClass =
@@ -582,6 +584,20 @@ export default function App() {
     navigate("/");
   }, [navigate]);
 
+  const handleOpenHelp = useCallback(() => {
+    navigate("/help");
+    if (isMobile) {
+      setSidebarCollapsed(true);
+    }
+  }, [isMobile, navigate]);
+
+  const handleOpenSettings = useCallback(() => {
+    navigate("/settings");
+    if (isMobile) {
+      setSidebarCollapsed(true);
+    }
+  }, [isMobile, navigate]);
+
   const handleStartChatFromWorkFolder = useCallback(() => {
     chat.newChat();
     closeCanvas();
@@ -753,15 +769,12 @@ export default function App() {
           if (auth) setSearchOpen((prev) => !prev);
         },
         onSettings: () => {
-          // Escape closes settings or search
-          if (settingsOpen) {
-            setSettingsOpen(false);
-          } else if (searchOpen) {
+          if (searchOpen) {
             setSearchOpen(false);
           }
         },
       }),
-      [auth, chat, artifactState.closeCanvas, settingsOpen, searchOpen],
+      [auth, chat, artifactState.closeCanvas, searchOpen],
     ),
   );
 
@@ -836,11 +849,13 @@ export default function App() {
           }}
           onDeleteRoom={chat.deleteRoom}
           onTogglePin={chat.togglePin}
-          onLogout={handleLogout}
           onToggleTools={supportsDesktopTools ? handleToggleTools : undefined}
           showTools={showTools}
           showWorkFolders={showWorkFolders}
-          onOpenSettings={() => setSettingsOpen(true)}
+          showHelp={showHelp}
+          showSettings={showSettings}
+          onOpenHelp={handleOpenHelp}
+          onOpenSettings={handleOpenSettings}
           isCollapsed={isMobile ? false : sidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed((prev) => !prev)}
           activeProject={activeProject}
@@ -910,6 +925,50 @@ export default function App() {
                 }
               />
             )}
+            <Route
+              path="/help"
+              element={
+                <HelpPanel
+                  onBack={handleBackToChat}
+                  onOpenTools={
+                    supportsDesktopTools ? () => navigate("/tools") : undefined
+                  }
+                  onOpenWorkFolders={
+                    supportsDesktopTools
+                      ? () => openWorkFolderPage(activeProject?.path)
+                      : undefined
+                  }
+                />
+              }
+            />
+            <Route
+              path="/settings"
+              element={
+                <SettingsPage
+                  onBack={handleBackToChat}
+                  theme={theme}
+                  onThemeChange={setTheme}
+                  selectedModel={chat.selectedModel}
+                  modelOptions={modelOptions}
+                  onModelChange={chat.setSelectedModel}
+                  onLogout={handleLogout}
+                  apiBaseUrl={auth.apiBaseUrl}
+                  tenantId={auth.tenantId}
+                  onMcpConfigChanged={
+                    supportsDesktopTools ? refreshMcpTools : undefined
+                  }
+                  showMcpSettings={supportsDesktopTools}
+                  sendKey={sendKey}
+                  onSendKeyChange={setSendKey}
+                  realtimeVoiceEnabled={realtimeVoiceEnabled}
+                  onRealtimeVoiceEnabledChange={setRealtimeVoiceEnabled}
+                  globalCustomInstructions={globalCustomInstructions}
+                  onGlobalCustomInstructionsChange={setGlobalCustomInstructions}
+                  maxRequests={maxRequests}
+                  onMaxRequestsChange={setMaxRequests}
+                />
+              }
+            />
             {supportsDesktopTools && (
               <>
                 <Route
@@ -975,29 +1034,6 @@ export default function App() {
         )}
       </div>
 
-      {/* Settings panel */}
-      <SettingsPanel
-        isOpen={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        theme={theme}
-        onThemeChange={setTheme}
-        selectedModel={chat.selectedModel}
-        modelOptions={modelOptions}
-        onModelChange={chat.setSelectedModel}
-        onLogout={handleLogout}
-        apiBaseUrl={auth.apiBaseUrl}
-        tenantId={auth.tenantId}
-        onMcpConfigChanged={supportsDesktopTools ? refreshMcpTools : undefined}
-        showMcpSettings={supportsDesktopTools}
-        sendKey={sendKey}
-        onSendKeyChange={setSendKey}
-        realtimeVoiceEnabled={realtimeVoiceEnabled}
-        onRealtimeVoiceEnabledChange={setRealtimeVoiceEnabled}
-        globalCustomInstructions={globalCustomInstructions}
-        onGlobalCustomInstructionsChange={setGlobalCustomInstructions}
-        maxRequests={maxRequests}
-        onMaxRequestsChange={setMaxRequests}
-      />
     </div>
   );
 }

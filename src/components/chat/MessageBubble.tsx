@@ -15,6 +15,7 @@ import {
   ZoomIn,
   Copy,
   Check,
+  RefreshCw,
   PanelRightOpen,
 } from "lucide-react";
 import type { AgentChunk, Artifact } from "../../lib/types";
@@ -36,6 +37,7 @@ type Props = {
     contentType: "html" | "jsx",
   ) => void;
   searchQuery?: string;
+  onRetry?: () => void;
 };
 
 export function MessageBubble({
@@ -44,6 +46,7 @@ export function MessageBubble({
   onOptionSelect,
   onOpenCanvas,
   searchQuery,
+  onRetry,
 }: Props) {
   switch (chunk.type) {
     case "user":
@@ -62,6 +65,7 @@ export function MessageBubble({
           text={chunk.text || chunk.content || ""}
           onOpenArtifact={onOpenArtifact}
           searchQuery={searchQuery}
+          onRetry={onRetry}
         />
       );
     case "thinking":
@@ -225,10 +229,12 @@ function AssistantMessage({
   text,
   onOpenArtifact,
   searchQuery: _searchQuery,
+  onRetry,
 }: {
   text: string;
   onOpenArtifact?: (artifact: Artifact) => void;
   searchQuery?: string;
+  onRetry?: () => void;
 }) {
   const [copied, setCopied] = useState(false);
   const codeBlocks = extractCodeBlocks(text);
@@ -398,6 +404,18 @@ function AssistantMessage({
             )}
           </button>
 
+          {onRetry && (
+            <button
+              type="button"
+              onClick={onRetry}
+              className="notion-button h-7 w-7 p-0 text-xs"
+              aria-label="再生成"
+              title="再生成"
+            >
+              <RefreshCw size={12} />
+            </button>
+          )}
+
           {/* Artifact buttons for code blocks */}
           {codeBlocks.map((block, i) => (
             <button
@@ -506,12 +524,11 @@ function ToolCallMessage({
 
   return (
     <div className="flex justify-start mb-2 gap-2">
-      <div className="w-8" />
       <div className="max-w-[75%]">
         <div className="flex items-center gap-2">
           <button
             onClick={() => setExpanded(!expanded)}
-            className="flex items-center gap-1.5 text-xs text-stone-500 transition-colors hover:text-stone-700 dark:text-stone-400 dark:hover:text-stone-200"
+            className="flex items-center gap-1.5 text-left text-xs text-stone-500 transition-colors hover:text-stone-700 dark:text-stone-400 dark:hover:text-stone-200"
           >
             {isPending ? (
               <Loader2 size={12} className="animate-spin" />
@@ -559,11 +576,10 @@ function ToolResultMessage({ chunk }: { chunk: AgentChunk }) {
 
   return (
     <div className="flex justify-start mb-2 gap-2">
-      <div className="w-8" />
       <div className="max-w-[75%]">
         <button
           onClick={() => setExpanded(!expanded)}
-          className="flex items-center gap-1.5 text-xs text-stone-500 transition-colors hover:text-stone-700 dark:text-stone-400 dark:hover:text-stone-200"
+          className="flex items-center gap-1.5 text-left text-xs text-stone-500 transition-colors hover:text-stone-700 dark:text-stone-400 dark:hover:text-stone-200"
         >
           <CheckCircle size={12} />
           {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}

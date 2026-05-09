@@ -1,5 +1,5 @@
 import {
-  X,
+  ArrowLeft,
   Keyboard,
   Palette,
   Bot,
@@ -16,8 +16,7 @@ import type { ModelOption } from "../../lib/models";
 type Theme = "light" | "dark" | "system";
 
 type Props = {
-  isOpen: boolean;
-  onClose: () => void;
+  onBack: () => void;
   theme: Theme;
   onThemeChange: (theme: Theme) => void;
   selectedModel: string;
@@ -42,7 +41,7 @@ function getShortcuts(sendKey: SendKeyMode) {
   return [
     { key: "Ctrl + N", description: "新しいチャット" },
     { key: "Ctrl + F", description: "チャット内検索" },
-    { key: "Escape", description: "パネルを閉じる" },
+    { key: "Escape", description: "検索を閉じる" },
     {
       key: sendKey === "cmd-enter" ? "⌘/Ctrl + Enter" : "Enter",
       description: "メッセージ送信",
@@ -54,9 +53,8 @@ function getShortcuts(sendKey: SendKeyMode) {
   ];
 }
 
-export function SettingsPanel({
-  isOpen,
-  onClose,
+export function SettingsPage({
+  onBack,
   theme,
   onThemeChange,
   selectedModel,
@@ -76,32 +74,37 @@ export function SettingsPanel({
   maxRequests,
   onMaxRequestsChange,
 }: Props) {
-  if (!isOpen) return null;
-
   const shortcuts = getShortcuts(sendKey);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/40 dark:bg-black/60"
-        onClick={onClose}
-      />
-
-      {/* Panel */}
-      <div className="surface-panel relative mx-3 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-[24px] animate-fade-in sm:mx-4 sm:rounded-[28px]">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-stone-200/80 px-6 py-4 dark:border-stone-800/80">
-          <h2 className="text-base font-semibold text-stone-900 dark:text-stone-100">
-            設定
-          </h2>
-          <button onClick={onClose} className="notion-icon-button p-1.5">
-            <X size={18} />
+    <div className="flex h-full flex-col bg-transparent transition-colors duration-150">
+      <div className="border-b border-stone-200/80 bg-white/55 px-4 py-3 backdrop-blur-md dark:border-stone-800/80 dark:bg-stone-950/25">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={onBack}
+            className="notion-icon-button relative z-10 p-2"
+            title="チャットに戻る"
+          >
+            <ArrowLeft size={18} />
           </button>
+          <div
+            className="titlebar-safe-header min-w-0 flex-1"
+            data-tauri-drag-region
+          >
+            <div className="notion-label mb-1">Settings</div>
+            <h2 className="truncate text-sm font-semibold text-stone-900 dark:text-stone-100">
+              設定
+            </h2>
+            <p className="mt-0.5 text-[11px] text-stone-500 dark:text-stone-400">
+              表示、モデル、ショートカット、MCP、アカウント
+            </p>
+          </div>
         </div>
+      </div>
 
-        {/* Body */}
-        <div className="max-h-[78vh] space-y-6 overflow-y-auto px-4 py-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] sm:max-h-[70vh] sm:px-6 sm:pb-5">
+      <div className="flex-1 overflow-y-auto">
+        <div className="mx-auto max-w-3xl space-y-6 px-4 py-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)]">
           {/* Theme */}
           <section>
             <div className="flex items-center gap-2 mb-3">

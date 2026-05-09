@@ -242,18 +242,6 @@ export function ChatPanel({
           </div>
         )}
 
-        {projectContext && !projectContext.has_agents_file && (
-          <div className="notion-callout mx-4 mt-4 rounded-2xl px-4 py-3 text-xs text-stone-600 dark:text-stone-300">
-            <span className="font-medium text-slate-700 dark:text-slate-200">
-              {projectContext.name}
-            </span>
-            {` を Workspace として使用中です。`}
-            Workspace Custom Instructions
-            はまだありません。作業ディレクトリ画面から `AGENTS.md`
-            を保存すると、この Workspace 固有の指示を使えます。
-          </div>
-        )}
-
         <MessageList
           chunks={chat.chunks}
           isLoading={chat.isLoading}

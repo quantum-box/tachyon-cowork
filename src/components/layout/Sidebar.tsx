@@ -4,8 +4,8 @@ import {
   Search,
   Trash2,
   Settings,
-  LogOut,
   FolderOpen,
+  CircleHelp,
   Pin,
   PinOff,
   PanelLeftClose,
@@ -41,10 +41,12 @@ type Props = {
   onSelectSession: (id: string) => void;
   onDeleteRoom: (id: string) => void;
   onTogglePin: (id: string) => void;
-  onLogout: () => void;
   onToggleTools?: () => void;
   showTools: boolean;
   showWorkFolders: boolean;
+  showHelp: boolean;
+  showSettings: boolean;
+  onOpenHelp: () => void;
   onOpenSettings: () => void;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
@@ -64,10 +66,12 @@ export function Sidebar({
   onSelectSession,
   onDeleteRoom,
   onTogglePin,
-  onLogout,
   onToggleTools,
   showTools,
   showWorkFolders,
+  showHelp,
+  showSettings,
+  onOpenHelp,
   onOpenSettings,
   isCollapsed = false,
   onToggleCollapse,
@@ -132,8 +136,15 @@ export function Sidebar({
           <MessageCircle size={16} />
         </button>
         <button
+          onClick={onOpenHelp}
+          className={`notion-icon-button p-2 ${showHelp ? "bg-white text-stone-900 dark:bg-stone-900 dark:text-stone-100" : ""}`}
+          title="使い方"
+        >
+          <CircleHelp size={16} />
+        </button>
+        <button
           onClick={onOpenSettings}
-          className="notion-icon-button p-2"
+          className={`notion-icon-button p-2 ${showSettings ? "bg-white text-stone-900 dark:bg-stone-900 dark:text-stone-100" : ""}`}
           title="設定"
         >
           <Settings size={16} />
@@ -272,7 +283,7 @@ export function Sidebar({
         )}
       </div>
 
-      {/* File Tools button */}
+      {/* Primary navigation */}
       {onToggleTools && (
         <div className="px-3 pt-2.5">
           <button
@@ -349,18 +360,18 @@ export function Sidebar({
           <MessageCircle size={16} />
         </button>
         <button
+          onClick={onOpenHelp}
+          className={`notion-icon-button p-2 ${showHelp ? "bg-white text-stone-900 dark:bg-stone-900 dark:text-stone-100" : ""}`}
+          title="使い方"
+        >
+          <CircleHelp size={16} />
+        </button>
+        <button
           onClick={onOpenSettings}
-          className="notion-icon-button p-2"
+          className={`notion-icon-button p-2 ${showSettings ? "bg-white text-stone-900 dark:bg-stone-900 dark:text-stone-100" : ""}`}
           title="設定"
         >
           <Settings size={16} />
-        </button>
-        <button
-          onClick={onLogout}
-          className="notion-icon-button p-2"
-          title="ログアウト"
-        >
-          <LogOut size={16} />
         </button>
       </div>
     </div>
