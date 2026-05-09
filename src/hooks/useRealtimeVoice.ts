@@ -128,6 +128,7 @@ const AGENT_CHAT_DRAFT_TOOLS = [
     parameters: {
       type: "object",
       properties: {},
+      required: [],
       additionalProperties: false,
     },
   },
@@ -447,6 +448,7 @@ function toUserFacingRealtimeError(error: unknown): string {
 
   const message = error.message.toLowerCase();
   const errorName = error.name.toLowerCase();
+  const rawMessage = error.message.trim();
   if (
     errorName === "notallowederror" ||
     errorName === "securityerror" ||
@@ -466,6 +468,9 @@ function toUserFacingRealtimeError(error: unknown): string {
   if (message.includes("401") || message.includes("403")) {
     return "音声会話の認証に失敗しました。再ログインしてから再試行してください。";
   }
+  if (message.includes("voice sdp exchange failed")) {
+    return `音声会話のRealtime接続に失敗しました。${rawMessage}`;
+  }
   if (
     message.includes("client secret") ||
     message.includes("realtime") ||
@@ -474,7 +479,7 @@ function toUserFacingRealtimeError(error: unknown): string {
     return "音声会話の準備に失敗しました。時間をおいて再試行してください。";
   }
 
-  return "音声会話を開始できませんでした。ネットワークを確認して再試行してください。";
+  return `音声会話を開始できませんでした。${rawMessage || "ネットワークを確認して再試行してください。"}`;
 }
 
 export function useRealtimeVoice(
@@ -761,6 +766,7 @@ export function useRealtimeVoice(
     } catch (err) {
       stop();
       playRealtimeCue("error");
+      console.error("Failed to start realtime voice", err);
       setError(toUserFacingRealtimeError(err));
     }
   }, [client, handleRealtimeEvent, status, stop]);
