@@ -388,12 +388,12 @@ export default function App() {
   );
 
   const submitAgentChatDraftFromRealtime = useCallback(
-    async (text: string) => {
+    (text: string) => {
       const message = text.trim();
       if (!message) return;
       agentChatDraftRef.current = "";
       setChatInput("");
-      await sendMessage(message);
+      void sendMessage(message);
     },
     [sendMessage, setChatInput],
   );
