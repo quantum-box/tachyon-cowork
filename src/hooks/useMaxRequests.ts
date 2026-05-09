@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 const STORAGE_KEY = "tachyon-cowork.max-requests";
-const DEFAULT_MAX_REQUESTS = 10;
+const DEFAULT_MAX_REQUESTS = 50;
 const MIN_MAX_REQUESTS = 1;
 const MAX_MAX_REQUESTS = 100;
 

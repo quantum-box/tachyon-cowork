@@ -753,7 +753,7 @@ export function useAgentChat(
   globalCustomInstructions = "",
   activeProjectPath?: string | null,
   activeProjectContext?: ProjectContext | null,
-  maxRequests = 10,
+  maxRequests = 50,
 ) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [chunks, setChunks] = useState<AgentChunk[]>([]);
