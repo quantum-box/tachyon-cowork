@@ -63,11 +63,6 @@ jobs:
 
           echo "SHORT_SHA=$SHORT_SHA" >> "$GITHUB_ENV"
           echo "PR_NUMBER=$PR_NUMBER" >> "$GITHUB_ENV"
-          if [ -n "$PR_NUMBER" ]; then
-            echo "TESTFLIGHT_RELEASE_NOTES=PR #$PR_NUMBER / commit $SHORT_SHA" >> "$GITHUB_ENV"
-          else
-            echo "TESTFLIGHT_RELEASE_NOTES=commit $SHORT_SHA" >> "$GITHUB_ENV"
-          fi
 
       - name: Prepare marketing version
         run: |
@@ -216,6 +211,17 @@ jobs:
           echo "IOS_BUILD_NUMBER=$BUILD_NUMBER" >> "$GITHUB_ENV"
           echo "Using iOS build number: $BUILD_NUMBER"
 
+      - name: Generate TestFlight release notes
+        env:
+          APP_BUNDLE_ID: com.quantumbox.tachyon-cowork
+          LOCALE: en-US
+        run: |
+          set -euo pipefail
+          TESTFLIGHT_RELEASE_METADATA_PATH="$RUNNER_TEMP/testflight-release-metadata.json"
+          echo "TESTFLIGHT_RELEASE_METADATA_PATH=$TESTFLIGHT_RELEASE_METADATA_PATH" >> "$GITHUB_ENV"
+          export TESTFLIGHT_RELEASE_METADATA_PATH
+          node scripts/ci/generate-testflight-release-notes.mjs
+
       - name: Archive iOS app
         run: |
           set -euo pipefail
@@ -278,8 +284,16 @@ jobs:
           name: Tachyon-Cowork-iOS-IPA
           path: ${{ env.IOS_IPA_PATH }}
 
+      - name: Upload TestFlight release metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: testflight-release-metadata
+          path: ${{ env.TESTFLIGHT_RELEASE_METADATA_PATH }}
+
       - name: Validate TestFlight release notes script
-        run: node --check scripts/ci/set-testflight-release-notes.mjs
+        run: |
+          node --check scripts/ci/generate-testflight-release-notes.mjs
+          node --check scripts/ci/set-testflight-release-notes.mjs
 
       - name: Upload to App Store Connect
         if: github.event_name == 'push' || github.event.inputs.upload == 'true'
@@ -288,18 +302,6 @@ jobs:
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
           APP_STORE_CONNECT_KEY_PATH="$HOME/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8" mise run ios:upload
-
-      - name: Set TestFlight release notes
-        if: github.event_name == 'push' || github.event.inputs.upload == 'true'
-        env:
-          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-          APP_BUNDLE_ID: com.quantumbox.tachyon-cowork
-          LOCALE: en-US
-        run: |
-          set -euo pipefail
-          export APP_STORE_CONNECT_KEY_PATH="$HOME/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
-          node scripts/ci/set-testflight-release-notes.mjs
 
       - name: Commit bumped marketing version
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
