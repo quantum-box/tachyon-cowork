@@ -56,30 +56,6 @@ function formatWorkspaceLabel(projectContext: ProjectContext): string {
   return workspace;
 }
 
-function getRealtimeStatusLabel(
-  status: ReturnType<typeof useRealtimeVoice>["status"],
-): { text: string; className: string } {
-  if (status === "connected") {
-    return {
-      text: "準備完了",
-      className:
-        "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300",
-    };
-  }
-  if (status === "connecting") {
-    return {
-      text: "準備中",
-      className:
-        "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300",
-    };
-  }
-  return {
-    text: "停止中",
-    className:
-      "bg-white/70 text-sky-700 dark:bg-sky-900/40 dark:text-sky-200",
-  };
-}
-
 export function ChatPanel({
   chat,
   files,
@@ -327,8 +303,6 @@ function RealtimeTranscriptPanel({
   if (!isActive) return null;
 
   const recentTranscripts = voice.transcripts.slice(-4);
-  const statusLabel = getRealtimeStatusLabel(voice.status);
-
   return (
     <section
       className="fixed right-3 top-1/2 z-30 w-[min(320px,calc(100vw-1.5rem))] -translate-y-1/2 rounded-xl border border-slate-400/20 bg-slate-200/20 px-2.5 py-2 text-[11px] text-slate-800 shadow-[0_18px_42px_rgba(15,23,42,0.12)] backdrop-blur-sm dark:border-white/15 dark:bg-slate-950/20 dark:text-slate-100 sm:right-5"
@@ -339,25 +313,17 @@ function RealtimeTranscriptPanel({
         <div className="flex min-w-0 items-center gap-1.5 font-semibold text-sky-800 dark:text-sky-200">
           <Mic size={12} />
           <span>リアルタイム</span>
-          <span
-            className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold ${statusLabel.className}`}
-          >
-            {statusLabel.text}
-          </span>
-          <span className="rounded-full bg-white/20 px-1.5 py-0.5 text-[9px] font-medium text-sky-700 ring-1 ring-sky-100/35 dark:bg-sky-900/15 dark:text-sky-200 dark:ring-sky-700/25">
-            エージェントチャットとは別
-          </span>
         </div>
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex shrink-0 items-center gap-1.5">
           {isActive && (
             <button
               type="button"
               onClick={voice.stop}
-              className="inline-flex items-center gap-1 rounded-lg border border-red-300/55 bg-red-50/30 px-2 py-1 text-[10px] font-semibold text-red-700 transition-colors hover:bg-red-100/45 dark:border-red-900/45 dark:bg-red-950/20 dark:text-red-300 dark:hover:bg-red-950/40"
+              className="inline-flex min-h-7 items-center gap-1.5 rounded-full border border-red-200/80 bg-red-50/90 px-3 py-1 text-[11px] font-bold text-red-700 shadow-sm transition-colors hover:bg-red-100/90 dark:border-red-800/55 dark:bg-red-950/35 dark:text-red-300 dark:hover:bg-red-950/55"
               aria-label="リアルタイム音声を停止"
               title="リアルタイム音声を停止"
             >
-              <MicOff size={11} />
+              <MicOff size={12} />
               停止
             </button>
           )}
