@@ -88,9 +88,25 @@ export function MessageList({
     return -1;
   }, [displayChunks, isLoading, onRetry]);
 
+  const streamingAssistantIndex = useMemo(() => {
+    if (!isLoading) return -1;
+    for (let i = displayChunks.length - 1; i >= 0; i -= 1) {
+      if (isAssistantResponseChunk(displayChunks[i])) {
+        return i;
+      }
+    }
+    return -1;
+  }, [displayChunks, isLoading]);
+
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chunks]);
+    const frame = requestAnimationFrame(() => {
+      bottomRef.current?.scrollIntoView({
+        behavior: isLoading ? "auto" : "smooth",
+        block: "end",
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [chunks, isLoading]);
 
   return (
     <div
@@ -121,6 +137,7 @@ export function MessageList({
             >
               <MessageBubble
                 chunk={chunk}
+                isStreaming={index === streamingAssistantIndex}
                 onOpenArtifact={onOpenArtifact}
                 onOptionSelect={onSendMessage}
                 onOpenCanvas={onOpenCanvas}

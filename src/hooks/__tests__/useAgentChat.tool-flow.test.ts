@@ -196,6 +196,45 @@ describe("useAgentChat tool flow", () => {
     expect(result.current.error).toBeNull();
   });
 
+  it("merges streamed say chunks with distinct event ids into one assistant message", async () => {
+    const client = buildClient([
+      {
+        id: "chunk-say-token-1",
+        type: "say",
+        text: "Hello",
+        created_at: "2026-04-20T00:00:01.000Z",
+      },
+      {
+        id: "chunk-say-token-2",
+        type: "say",
+        text: " world",
+        created_at: "2026-04-20T00:00:01.100Z",
+      },
+      {
+        id: "chunk-say-token-3",
+        type: "say",
+        text: ".",
+        created_at: "2026-04-20T00:00:01.200Z",
+      },
+    ]);
+
+    const { result } = renderHook(() => useAgentChat(client));
+
+    await act(async () => {
+      await result.current.sendMessage("Stream a short response");
+    });
+
+    const assistantChunks = result.current.chunks.filter(
+      (chunk) => chunk.type === "say",
+    );
+    expect(assistantChunks).toHaveLength(1);
+    expect(assistantChunks[0]).toEqual(
+      expect.objectContaining({
+        text: "Hello world.",
+      }),
+    );
+  });
+
   it("handles chained client tool calls emitted after a tool result", async () => {
     vi.mocked(executeClientTool)
       .mockResolvedValueOnce({
