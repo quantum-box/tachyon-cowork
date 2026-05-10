@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/nicegui-lib/tauri-v2-schema/main/tauri.conf.json",
   "productName": "Tachyon Cowork",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "identifier": "com.quantumbox.tachyon-cowork",
   "build": {
     "beforeBuildCommand": "npm run build",
@@ -36,7 +36,9 @@
   "plugins": {
     "deep-link": {
       "desktop": {
-        "schemes": ["tachyon-cowork"]
+        "schemes": [
+          "tachyon-cowork"
+        ]
       }
     },
     "updater": {
