@@ -1,7 +1,6 @@
 pub mod file_manager;
 pub mod meeting_recorder;
 pub mod office_worker;
-pub mod web_search;
 
 use serde::Serialize;
 
@@ -47,7 +46,6 @@ pub fn all_apps() -> Vec<BuiltinAppInfo> {
         file_manager::app_info(),
         meeting_recorder::app_info(),
         office_worker::app_info(),
-        web_search::app_info(),
     ]
 }
 
@@ -62,7 +60,6 @@ pub async fn call_tool(
         "file_manager" => file_manager::call_tool(tool_name, arguments, project_root).await,
         "meeting_recorder" => meeting_recorder::call_tool(tool_name, arguments).await,
         "office_worker" => office_worker::call_tool(tool_name, arguments).await,
-        "web_search" => web_search::call_tool(tool_name, arguments).await,
         _ => Err(format!("Unknown built-in app: {}", app_id)),
     }
 }
