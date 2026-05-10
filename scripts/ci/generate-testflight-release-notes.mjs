@@ -119,7 +119,7 @@ if (process.env.TESTFLIGHT_RELEASE_METADATA_PATH) {
         bundleId: process.env.APP_BUNDLE_ID,
         locale: process.env.LOCALE,
         marketingVersion: process.env.MARKETING_VERSION,
-        buildNumber: process.env.IOS_BUILD_NUMBER,
+        buildNumber: process.env.APP_STORE_BUILD_VERSION || process.env.IOS_BUILD_NUMBER,
         releaseNotes,
         source: metadata.source,
         headSha: process.env.GITHUB_SHA,
