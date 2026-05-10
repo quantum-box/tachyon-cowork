@@ -82,9 +82,10 @@ async function findBuild(appId) {
     );
     await sleep(30_000);
   }
-  throw new Error(
-    `Could not find TestFlight build ${marketingVersion} (${buildNumber})`,
+  console.warn(
+    `::warning::Could not find TestFlight build ${marketingVersion} (${buildNumber}); skipping release notes because App Store Connect may still be processing the upload.`,
   );
+  return null;
 }
 
 const apps = await request(
@@ -96,6 +97,10 @@ if (!app) {
 }
 
 const build = await findBuild(app.id);
+if (!build) {
+  process.exit(0);
+}
+
 const localizations = await request(
   `/v1/builds/${build.id}/betaBuildLocalizations?filter[locale]=${encodeURIComponent(
     locale,
