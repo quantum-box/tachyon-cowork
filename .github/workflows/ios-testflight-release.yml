@@ -34,17 +34,70 @@ jobs:
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository)
     timeout-minutes: 90
     permissions:
-      contents: read
+      contents: write
       pull-requests: write
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
+
+      - name: Prepare release metadata
+        run: |
+          set -euo pipefail
+          SHORT_SHA="$(git rev-parse --short HEAD)"
+          COMMIT_SUBJECT="$(git log -1 --pretty=%s)"
+          PR_NUMBER=""
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            PR_NUMBER="${{ github.event.pull_request.number }}"
+          elif [[ "$COMMIT_SUBJECT" =~ \#([0-9]+) ]]; then
+            PR_NUMBER="${BASH_REMATCH[1]}"
+          fi
+
+          echo "SHORT_SHA=$SHORT_SHA" >> "$GITHUB_ENV"
+          echo "PR_NUMBER=$PR_NUMBER" >> "$GITHUB_ENV"
+          if [ -n "$PR_NUMBER" ]; then
+            echo "TESTFLIGHT_RELEASE_NOTES=PR #$PR_NUMBER / commit $SHORT_SHA" >> "$GITHUB_ENV"
+          else
+            echo "TESTFLIGHT_RELEASE_NOTES=commit $SHORT_SHA" >> "$GITHUB_ENV"
+          fi
+
+      - name: Prepare marketing version
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs');
+
+          const configPath = 'src-tauri/tauri.conf.json';
+          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+          const current = String(config.version);
+          let next = current;
+
+          if (
+            process.env.GITHUB_EVENT_NAME === 'push' &&
+            process.env.GITHUB_REF === 'refs/heads/main'
+          ) {
+            const parts = current.split('.').map((part) => Number.parseInt(part, 10));
+            if (parts.length !== 3 || parts.some((part) => Number.isNaN(part))) {
+              throw new Error(`Unsupported marketing version: ${current}`);
+            }
+
+            parts[2] += 1;
+            next = parts.join('.');
+            config.version = next;
+            fs.writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`);
+          }
+
+          fs.appendFileSync(process.env.GITHUB_ENV, `MARKETING_VERSION=${next}\n`);
+          console.log(`Using marketing version: ${next}`);
+          NODE
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -154,6 +207,9 @@ jobs:
             BUILD_NUMBER="${{ github.event.inputs.build_number }}"
           elif [ "${{ github.event_name }}" = "pull_request" ]; then
             BUILD_NUMBER="$(date +%m%d%H%M)${GITHUB_RUN_ATTEMPT}"
+          elif [ "${{ github.event_name }}" = "push" ] && [ "${GITHUB_REF}" = "refs/heads/main" ]; then
+            test -n "${PR_NUMBER:-}"
+            BUILD_NUMBER="${PR_NUMBER}${GITHUB_RUN_ATTEMPT}"
           else
             BUILD_NUMBER="$(date +%m%d%H%M | sed 's/^0*//')"
           fi
@@ -229,6 +285,168 @@ jobs:
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
           APP_STORE_CONNECT_KEY_PATH="$HOME/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8" mise run ios:upload
+
+      - name: Set TestFlight release notes
+        if: github.event_name == 'push' || github.event.inputs.upload == 'true'
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_BUNDLE_ID: com.quantumbox.tachyon-cowork
+          LOCALE: en-US
+        run: |
+          set -euo pipefail
+          export APP_STORE_CONNECT_KEY_PATH="$HOME/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
+          node <<'NODE'
+          const crypto = require('node:crypto');
+          const fs = require('node:fs');
+
+          const apiBase = 'https://api.appstoreconnect.apple.com';
+          const keyId = process.env.APP_STORE_CONNECT_KEY_ID;
+          const issuerId = process.env.APP_STORE_CONNECT_ISSUER_ID;
+          const privateKey = fs.readFileSync(process.env.APP_STORE_CONNECT_KEY_PATH, 'utf8');
+          const bundleId = process.env.APP_BUNDLE_ID;
+          const marketingVersion = process.env.MARKETING_VERSION;
+          const buildNumber = process.env.IOS_BUILD_NUMBER;
+          const locale = process.env.LOCALE;
+          const whatsNew = process.env.TESTFLIGHT_RELEASE_NOTES;
+
+          function base64url(value) {
+            return Buffer.from(value).toString('base64url');
+          }
+
+          function createToken() {
+            const now = Math.floor(Date.now() / 1000);
+            const header = { alg: 'ES256', kid: keyId, typ: 'JWT' };
+            const payload = {
+              aud: 'appstoreconnect-v1',
+              exp: now + 20 * 60,
+              iat: now,
+              iss: issuerId,
+            };
+            const body = `${base64url(JSON.stringify(header))}.${base64url(
+              JSON.stringify(payload),
+            )}`;
+            const signature = crypto.sign('sha256', Buffer.from(body), {
+              key: privateKey,
+              dsaEncoding: 'ieee-p1363',
+            });
+            return `${body}.${signature.toString('base64url')}`;
+          }
+
+          async function request(path, options = {}) {
+            const response = await fetch(`${apiBase}${path}`, {
+              ...options,
+              headers: {
+                Authorization: `Bearer ${createToken()}`,
+                'Content-Type': 'application/json',
+                ...(options.headers || {}),
+              },
+            });
+            const text = await response.text();
+            const data = text ? JSON.parse(text) : {};
+            if (!response.ok) {
+              throw new Error(
+                `App Store Connect API ${response.status} ${response.statusText}: ${text}`,
+              );
+            }
+            return data;
+          }
+
+          function sleep(ms) {
+            return new Promise((resolve) => setTimeout(resolve, ms));
+          }
+
+          async function findBuild(appId) {
+            for (let attempt = 1; attempt <= 30; attempt += 1) {
+              const preReleaseVersions = await request(
+                `/v1/preReleaseVersions?filter[app]=${appId}&filter[platform]=IOS&filter[version]=${encodeURIComponent(
+                  marketingVersion,
+                )}&limit=1`,
+              );
+              const preReleaseVersion = preReleaseVersions.data?.[0];
+              if (preReleaseVersion) {
+                const builds = await request(
+                  `/v1/builds?filter[preReleaseVersion]=${preReleaseVersion.id}&filter[version]=${encodeURIComponent(
+                    buildNumber,
+                  )}&limit=1`,
+                );
+                const build = builds.data?.[0];
+                if (build) {
+                  return build;
+                }
+              }
+
+              console.log(
+                `Waiting for TestFlight build ${marketingVersion} (${buildNumber}) to appear (${attempt}/30)...`,
+              );
+              await sleep(30_000);
+            }
+            throw new Error(
+              `Could not find TestFlight build ${marketingVersion} (${buildNumber})`,
+            );
+          }
+
+          const apps = await request(
+            `/v1/apps?filter[bundleId]=${encodeURIComponent(bundleId)}&limit=1`,
+          );
+          const app = apps.data?.[0];
+          if (!app) {
+            throw new Error(`Could not find app for bundle id ${bundleId}`);
+          }
+
+          const build = await findBuild(app.id);
+          const localizations = await request(
+            `/v1/builds/${build.id}/betaBuildLocalizations?filter[locale]=${encodeURIComponent(
+              locale,
+            )}&limit=1`,
+          );
+          const localization = localizations.data?.[0];
+
+          if (localization) {
+            await request(`/v1/betaBuildLocalizations/${localization.id}`, {
+              method: 'PATCH',
+              body: JSON.stringify({
+                data: {
+                  id: localization.id,
+                  type: 'betaBuildLocalizations',
+                  attributes: { whatsNew },
+                },
+              }),
+            });
+          } else {
+            await request('/v1/betaBuildLocalizations', {
+              method: 'POST',
+              body: JSON.stringify({
+                data: {
+                  type: 'betaBuildLocalizations',
+                  attributes: { locale, whatsNew },
+                  relationships: {
+                    build: {
+                      data: { id: build.id, type: 'builds' },
+                    },
+                  },
+                },
+              }),
+            });
+          }
+
+          console.log(`Set TestFlight release notes: ${whatsNew}`);
+          NODE
+
+      - name: Commit bumped marketing version
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- src-tauri/tauri.conf.json; then
+            echo "No marketing version change to commit."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src-tauri/tauri.conf.json
+          git commit -m "[skip ci] chore: bump version to ${MARKETING_VERSION}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
 
       - name: Show Rust compiler cache stats
         if: always()
