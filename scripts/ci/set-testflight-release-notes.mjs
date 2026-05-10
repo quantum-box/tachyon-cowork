@@ -10,6 +10,14 @@ const marketingVersion = process.env.MARKETING_VERSION;
 const buildNumber = process.env.IOS_BUILD_NUMBER;
 const locale = process.env.LOCALE;
 const whatsNew = process.env.TESTFLIGHT_RELEASE_NOTES;
+const buildLookupAttempts = Number.parseInt(
+  process.env.TESTFLIGHT_BUILD_LOOKUP_ATTEMPTS || "30",
+  10,
+);
+const buildLookupDelayMs = Number.parseInt(
+  process.env.TESTFLIGHT_BUILD_LOOKUP_DELAY_MS || "30000",
+  10,
+);
 
 function base64url(value) {
   return Buffer.from(value).toString("base64url");
@@ -58,7 +66,7 @@ function sleep(ms) {
 }
 
 async function findBuild(appId) {
-  for (let attempt = 1; attempt <= 30; attempt += 1) {
+  for (let attempt = 1; attempt <= buildLookupAttempts; attempt += 1) {
     const preReleaseVersions = await request(
       `/v1/preReleaseVersions?filter[app]=${appId}&filter[platform]=IOS&filter[version]=${encodeURIComponent(
         marketingVersion,
@@ -78,9 +86,9 @@ async function findBuild(appId) {
     }
 
     console.log(
-      `Waiting for TestFlight build ${marketingVersion} (${buildNumber}) to appear (${attempt}/30)...`,
+      `Waiting for TestFlight build ${marketingVersion} (${buildNumber}) to appear (${attempt}/${buildLookupAttempts})...`,
     );
-    await sleep(30_000);
+    await sleep(buildLookupDelayMs);
   }
   console.warn(
     `::warning::Could not find TestFlight build ${marketingVersion} (${buildNumber}); skipping release notes because App Store Connect may still be processing the upload.`,
