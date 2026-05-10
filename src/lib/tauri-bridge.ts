@@ -29,6 +29,16 @@ export function isTauri(): boolean {
   );
 }
 
+/** Read the application marketing version from Tauri. Returns null on web. */
+export async function getTauriAppVersion(): Promise<string | null> {
+  if (!isTauri()) {
+    return null;
+  }
+
+  const { getVersion } = await import("@tauri-apps/api/app");
+  return getVersion();
+}
+
 export type TauriPlatform = "android" | "ios" | "linux" | "macos" | "windows";
 
 const MOBILE_TAURI_PLATFORMS = new Set<TauriPlatform>(["android", "ios"]);

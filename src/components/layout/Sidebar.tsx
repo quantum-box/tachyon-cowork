@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   MessageSquarePlus,
   Search,
@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import type { SessionSummary } from "../../lib/types";
 import {
+  getTauriAppVersion,
   isTauri,
   isTauriMacOS,
   type ProjectEntry,
@@ -79,6 +80,7 @@ export function Sidebar({
 }: Props) {
   const isMacDesktop = isTauriMacOS();
   const [search, setSearch] = useState("");
+  const [appVersion, setAppVersion] = useState<string | null>(null);
   const workFolderList =
     recentProjects.length > 0
       ? recentProjects.slice(0, 3)
@@ -86,6 +88,27 @@ export function Sidebar({
         ? [activeProject]
         : [];
   const canUseWorkFolders = !!onPickProject;
+  const displayedVersion = appVersion ? `v${appVersion}` : null;
+
+  useEffect(() => {
+    let isMounted = true;
+
+    getTauriAppVersion()
+      .then((version) => {
+        if (isMounted) {
+          setAppVersion(version);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setAppVersion(null);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const filtered = search
     ? sessions.filter((r) =>
@@ -326,28 +349,35 @@ export function Sidebar({
       <UpdateChecker />
 
       {/* Footer */}
-      <div className="flex items-center gap-2 border-t border-stone-200/80 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 dark:border-stone-800/80">
-        <button
-          onClick={openFeedbackUrl}
-          className="notion-icon-button p-2"
-          title="フィードバック"
-        >
-          <MessageCircle size={16} />
-        </button>
-        <button
-          onClick={onOpenHelp}
-          className={`notion-icon-button p-2 ${showHelp ? "bg-white text-stone-900 dark:bg-stone-900 dark:text-stone-100" : ""}`}
-          title="使い方"
-        >
-          <CircleHelp size={16} />
-        </button>
-        <button
-          onClick={onOpenSettings}
-          className={`notion-icon-button p-2 ${showSettings ? "bg-white text-stone-900 dark:bg-stone-900 dark:text-stone-100" : ""}`}
-          title="設定"
-        >
-          <Settings size={16} />
-        </button>
+      <div className="border-t border-stone-200/80 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 dark:border-stone-800/80">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={openFeedbackUrl}
+            className="notion-icon-button p-2"
+            title="フィードバック"
+          >
+            <MessageCircle size={16} />
+          </button>
+          <button
+            onClick={onOpenHelp}
+            className={`notion-icon-button p-2 ${showHelp ? "bg-white text-stone-900 dark:bg-stone-900 dark:text-stone-100" : ""}`}
+            title="使い方"
+          >
+            <CircleHelp size={16} />
+          </button>
+          <button
+            onClick={onOpenSettings}
+            className={`notion-icon-button p-2 ${showSettings ? "bg-white text-stone-900 dark:bg-stone-900 dark:text-stone-100" : ""}`}
+            title="設定"
+          >
+            <Settings size={16} />
+          </button>
+        </div>
+        {displayedVersion && (
+          <div className="pt-2 text-center text-[10px] font-medium tabular-nums text-stone-400 dark:text-stone-500">
+            {displayedVersion}
+          </div>
+        )}
       </div>
     </div>
   );
