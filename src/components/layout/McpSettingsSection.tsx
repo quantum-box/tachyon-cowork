@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Plus, Trash2, Terminal, Globe, Package, ChevronDown, ChevronRight } from "lucide-react";
 import {
   isTauri,
+  isTauriMobile,
   mcpAddServer,
   mcpRemoveServer,
   mcpToggleServer,
@@ -19,6 +20,8 @@ type Props = {
 };
 
 export function McpSettingsSection({ onConfigChanged }: Props) {
+  const isNativeApp = isTauri();
+  const isMobileApp = isTauriMobile();
   const [statuses, setStatuses] = useState<McpServerStatus[]>([]);
   const [builtinAppInfos, setBuiltinAppInfos] = useState<BuiltinAppInfo[]>([]);
   const [showForm, setShowForm] = useState(false);
@@ -27,13 +30,15 @@ export function McpSettingsSection({ onConfigChanged }: Props) {
 
   // フォーム状態
   const [name, setName] = useState("");
-  const [transportType, setTransportType] = useState<"stdio" | "sse">("stdio");
+  const [transportType, setTransportType] = useState<"stdio" | "sse">(() =>
+    isTauriMobile() ? "sse" : "stdio",
+  );
   const [command, setCommand] = useState("");
   const [args, setArgs] = useState("");
   const [url, setUrl] = useState("");
 
   const refreshStatuses = useCallback(async () => {
-    if (!isTauri()) return;
+    if (!isNativeApp) return;
     try {
       const [s, apps] = await Promise.all([mcpGetServerStatuses(), mcpGetBuiltinApps()]);
       setStatuses(s);
@@ -41,11 +46,17 @@ export function McpSettingsSection({ onConfigChanged }: Props) {
     } catch (e) {
       console.error("Failed to fetch MCP statuses:", e);
     }
-  }, []);
+  }, [isNativeApp]);
 
   useEffect(() => {
     refreshStatuses();
   }, [refreshStatuses]);
+
+  useEffect(() => {
+    if (isMobileApp && transportType === "stdio") {
+      setTransportType("sse");
+    }
+  }, [isMobileApp, transportType]);
 
   const builtinApps = statuses.filter((s) => s.builtin);
   const externalServers = statuses.filter((s) => !s.builtin);
@@ -146,13 +157,13 @@ export function McpSettingsSection({ onConfigChanged }: Props) {
     setCommand("");
     setArgs("");
     setUrl("");
-    setTransportType("stdio");
+    setTransportType(isMobileApp ? "sse" : "stdio");
   };
 
-  if (!isTauri()) {
+  if (!isNativeApp) {
     return (
       <p className="text-xs text-gray-500 dark:text-gray-400">
-        MCP サーバーはデスクトップアプリでのみ利用できます。
+        MCP 設定は Tachyon Cowork アプリで利用できます。
       </p>
     );
   }
@@ -266,6 +277,12 @@ export function McpSettingsSection({ onConfigChanged }: Props) {
           </p>
         )}
 
+        {isMobileApp && (
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            iOS / Android では外部コマンドを起動する stdio MCP は利用できません。
+          </p>
+        )}
+
         {externalServers.map((s) => (
           <div
             key={s.id}
@@ -336,11 +353,12 @@ export function McpSettingsSection({ onConfigChanged }: Props) {
             <div className="flex gap-2">
               <button
                 onClick={() => setTransportType("stdio")}
+                disabled={isMobileApp}
                 className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
                   transportType === "stdio"
                     ? "bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-700"
                     : "bg-white dark:bg-slate-900 text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-slate-600"
-                }`}
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 <Terminal size={12} />
                 stdio
