@@ -297,8 +297,8 @@ jobs:
           set -euo pipefail
           export APP_STORE_CONNECT_KEY_PATH="$HOME/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
           node <<'NODE'
-          const crypto = require('node:crypto');
-          const fs = require('node:fs');
+          import crypto from 'node:crypto';
+          import fs from 'node:fs';
 
           const apiBase = 'https://api.appstoreconnect.apple.com';
           const keyId = process.env.APP_STORE_CONNECT_KEY_ID;
