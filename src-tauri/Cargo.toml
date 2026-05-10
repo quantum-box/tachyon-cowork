@@ -1,6 +1,6 @@
 [package]
 name = "tachyon-cowork"
-version = "0.1.2"
+version = "0.2.0"
 description = "Tachyon Cowork - AI Assistant Desktop App"
 edition = "2021"
 
