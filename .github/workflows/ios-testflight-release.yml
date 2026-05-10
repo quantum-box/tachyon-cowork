@@ -29,7 +29,7 @@ concurrency:
 
 jobs:
   testflight:
-    name: Build and upload TestFlight IPA
+    name: Build iOS IPA and upload TestFlight on main
     runs-on: macos-26
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository)
     timeout-minutes: 90
@@ -223,7 +223,7 @@ jobs:
           path: ${{ env.IOS_IPA_PATH }}
 
       - name: Upload to App Store Connect
-        if: github.event_name == 'push' || github.event_name == 'pull_request' || github.event.inputs.upload == 'true'
+        if: github.event_name == 'push' || github.event.inputs.upload == 'true'
         env:
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
@@ -244,7 +244,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: `Uploaded TestFlight build \`${version}\` for this PR.`
+              body: `Built iOS IPA \`${version}\` for this PR. TestFlight upload runs on main push.`
             });
 
       - name: Notify Slack on failure
