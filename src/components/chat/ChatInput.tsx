@@ -128,21 +128,16 @@ export function ChatInput({
   const voiceStatus = realtimeVoice?.status ?? "idle";
   const isVoiceConnecting = voiceStatus === "connecting";
   const isVoiceConnected = voiceStatus === "connected";
+  const isVoiceActive = isVoiceConnecting || isVoiceConnected;
 
   const handleVoiceClick = useCallback(async () => {
     if (!realtimeVoice || isDisabled || isLoading) return;
-    if (isVoiceConnected || isVoiceConnecting) {
+    if (isVoiceActive) {
       realtimeVoice.stop();
       return;
     }
     await realtimeVoice.start();
-  }, [
-    isDisabled,
-    isLoading,
-    isVoiceConnected,
-    isVoiceConnecting,
-    realtimeVoice,
-  ]);
+  }, [isDisabled, isLoading, isVoiceActive, realtimeVoice]);
 
   return (
     <form
@@ -193,22 +188,16 @@ export function ChatInput({
                   onClick={handleVoiceClick}
                   disabled={isDisabled || isLoading}
                   className={[
-                    "notion-icon-button min-h-9 min-w-9 shrink-0 rounded-2xl p-2 disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-10 sm:min-w-10 sm:p-2.5",
-                    isVoiceConnected
-                      ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300"
-                      : "",
+                    "notion-icon-button min-h-9 shrink-0 rounded-2xl disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-10",
+                    isVoiceActive
+                      ? "min-w-[74px] gap-1.5 border-red-200/80 bg-red-50 px-3 py-2 font-bold text-red-700 shadow-sm hover:bg-red-100 dark:border-red-800/55 dark:bg-red-950/35 dark:text-red-300 dark:hover:bg-red-950/55 sm:min-w-[82px] sm:px-3.5 sm:py-2.5"
+                      : "min-w-9 p-2 sm:min-w-10 sm:p-2.5",
                   ].join(" ")}
                   aria-label={
-                    isVoiceConnected || isVoiceConnecting
-                      ? "音声会話を終了"
-                      : "音声会話を開始"
+                    isVoiceActive ? "音声会話を停止" : "音声会話を開始"
                   }
                   title={
-                    isVoiceConnected
-                      ? "音声会話を終了"
-                      : isVoiceConnecting
-                        ? "音声会話に接続中"
-                        : "音声会話を開始"
+                    isVoiceActive ? "音声会話を停止" : "音声会話を開始"
                   }
                 >
                   {isVoiceConnecting ? (
@@ -218,6 +207,7 @@ export function ChatInput({
                   ) : (
                     <Mic size={19} />
                   )}
+                  {isVoiceActive && <span className="text-[12px]">停止</span>}
                 </button>
               )}
             </div>
