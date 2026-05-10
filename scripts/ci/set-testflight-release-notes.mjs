@@ -110,11 +110,11 @@ if (!build) {
 }
 
 const localizations = await request(
-  `/v1/builds/${build.id}/betaBuildLocalizations?filter[locale]=${encodeURIComponent(
-    locale,
-  )}&limit=1`,
+  `/v1/builds/${build.id}/betaBuildLocalizations?limit=200`,
 );
-const localization = localizations.data?.[0];
+const localization = localizations.data?.find(
+  (item) => item.attributes?.locale === locale,
+);
 
 if (localization) {
   await request(`/v1/betaBuildLocalizations/${localization.id}`, {
