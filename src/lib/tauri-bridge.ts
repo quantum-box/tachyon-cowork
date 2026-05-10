@@ -9,9 +9,24 @@ import type { ToolCall, ToolResult } from "./types";
 import type { AuthState } from "./auth";
 import { getConfiguredApiBaseUrl } from "./auth-config";
 
+type TauriGlobal = typeof globalThis & {
+  isTauri?: boolean;
+  __TAURI__?: unknown;
+  __TAURI_INTERNALS__?: unknown;
+};
+
 /** Detect whether we are running inside a Tauri webview. */
 export function isTauri(): boolean {
-  return typeof window !== "undefined" && "__TAURI__" in window;
+  if (typeof globalThis === "undefined") {
+    return false;
+  }
+
+  const tauriGlobal = globalThis as TauriGlobal;
+  return (
+    tauriGlobal.isTauri === true ||
+    "__TAURI__" in tauriGlobal ||
+    "__TAURI_INTERNALS__" in tauriGlobal
+  );
 }
 
 export type TauriPlatform = "android" | "ios" | "linux" | "macos" | "windows";
