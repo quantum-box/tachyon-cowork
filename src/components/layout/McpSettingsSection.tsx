@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
-import { Plus, Trash2, Terminal, Globe, Package, ChevronDown, ChevronRight } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  Terminal,
+  Globe,
+  Package,
+  ChevronDown,
+  ChevronRight,
+  Search,
+} from "lucide-react";
 import {
   isTauri,
   mcpAddServer,
@@ -17,6 +26,17 @@ import {
 type Props = {
   onConfigChanged?: () => void;
 };
+
+const AGENT_API_BUILTIN_TOOLS = [
+  {
+    name: "web_search",
+    description: "Web検索を Agent API の組み込みツールで実行します",
+  },
+  {
+    name: "url_fetch",
+    description: "URL取得を Agent API の組み込みツールで実行します",
+  },
+] as const;
 
 export function McpSettingsSection({ onConfigChanged }: Props) {
   const [statuses, setStatuses] = useState<McpServerStatus[]>([]);
@@ -159,6 +179,68 @@ export function McpSettingsSection({ onConfigChanged }: Props) {
 
   return (
     <div className="space-y-4">
+      {/* Agent API 組み込みツール */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+          <Search size={12} />
+          Agent API 組み込みツール
+        </div>
+
+        <div className="space-y-0">
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700">
+            <button
+              onClick={() => toggleExpanded("agent-api-builtins")}
+              className="shrink-0 p-0.5 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            >
+              {expandedApps.has("agent-api-builtins") ? (
+                <ChevronDown size={14} />
+              ) : (
+                <ChevronRight size={14} />
+              )}
+            </button>
+
+            <span className="shrink-0 w-2 h-2 rounded-full bg-emerald-500" />
+
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
+                Agent API Tools
+              </div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                API 組み込みの検索・URL取得
+              </div>
+            </div>
+
+            <span className="shrink-0 text-xs text-gray-400 dark:text-gray-500">
+              ツール {AGENT_API_BUILTIN_TOOLS.length} 件
+            </span>
+
+            <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+              有効
+            </span>
+          </div>
+
+          {expandedApps.has("agent-api-builtins") && (
+            <div className="ml-7 mt-1 mb-1 px-3 py-2 rounded-md bg-gray-100 dark:bg-slate-800/50 border border-gray-150 dark:border-slate-700/50">
+              <div className="space-y-1.5">
+                {AGENT_API_BUILTIN_TOOLS.map((tool) => (
+                  <div key={tool.name} className="text-xs flex items-start gap-1.5">
+                    <span className="w-1 h-1 mt-1.5 rounded-full bg-gray-400 dark:bg-gray-500 shrink-0" />
+                    <div>
+                      <span className="font-mono text-gray-700 dark:text-gray-300">
+                        {tool.name}
+                      </span>
+                      <span className="text-gray-400 dark:text-gray-500 ml-1.5">
+                        {tool.description}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* 組み込みアプリ */}
       {builtinApps.length > 0 && (
         <div className="space-y-2">
