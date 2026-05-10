@@ -211,17 +211,6 @@ jobs:
           echo "IOS_BUILD_NUMBER=$BUILD_NUMBER" >> "$GITHUB_ENV"
           echo "Using iOS build number: $BUILD_NUMBER"
 
-      - name: Generate TestFlight release notes
-        env:
-          APP_BUNDLE_ID: com.quantumbox.tachyon-cowork
-          LOCALE: en-US
-        run: |
-          set -euo pipefail
-          TESTFLIGHT_RELEASE_METADATA_PATH="$RUNNER_TEMP/testflight-release-metadata.json"
-          echo "TESTFLIGHT_RELEASE_METADATA_PATH=$TESTFLIGHT_RELEASE_METADATA_PATH" >> "$GITHUB_ENV"
-          export TESTFLIGHT_RELEASE_METADATA_PATH
-          node scripts/ci/generate-testflight-release-notes.mjs
-
       - name: Archive iOS app
         run: |
           set -euo pipefail
@@ -277,6 +266,18 @@ jobs:
           ./scripts/ci/verify-ios-icons.sh
           echo "Verified ITSAppUsesNonExemptEncryption=false in build $VERSION"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "APP_STORE_BUILD_VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Generate TestFlight release notes
+        env:
+          APP_BUNDLE_ID: com.quantumbox.tachyon-cowork
+          LOCALE: en-US
+        run: |
+          set -euo pipefail
+          TESTFLIGHT_RELEASE_METADATA_PATH="$RUNNER_TEMP/testflight-release-metadata.json"
+          echo "TESTFLIGHT_RELEASE_METADATA_PATH=$TESTFLIGHT_RELEASE_METADATA_PATH" >> "$GITHUB_ENV"
+          export TESTFLIGHT_RELEASE_METADATA_PATH
+          node scripts/ci/generate-testflight-release-notes.mjs
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
