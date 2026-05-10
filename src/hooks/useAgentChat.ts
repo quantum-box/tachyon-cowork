@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { AgentChatClient, isUnauthorizedApiError } from "../lib/api-client";
 import type {
   AgentChunk,
@@ -34,6 +35,15 @@ const MAX_RETRIES = 2;
 
 /** Base delay for exponential backoff (ms) */
 const RETRY_BASE_DELAY_MS = 1_000;
+
+function waitForNextPaint(): Promise<void> {
+  if (typeof requestAnimationFrame === "function") {
+    return new Promise((resolve) => {
+      requestAnimationFrame(() => resolve());
+    });
+  }
+  return delay(0);
+}
 
 function isRetryableError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
@@ -523,7 +533,7 @@ function getChunkStreamKey(
     case "say":
     case "attempt_completion":
     case "completion":
-      return `${chunk.type}:${getChunkSourceId(chunk)}:${streamState?.assistantSegment ?? 0}`;
+      return `${chunk.type}:${streamState?.assistantSegment ?? 0}`;
     case "thinking":
       return "thinking";
     case "tool_call":
@@ -539,6 +549,16 @@ function getChunkStreamKey(
     default:
       return `${chunk.type}:${getChunkSourceId(chunk)}`;
   }
+}
+
+function isStreamingTextChunk(chunk: AgentChunk): boolean {
+  return (
+    chunk.type === "say" ||
+    chunk.type === "assistant" ||
+    chunk.type === "attempt_completion" ||
+    chunk.type === "completion" ||
+    chunk.type === "thinking"
+  );
 }
 
 function withStreamScopedId(
@@ -1070,7 +1090,14 @@ export function useAgentChat(
           streamScopeState,
         );
         receivedStreamChunk = true;
-        setChunks((prev) => upsertChunk(prev, chunk));
+        if (isStreamingTextChunk(chunk)) {
+          flushSync(() => {
+            setChunks((prev) => upsertChunk(prev, chunk));
+          });
+          await waitForNextPaint();
+        } else {
+          setChunks((prev) => upsertChunk(prev, chunk));
+        }
 
         if (chunk.type === "tool_call_pending" && currentSessionId) {
           try {

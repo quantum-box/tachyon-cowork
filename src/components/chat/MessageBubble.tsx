@@ -30,6 +30,7 @@ import { MermaidDiagram } from "../artifact/MermaidDiagram";
 
 type Props = {
   chunk: AgentChunk;
+  isStreaming?: boolean;
   onOpenArtifact?: (artifact: Artifact) => void;
   onOptionSelect?: (option: string) => void;
   onOpenCanvas?: (
@@ -43,6 +44,7 @@ type Props = {
 
 export function MessageBubble({
   chunk,
+  isStreaming,
   onOpenArtifact,
   onOptionSelect,
   onOpenCanvas,
@@ -64,6 +66,7 @@ export function MessageBubble({
       return (
         <AssistantMessage
           text={chunk.text || chunk.content || ""}
+          isStreaming={isStreaming}
           onOpenArtifact={onOpenArtifact}
           searchQuery={searchQuery}
           onRetry={onRetry}
@@ -241,11 +244,13 @@ function extractCodeBlocks(text: string): CodeBlockInfo[] {
 
 function AssistantMessage({
   text,
+  isStreaming,
   onOpenArtifact,
   searchQuery: _searchQuery,
   onRetry,
 }: {
   text: string;
+  isStreaming?: boolean;
   onOpenArtifact?: (artifact: Artifact) => void;
   searchQuery?: string;
   onRetry?: () => void;
@@ -288,6 +293,16 @@ function AssistantMessage({
     },
     [onOpenArtifact],
   );
+
+  if (isStreaming) {
+    return (
+      <div className="group/msg mb-8">
+        <div className="max-w-none whitespace-pre-wrap text-[15px] leading-7 text-stone-800 dark:text-stone-100">
+          {text}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="group/msg mb-8">
