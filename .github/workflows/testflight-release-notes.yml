@@ -1,0 +1,87 @@
+name: TestFlight Release Notes
+
+on:
+  workflow_run:
+    workflows: ["iOS TestFlight Release"]
+    types: [completed]
+
+concurrency:
+  group: testflight-release-notes-${{ github.event.workflow_run.id }}
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    name: Apply TestFlight release notes
+    if: >
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      actions: read
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Download TestFlight release metadata
+        uses: actions/download-artifact@v4
+        with:
+          name: testflight-release-metadata
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/testflight-release-metadata
+
+      - name: Install App Store Connect API key
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_API_KEY_P8: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
+        run: |
+          set -euo pipefail
+          test -n "$APP_STORE_CONNECT_KEY_ID"
+          test -n "$APP_STORE_CONNECT_API_KEY_P8"
+          mkdir -p "$HOME/.appstoreconnect/private_keys"
+          chmod 700 "$HOME/.appstoreconnect/private_keys"
+          printf '%s' "$APP_STORE_CONNECT_API_KEY_P8" > "$HOME/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
+          chmod 600 "$HOME/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
+
+      - name: Load TestFlight release metadata
+        run: |
+          set -euo pipefail
+          export METADATA_PATH="$RUNNER_TEMP/testflight-release-metadata/testflight-release-metadata.json"
+          node <<'NODE'
+          const fs = require('node:fs');
+
+          const metadata = JSON.parse(fs.readFileSync(process.env.METADATA_PATH, 'utf8'));
+          const values = {
+            APP_BUNDLE_ID: metadata.bundleId,
+            LOCALE: metadata.locale,
+            MARKETING_VERSION: metadata.marketingVersion,
+            IOS_BUILD_NUMBER: metadata.buildNumber,
+            TESTFLIGHT_RELEASE_NOTES: metadata.releaseNotes,
+          };
+
+          for (const [key, value] of Object.entries(values)) {
+            if (!value) {
+              throw new Error(`${key} is missing from TestFlight release metadata`);
+            }
+            fs.appendFileSync(process.env.GITHUB_ENV, `${key}<<__${key}__\n${value}\n__${key}__\n`);
+          }
+          NODE
+
+      - name: Set TestFlight release notes
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          export APP_STORE_CONNECT_KEY_PATH="$HOME/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
+          node scripts/ci/set-testflight-release-notes.mjs
