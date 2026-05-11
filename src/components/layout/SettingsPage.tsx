@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { McpSettingsSection } from "./McpSettingsSection";
+import { useWindowDrag } from "../../hooks/useWindowDrag";
 import type { SendKeyMode } from "../../hooks/useSendKey";
 import type { ModelOption } from "../../lib/models";
 
@@ -75,11 +76,12 @@ export function SettingsPage({
   onMaxRequestsChange,
 }: Props) {
   const shortcuts = getShortcuts(sendKey);
+  const handleWindowDrag = useWindowDrag();
 
   return (
     <div className="flex h-full flex-col bg-transparent transition-colors duration-150">
       <div className="border-b border-stone-200/80 bg-white/55 px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] backdrop-blur-md dark:border-stone-800/80 dark:bg-stone-950/25">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3" onMouseDown={handleWindowDrag}>
           <button
             type="button"
             onClick={onBack}

@@ -4,6 +4,7 @@ import { FileSearchPanel } from "../file/FileSearchPanel";
 import { FileOrganizer } from "../file/FileOrganizer";
 import { DuplicateDetector } from "../file/DuplicateDetector";
 import { DiskUsageChart } from "../file/DiskUsageChart";
+import { useWindowDrag } from "../../hooks/useWindowDrag";
 
 type Tab = "search" | "organize" | "duplicates" | "usage";
 
@@ -30,12 +31,13 @@ export function ToolsPanel({
   projectDirectory,
 }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>("search");
+  const handleWindowDrag = useWindowDrag();
 
   return (
     <div className="flex h-full flex-col bg-transparent transition-colors duration-150">
       {/* Header */}
       <div className="border-b border-stone-200/80 bg-white/55 px-4 py-4 backdrop-blur-md dark:border-stone-800/80 dark:bg-stone-950/25">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2" onMouseDown={handleWindowDrag}>
           <button
             onClick={onBack}
             className="notion-icon-button p-2"
@@ -44,7 +46,7 @@ export function ToolsPanel({
             <ArrowLeft size={18} />
           </button>
           <div
-            className="titlebar-safe-header titlebar-safe-start"
+            className="titlebar-safe-header titlebar-safe-start min-w-0 flex-1"
             data-tauri-drag-region
           >
             <div className="notion-label mb-1">ツール</div>

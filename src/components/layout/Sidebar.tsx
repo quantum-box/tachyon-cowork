@@ -18,6 +18,7 @@ import {
   isTauriMacOS,
   type ProjectEntry,
 } from "../../lib/tauri-bridge";
+import { useWindowDrag } from "../../hooks/useWindowDrag";
 import { UpdateChecker } from "./UpdateChecker";
 
 const FEEDBACK_URL =
@@ -81,6 +82,7 @@ export function Sidebar({
   const isMacDesktop = isTauriMacOS();
   const [search, setSearch] = useState("");
   const [appVersion, setAppVersion] = useState<string | null>(null);
+  const handleWindowDrag = useWindowDrag();
   const workFolderList =
     recentProjects.length > 0
       ? recentProjects.slice(0, 3)
@@ -130,7 +132,11 @@ export function Sidebar({
           isMacDesktop ? "w-[76px]" : "w-14"
         }`}
       >
-        <div className="window-drag-strip w-full" data-tauri-drag-region />
+        <div
+          className="window-drag-strip w-full"
+          data-tauri-drag-region
+          onMouseDown={handleWindowDrag}
+        />
         <button
           onClick={onToggleCollapse}
           className="notion-icon-button p-2"
@@ -173,10 +179,17 @@ export function Sidebar({
 
   return (
     <div className="flex h-full flex-col bg-transparent transition-colors duration-150">
-      <div className="window-drag-strip w-full" data-tauri-drag-region />
+      <div
+        className="window-drag-strip w-full"
+        data-tauri-drag-region
+        onMouseDown={handleWindowDrag}
+      />
       {/* Header */}
       <div className="border-b border-stone-200/80 px-3 pb-3 pt-[calc(env(safe-area-inset-top)+1rem)] dark:border-stone-800/80">
-        <div className="titlebar-safe-header mb-2.5 flex items-center justify-between">
+        <div
+          className="titlebar-safe-header mb-2.5 flex items-center justify-between"
+          onMouseDown={handleWindowDrag}
+        >
           <div className="titlebar-safe-start" data-tauri-drag-region>
             <h1 className="text-[13px] font-semibold tracking-[0.01em] text-stone-800 dark:text-stone-100">
               Tachyon Cowork

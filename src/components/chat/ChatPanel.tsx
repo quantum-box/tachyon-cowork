@@ -8,6 +8,7 @@ import type {
 } from "../../lib/types";
 import type { SendKeyMode } from "../../hooks/useSendKey";
 import type { useRealtimeVoice } from "../../hooks/useRealtimeVoice";
+import { useWindowDrag } from "../../hooks/useWindowDrag";
 import type { ProjectContext } from "../../lib/tauri-bridge";
 import { FileDropZone } from "../file/FileDropZone";
 import { MessageList } from "./MessageList";
@@ -78,6 +79,7 @@ export function ChatPanel({
   realtimeVoice,
 }: Props) {
   const [searchQuery] = useState("");
+  const handleWindowDrag = useWindowDrag();
   const hasNetworkIssue = isOffline || chat.error?.kind === "network";
   const workspaceLabel = projectContext
     ? formatWorkspaceLabel(projectContext)
@@ -101,8 +103,11 @@ export function ChatPanel({
     <FileDropZone onFilesDropped={onFilesAdd}>
       <div className="relative flex h-full flex-col bg-transparent transition-colors duration-150">
         <div className="border-b border-stone-200/80 bg-white/55 pb-2.5 pt-[calc(env(safe-area-inset-top)+0.625rem)] backdrop-blur-md dark:border-stone-800/80 dark:bg-stone-950/25">
-          <div className="flex w-full items-center justify-between gap-3 px-2.5 md:px-3">
-            <div className="titlebar-safe-header flex min-w-0 items-center gap-3">
+          <div
+            className="flex w-full items-center justify-between gap-3 px-2.5 md:px-3"
+            onMouseDown={handleWindowDrag}
+          >
+            <div className="titlebar-safe-header flex min-w-0 flex-1 items-center gap-3">
               {onToggleSidebar && (
                 <button
                   type="button"
@@ -114,7 +119,7 @@ export function ChatPanel({
                 </button>
               )}
               <div
-                className="titlebar-safe-start min-w-0"
+                className="titlebar-safe-start min-w-0 flex-1"
                 data-tauri-drag-region
               >
                 <div className="notion-label mb-1">ワークスペース</div>

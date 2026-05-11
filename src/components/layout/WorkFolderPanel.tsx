@@ -1,5 +1,6 @@
 import { ArrowLeft, FolderOpen, PencilLine } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useWindowDrag } from "../../hooks/useWindowDrag";
 import type { SessionSummary } from "../../lib/types";
 import type { ProjectContext, ProjectEntry } from "../../lib/tauri-bridge";
 
@@ -31,6 +32,7 @@ export function WorkFolderPanel({
   onOpenSession,
 }: Props) {
   const [customInstructions, setCustomInstructions] = useState("");
+  const handleWindowDrag = useWindowDrag();
 
   useEffect(() => {
     setCustomInstructions(projectContext?.custom_instructions ?? "");
@@ -39,7 +41,7 @@ export function WorkFolderPanel({
   return (
     <div className="flex h-full flex-col bg-transparent transition-colors duration-150">
       <div className="border-b border-stone-200/80 bg-white/55 px-4 py-3 backdrop-blur-md dark:border-stone-800/80 dark:bg-stone-950/25">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3" onMouseDown={handleWindowDrag}>
           <button
             type="button"
             onClick={onBack}

@@ -8,6 +8,7 @@ import {
   X,
 } from "lucide-react";
 import { useState } from "react";
+import { useWindowDrag } from "../../hooks/useWindowDrag";
 import type { ProjectEntry } from "../../lib/tauri-bridge";
 
 type Props = {
@@ -32,6 +33,7 @@ export function WorkFolderListPanel({
   onRemoveProject,
 }: Props) {
   const [showCreate, setShowCreate] = useState(false);
+  const handleWindowDrag = useWindowDrag();
   const projects = activeProject
     ? [
         activeProject,
@@ -44,7 +46,7 @@ export function WorkFolderListPanel({
   return (
     <div className="flex h-full flex-col bg-transparent transition-colors duration-150">
       <div className="border-b border-stone-200/80 bg-white/55 px-4 py-3 backdrop-blur-md dark:border-stone-800/80 dark:bg-stone-950/25">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3" onMouseDown={handleWindowDrag}>
           <button
             type="button"
             onClick={onBack}

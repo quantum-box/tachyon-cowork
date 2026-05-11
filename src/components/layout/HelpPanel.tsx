@@ -10,6 +10,7 @@ import {
   Settings,
   Wrench,
 } from "lucide-react";
+import { useWindowDrag } from "../../hooks/useWindowDrag";
 
 type Props = {
   onBack: () => void;
@@ -64,10 +65,12 @@ const quickTips = [
 ];
 
 export function HelpPanel({ onBack, onOpenTools, onOpenWorkFolders }: Props) {
+  const handleWindowDrag = useWindowDrag();
+
   return (
     <div className="flex h-full flex-col bg-transparent transition-colors duration-150">
       <div className="border-b border-stone-200/80 bg-white/55 px-4 py-3 backdrop-blur-md dark:border-stone-800/80 dark:bg-stone-950/25">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3" onMouseDown={handleWindowDrag}>
           <button
             type="button"
             onClick={onBack}
