@@ -1228,6 +1228,10 @@ export function useAgentChat(
             task,
             model: modelOverride ?? selectedModel,
             max_requests: maxRequests,
+            tool_access: [
+              { type: "builtin", name: "web_search" },
+              { type: "builtin", name: "url_fetch" },
+            ],
             use_json_tool_calls: true,
             ...(customInstructions && {
               custom_instructions: customInstructions,

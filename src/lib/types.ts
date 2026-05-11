@@ -79,14 +79,10 @@ export type AgentExecuteRequest = {
 };
 
 /** Tool access permissions for agent execution */
-export type ToolAccess = {
-  filesystem?: boolean;
-  command?: boolean;
-  coding_agent_job?: boolean;
-  web_search?: boolean;
-  url_fetch?: boolean;
-  sub_agent?: boolean;
-};
+export type ToolAccess = Array<{
+  type: "builtin";
+  name: string;
+}>;
 
 /** Information about a single LLM model */
 export type ModelInfo = {
