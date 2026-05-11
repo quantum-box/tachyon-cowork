@@ -63,9 +63,10 @@ export function MessageBubble({
     case "say":
     case "assistant":
     case "attempt_completion":
+    case "completion":
       return (
         <AssistantMessage
-          text={chunk.text || chunk.content || ""}
+          text={chunk.text || chunk.content || chunk.result || ""}
           isStreaming={isStreaming}
           onOpenArtifact={onOpenArtifact}
           searchQuery={searchQuery}
