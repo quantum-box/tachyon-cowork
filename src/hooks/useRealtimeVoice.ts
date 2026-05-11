@@ -28,6 +28,7 @@ type RealtimeVoiceState = {
 };
 
 const REALTIME_CALL_URL = "https://api.openai.com/v1/realtime/calls";
+export const REALTIME_VAD_PRESET = "server_vad_ambient";
 
 type BrowserAudioContextConstructor = new () => AudioContext;
 
@@ -695,7 +696,7 @@ export function useRealtimeVoice(
         voice: "marin",
         instruction_preset: "cowork_assistant",
         transcription: "ja",
-        vad: "server_vad",
+        vad: REALTIME_VAD_PRESET,
         ...buildRealtimeToolSessionConfig(agentChatContext),
       });
 

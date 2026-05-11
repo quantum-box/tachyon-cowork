@@ -1,6 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import {
+  REALTIME_VAD_PRESET,
   buildRealtimeAgentChatContext,
   buildRealtimeToolSessionConfig,
   buildRealtimeToolSessionUpdate,
@@ -8,6 +9,12 @@ import {
   extractRealtimeToolCall,
   useRealtimeVoice,
 } from "../useRealtimeVoice";
+
+describe("realtime voice session defaults", () => {
+  it("uses the ambient-noise VAD preset issued by Tachyon API", () => {
+    expect(REALTIME_VAD_PRESET).toBe("server_vad_ambient");
+  });
+});
 
 describe("extractRealtimeTranscriptUpdate", () => {
   it("extracts user transcription deltas from realtime events", () => {

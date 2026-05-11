@@ -108,6 +108,7 @@ describe("AgentChatClient.issueRealtimeClientSecret", () => {
         instructions: "Use the available tools.",
         tool_choice: "auto",
         tools: [{ type: "function", name: "set_agent_chat_draft" }],
+        vad: "server_vad_ambient",
       }),
     ).resolves.toMatchObject({
       client_secret: "ek_test",
@@ -127,6 +128,7 @@ describe("AgentChatClient.issueRealtimeClientSecret", () => {
       instructions: "Use the available tools.",
       tool_choice: "auto",
       tools: [{ type: "function", name: "set_agent_chat_draft" }],
+      vad: "server_vad_ambient",
     });
   });
 });

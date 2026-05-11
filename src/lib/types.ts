@@ -115,12 +115,18 @@ export type AuthConfig = {
   userId?: string;
 };
 
+export type RealtimeVadPreset =
+  | "off"
+  | "server_vad"
+  | "server_vad_ambient"
+  | "semantic_vad";
+
 export type RealtimeClientSecretRequest = {
   voice?: string;
   instruction_preset?: string;
   instructions?: string;
   transcription?: string;
-  vad?: string;
+  vad?: RealtimeVadPreset;
   tools?: ReadonlyArray<Record<string, unknown>>;
   tool_choice?: "auto" | "none" | "required";
 };
