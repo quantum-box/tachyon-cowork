@@ -26,7 +26,8 @@ function isAssistantResponseChunk(chunk: AgentChunk): boolean {
   return (
     chunk.type === "say" ||
     chunk.type === "assistant" ||
-    chunk.type === "attempt_completion"
+    chunk.type === "attempt_completion" ||
+    chunk.type === "completion"
   );
 }
 
@@ -126,6 +127,7 @@ export function MessageList({
               chunk.type === "say" ||
               chunk.type === "assistant" ||
               chunk.type === "attempt_completion" ||
+              chunk.type === "completion" ||
               chunk.type === "tool_call" ||
               chunk.type === "tool_call_args" ||
               chunk.type === "tool_result");

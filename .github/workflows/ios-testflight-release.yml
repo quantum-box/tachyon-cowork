@@ -297,7 +297,7 @@ jobs:
           node --check scripts/ci/set-testflight-release-notes.mjs
 
       - name: Upload to App Store Connect
-        if: github.event_name == 'push' || github.event.inputs.upload == 'true'
+        if: github.event_name == 'push' || github.event_name == 'pull_request' || github.event.inputs.upload == 'true'
         env:
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
