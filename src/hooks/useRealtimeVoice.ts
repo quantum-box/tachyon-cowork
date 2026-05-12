@@ -29,6 +29,72 @@ type RealtimeVoiceState = {
 
 const REALTIME_CALL_URL = "https://api.openai.com/v1/realtime/calls";
 export const REALTIME_VAD_PRESET = "server_vad_ambient";
+export const REALTIME_AMBIENT_TURN_DETECTION = {
+  type: "server_vad",
+  threshold: 0.7,
+  prefix_padding_ms: 500,
+  silence_duration_ms: 800,
+};
+export const REALTIME_PLAYBACK_TURN_DETECTION = {
+  type: "server_vad",
+  threshold: 0.85,
+  prefix_padding_ms: 500,
+  silence_duration_ms: 1000,
+};
+
+type RealtimeDeviceHints = {
+  userAgent?: string;
+  userAgentData?: { mobile?: boolean };
+  maxTouchPoints?: number;
+  coarsePointer?: boolean;
+};
+
+function readRealtimeDeviceHints(): RealtimeDeviceHints {
+  const nav = navigator as Navigator & {
+    userAgentData?: { mobile?: boolean };
+  };
+  return {
+    userAgent: nav.userAgent,
+    userAgentData: nav.userAgentData,
+    maxTouchPoints: nav.maxTouchPoints,
+    coarsePointer: window.matchMedia?.("(pointer: coarse)")?.matches,
+  };
+}
+
+export function shouldDisableRealtimeAutoGainControl(
+  hints: RealtimeDeviceHints = readRealtimeDeviceHints(),
+): boolean {
+  if (hints.userAgentData?.mobile) return true;
+  if (/Android|iPhone|iPad|iPod/i.test(hints.userAgent ?? "")) return true;
+  return hints.coarsePointer === true && (hints.maxTouchPoints ?? 0) > 0;
+}
+
+export function buildRealtimeAudioConstraints(
+  hints?: RealtimeDeviceHints,
+): MediaTrackConstraints {
+  return {
+    echoCancellation: true,
+    noiseSuppression: true,
+    autoGainControl: !shouldDisableRealtimeAutoGainControl(hints),
+  };
+}
+
+export function buildRealtimeVadSessionUpdate(
+  turnDetection:
+    | typeof REALTIME_AMBIENT_TURN_DETECTION
+    | typeof REALTIME_PLAYBACK_TURN_DETECTION,
+) {
+  return {
+    type: "session.update",
+    session: {
+      audio: {
+        input: {
+          turn_detection: turnDetection,
+        },
+      },
+    },
+  } as const;
+}
 
 type BrowserAudioContextConstructor = new () => AudioContext;
 
@@ -88,8 +154,7 @@ export function playRealtimeCue(kind: "start" | "stop" | "error" | "thinking") {
       oscillator.stop(audioContext.currentTime + tone.offset + tone.duration);
     }
 
-    const peakGain =
-      kind === "start" ? 0.3 : kind === "thinking" ? 0.18 : 0.04;
+    const peakGain = kind === "start" ? 0.3 : kind === "thinking" ? 0.18 : 0.04;
     gain.gain.exponentialRampToValueAtTime(
       peakGain,
       audioContext.currentTime + 0.015,
@@ -277,6 +342,24 @@ export function buildRealtimeToolSessionUpdate(agentChatContext?: string) {
     type: "session.update",
     session: buildRealtimeToolSessionConfig(agentChatContext),
   };
+}
+
+function isAssistantAudioPlaybackStart(event: unknown): boolean {
+  if (!isRecord(event)) return false;
+  const type = readString(event.type);
+  return (
+    type === "response.audio.delta" || type === "response.output_audio.delta"
+  );
+}
+
+function isAssistantAudioPlaybackDone(event: unknown): boolean {
+  if (!isRecord(event)) return false;
+  const type = readString(event.type);
+  return (
+    type === "response.audio.done" ||
+    type === "response.output_audio.done" ||
+    type === "response.done"
+  );
 }
 
 export type RealtimeTranscriptUpdate = {
@@ -516,6 +599,7 @@ export function useRealtimeVoice(
   const transcriptTextByIdRef = useRef<Map<string, string>>(new Map());
   const handledToolCallIdsRef = useRef<Set<string>>(new Set());
   const playedConnectedCueRef = useRef(false);
+  const realtimeVadModeRef = useRef<"ambient" | "playback">("ambient");
 
   useEffect(() => {
     optionsRef.current = options;
@@ -543,6 +627,7 @@ export function useRealtimeVoice(
     transcriptTextByIdRef.current.clear();
     handledToolCallIdsRef.current.clear();
     playedConnectedCueRef.current = false;
+    realtimeVadModeRef.current = "ambient";
     setStatus("idle");
 
     if (shouldPlayStopCue) {
@@ -637,6 +722,22 @@ export function useRealtimeVoice(
     [stop],
   );
 
+  const updateRealtimeVadMode = useCallback((mode: "ambient" | "playback") => {
+    if (realtimeVadModeRef.current === mode) return;
+
+    const dataChannel = dataChannelRef.current;
+    if (!dataChannel || dataChannel.readyState !== "open") return;
+
+    const turnDetection =
+      mode === "playback"
+        ? REALTIME_PLAYBACK_TURN_DETECTION
+        : REALTIME_AMBIENT_TURN_DETECTION;
+    dataChannel.send(
+      JSON.stringify(buildRealtimeVadSessionUpdate(turnDetection)),
+    );
+    realtimeVadModeRef.current = mode;
+  }, []);
+
   const handleRealtimeEvent = useCallback(
     (rawData: unknown) => {
       let parsed: unknown = rawData;
@@ -646,6 +747,12 @@ export function useRealtimeVoice(
         } catch {
           return;
         }
+      }
+
+      if (isAssistantAudioPlaybackStart(parsed)) {
+        updateRealtimeVadMode("playback");
+      } else if (isAssistantAudioPlaybackDone(parsed)) {
+        updateRealtimeVadMode("ambient");
       }
 
       const toolCall = extractRealtimeToolCall(parsed);
@@ -670,7 +777,7 @@ export function useRealtimeVoice(
         isFinal: update.isFinal,
       });
     },
-    [appendTranscript, handleRealtimeToolCall],
+    [appendTranscript, handleRealtimeToolCall, updateRealtimeVadMode],
   );
 
   const start = useCallback(async () => {
@@ -734,11 +841,7 @@ export function useRealtimeVoice(
       };
 
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
+        audio: buildRealtimeAudioConstraints(),
       });
       mediaStreamRef.current = stream;
       for (const track of stream.getTracks()) {
