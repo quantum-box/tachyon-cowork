@@ -100,6 +100,26 @@ describe("useAgentChat tool flow", () => {
     );
   });
 
+  it("enables built-in web search and URL fetch for agent execution", async () => {
+    const client = buildClient([]);
+
+    const { result } = renderHook(() => useAgentChat(client));
+
+    await act(async () => {
+      await result.current.sendMessage("Fetch this URL");
+    });
+
+    expect(client.executeAgent).toHaveBeenCalledWith(
+      "session-1",
+      expect.objectContaining({
+        tool_access: [
+          { type: "builtin", name: "web_search" },
+          { type: "builtin", name: "url_fetch" },
+        ],
+      }),
+    );
+  });
+
   it("uses an explicit model override when sending a message", async () => {
     const client = buildClient([]);
 

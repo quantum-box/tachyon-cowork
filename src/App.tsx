@@ -120,8 +120,12 @@ export default function App() {
 
   const { theme, setTheme } = useTheme();
   const { sendKey, setSendKey } = useSendKey();
-  const { realtimeVoiceEnabled, setRealtimeVoiceEnabled } =
-    useRealtimeVoiceSettings();
+  const {
+    realtimeVoiceEnabled,
+    setRealtimeVoiceEnabled,
+    realtimeSoundEnabled,
+    setRealtimeSoundEnabled,
+  } = useRealtimeVoiceSettings();
   const { globalCustomInstructions, setGlobalCustomInstructions } =
     useGlobalCustomInstructions();
   const { maxRequests, setMaxRequests } = useMaxRequests();
@@ -435,6 +439,7 @@ export default function App() {
       buildRealtimeAgentChatContext(agentChunksRef.current),
     onSetAgentChatDraft: setAgentChatDraftFromRealtime,
     onSubmitAgentChatDraft: submitAgentChatDraftFromRealtime,
+    soundEnabled: realtimeSoundEnabled,
   });
   const realtimeVoiceStatus = realtimeVoice.status;
   const startRealtimeVoice = realtimeVoice.start;
@@ -470,6 +475,7 @@ export default function App() {
   ]);
 
   useEffect(() => {
+    if (!realtimeSoundEnabled) return;
     if (!isChatLoading) return;
 
     playRealtimeCue("thinking");
@@ -480,19 +486,20 @@ export default function App() {
     return () => {
       window.clearInterval(interval);
     };
-  }, [isChatLoading]);
+  }, [isChatLoading, realtimeSoundEnabled]);
 
   useEffect(() => {
     const currentError = chatError?.message ?? null;
     if (
       realtimeVoiceEnabled &&
+      realtimeSoundEnabled &&
       currentError &&
       currentError !== previousChatErrorRef.current
     ) {
       playRealtimeCue("error");
     }
     previousChatErrorRef.current = currentError;
-  }, [chatError?.message, realtimeVoiceEnabled]);
+  }, [chatError?.message, realtimeSoundEnabled, realtimeVoiceEnabled]);
 
   const sendMessageWithRealtimePause = useCallback(
     async (
@@ -1064,6 +1071,8 @@ export default function App() {
                   onSendKeyChange={setSendKey}
                   realtimeVoiceEnabled={realtimeVoiceEnabled}
                   onRealtimeVoiceEnabledChange={setRealtimeVoiceEnabled}
+                  realtimeSoundEnabled={realtimeSoundEnabled}
+                  onRealtimeSoundEnabledChange={setRealtimeSoundEnabled}
                   globalCustomInstructions={globalCustomInstructions}
                   onGlobalCustomInstructionsChange={setGlobalCustomInstructions}
                   maxRequests={maxRequests}

@@ -75,6 +75,15 @@ export function isTauriMacOS(): boolean {
   );
 }
 
+export async function startTauriWindowDrag(): Promise<void> {
+  if (!isTauriDesktop()) {
+    return;
+  }
+
+  const { getCurrentWindow } = await import("@tauri-apps/api/window");
+  await getCurrentWindow().startDragging();
+}
+
 /** Lazy wrapper around `@tauri-apps/api/core` invoke. */
 async function tauriInvoke<T>(
   cmd: string,

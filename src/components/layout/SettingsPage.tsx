@@ -7,9 +7,11 @@ import {
   LogOut,
   Puzzle,
   Mic,
+  Volume2,
 } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { McpSettingsSection } from "./McpSettingsSection";
+import { useWindowDrag } from "../../hooks/useWindowDrag";
 import type { SendKeyMode } from "../../hooks/useSendKey";
 import type { ModelOption } from "../../lib/models";
 
@@ -31,6 +33,8 @@ type Props = {
   onSendKeyChange: (mode: SendKeyMode) => void;
   realtimeVoiceEnabled: boolean;
   onRealtimeVoiceEnabledChange: (enabled: boolean) => void;
+  realtimeSoundEnabled: boolean;
+  onRealtimeSoundEnabledChange: (enabled: boolean) => void;
   globalCustomInstructions: string;
   onGlobalCustomInstructionsChange: (value: string) => void;
   maxRequests: number;
@@ -69,17 +73,20 @@ export function SettingsPage({
   onSendKeyChange,
   realtimeVoiceEnabled,
   onRealtimeVoiceEnabledChange,
+  realtimeSoundEnabled,
+  onRealtimeSoundEnabledChange,
   globalCustomInstructions,
   onGlobalCustomInstructionsChange,
   maxRequests,
   onMaxRequestsChange,
 }: Props) {
   const shortcuts = getShortcuts(sendKey);
+  const handleWindowDrag = useWindowDrag();
 
   return (
     <div className="flex h-full flex-col bg-transparent transition-colors duration-150">
       <div className="border-b border-stone-200/80 bg-white/55 px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] backdrop-blur-md dark:border-stone-800/80 dark:bg-stone-950/25">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3" onMouseDown={handleWindowDrag}>
           <button
             type="button"
             onClick={onBack}
@@ -204,6 +211,34 @@ export function SettingsPage({
                 type="checkbox"
                 checked={realtimeVoiceEnabled}
                 onChange={(e) => onRealtimeVoiceEnabledChange(e.target.checked)}
+                className="h-4 w-4 accent-stone-900 dark:accent-stone-100"
+              />
+            </label>
+            <p className="mt-2 text-xs leading-relaxed text-stone-500 dark:text-stone-400">
+              スマホでスピーカー再生している場合、アシスタントの音声をマイクが拾って
+              音声会話がうまく動かないことがあります。安定しないときは音量を下げるか、
+              イヤホンの利用を試してください。
+            </p>
+          </section>
+
+          <section>
+            <div className="flex items-center gap-2 mb-3">
+              <Volume2
+                size={14}
+                className="text-stone-500 dark:text-stone-400"
+              />
+              <h3 className="text-sm font-medium text-stone-800 dark:text-stone-200">
+                サウンド
+              </h3>
+            </div>
+            <label className="notion-input flex cursor-pointer items-center justify-between gap-3 rounded-2xl px-3 py-2.5">
+              <span className="min-w-0 text-sm text-stone-700 dark:text-stone-200">
+                接続・処理中・エラーの効果音を鳴らす
+              </span>
+              <input
+                type="checkbox"
+                checked={realtimeSoundEnabled}
+                onChange={(e) => onRealtimeSoundEnabledChange(e.target.checked)}
                 className="h-4 w-4 accent-stone-900 dark:accent-stone-100"
               />
             </label>

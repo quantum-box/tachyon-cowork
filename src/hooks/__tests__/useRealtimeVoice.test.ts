@@ -1,13 +1,90 @@
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import {
+  REALTIME_AMBIENT_TURN_DETECTION,
+  REALTIME_PLAYBACK_TURN_DETECTION,
+  REALTIME_VAD_PRESET,
+  buildRealtimeAudioConstraints,
   buildRealtimeAgentChatContext,
   buildRealtimeToolSessionConfig,
   buildRealtimeToolSessionUpdate,
+  buildRealtimeVadSessionUpdate,
   extractRealtimeTranscriptUpdate,
   extractRealtimeToolCall,
+  shouldDisableRealtimeAutoGainControl,
   useRealtimeVoice,
 } from "../useRealtimeVoice";
+
+describe("realtime voice session defaults", () => {
+  it("uses the ambient-noise VAD preset issued by Tachyon API", () => {
+    expect(REALTIME_VAD_PRESET).toBe("server_vad_ambient");
+  });
+
+  it("disables browser auto gain control on mobile-like devices", () => {
+    expect(
+      shouldDisableRealtimeAutoGainControl({
+        userAgentData: { mobile: true },
+      }),
+    ).toBe(true);
+    expect(
+      shouldDisableRealtimeAutoGainControl({
+        userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)",
+      }),
+    ).toBe(true);
+    expect(
+      shouldDisableRealtimeAutoGainControl({
+        coarsePointer: false,
+        maxTouchPoints: 0,
+        userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 15_0)",
+      }),
+    ).toBe(false);
+  });
+
+  it("builds strict VAD session updates while assistant audio is playing", () => {
+    expect(
+      buildRealtimeVadSessionUpdate(REALTIME_PLAYBACK_TURN_DETECTION),
+    ).toMatchObject({
+      type: "session.update",
+      session: {
+        audio: {
+          input: {
+            turn_detection: {
+              type: "server_vad",
+              threshold: 0.85,
+              silence_duration_ms: 1000,
+            },
+          },
+        },
+      },
+    });
+
+    expect(
+      buildRealtimeVadSessionUpdate(REALTIME_AMBIENT_TURN_DETECTION).session
+        .audio.input.turn_detection.threshold,
+    ).toBe(0.7);
+  });
+
+  it("builds desktop and mobile audio constraints", () => {
+    expect(
+      buildRealtimeAudioConstraints({
+        coarsePointer: false,
+        maxTouchPoints: 0,
+        userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 15_0)",
+      }),
+    ).toMatchObject({
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+    });
+    expect(
+      buildRealtimeAudioConstraints({
+        userAgentData: { mobile: true },
+      }),
+    ).toMatchObject({
+      autoGainControl: false,
+    });
+  });
+});
 
 describe("extractRealtimeTranscriptUpdate", () => {
   it("extracts user transcription deltas from realtime events", () => {

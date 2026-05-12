@@ -79,14 +79,10 @@ export type AgentExecuteRequest = {
 };
 
 /** Tool access permissions for agent execution */
-export type ToolAccess = {
-  filesystem?: boolean;
-  command?: boolean;
-  coding_agent_job?: boolean;
-  web_search?: boolean;
-  url_fetch?: boolean;
-  sub_agent?: boolean;
-};
+export type ToolAccess = Array<{
+  type: "builtin";
+  name: string;
+}>;
 
 /** Information about a single LLM model */
 export type ModelInfo = {
@@ -115,12 +111,18 @@ export type AuthConfig = {
   userId?: string;
 };
 
+export type RealtimeVadPreset =
+  | "off"
+  | "server_vad"
+  | "server_vad_ambient"
+  | "semantic_vad";
+
 export type RealtimeClientSecretRequest = {
   voice?: string;
   instruction_preset?: string;
   instructions?: string;
   transcription?: string;
-  vad?: string;
+  vad?: RealtimeVadPreset;
   tools?: ReadonlyArray<Record<string, unknown>>;
   tool_choice?: "auto" | "none" | "required";
 };
