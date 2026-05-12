@@ -1,4 +1,10 @@
-import { useState, useCallback, type ReactNode } from "react";
+import {
+  useState,
+  useCallback,
+  useEffect,
+  useRef,
+  type ReactNode,
+} from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
@@ -41,6 +47,22 @@ type Props = {
   searchQuery?: string;
   onRetry?: () => void;
 };
+
+async function copyTextToClipboard(text: string): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    // fallback for non-secure contexts
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    document.body.removeChild(ta);
+  }
+}
 
 export function MessageBubble({
   chunk,
@@ -98,7 +120,8 @@ export function MessageBubble({
       return (
         <div className="flex justify-start mb-2">
           <div className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/25 dark:text-amber-400">
-            ツールジョブ: {chunk.provider || "不明"} ({chunk.job_id?.slice(0, 8)}
+            ツールジョブ: {chunk.provider || "不明"} (
+            {chunk.job_id?.slice(0, 8)}
             ...)
           </div>
         </div>
@@ -155,45 +178,186 @@ function UserMessage({
   searchQuery?: string;
 }) {
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    selectedText: string;
+  } | null>(null);
+  const messageRef = useRef<HTMLDivElement>(null);
   const hasImages = imageUrls && imageUrls.length > 0;
+
+  const markCopied = useCallback(() => {
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, []);
+
+  const handleCopyText = useCallback(
+    async (value: string) => {
+      await copyTextToClipboard(value);
+      markCopied();
+    },
+    [markCopied],
+  );
+
+  const getSelectedTextInMessage = useCallback(() => {
+    const selection = window.getSelection();
+    const root = messageRef.current;
+    if (!selection || selection.isCollapsed || !root) return "";
+    const anchorNode = selection.anchorNode;
+    const focusNode = selection.focusNode;
+    if (
+      (!anchorNode || !root.contains(anchorNode)) &&
+      (!focusNode || !root.contains(focusNode))
+    ) {
+      return "";
+    }
+    return selection.toString().trim();
+  }, []);
+
+  const handleCopy = useCallback(async () => {
+    await handleCopyText(text);
+  }, [handleCopyText, text]);
+
+  const handleContextMenu = useCallback(
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      setContextMenu({
+        x: event.clientX,
+        y: event.clientY,
+        selectedText: getSelectedTextInMessage(),
+      });
+    },
+    [getSelectedTextInMessage],
+  );
+
+  const handleContextCopy = useCallback(async () => {
+    if (!contextMenu) return;
+    await handleCopyText(contextMenu.selectedText || text);
+    setContextMenu(null);
+  }, [contextMenu, handleCopyText, text]);
+
+  const handleContextCopyAll = useCallback(async () => {
+    await handleCopyText(text);
+    setContextMenu(null);
+  }, [handleCopyText, text]);
+
+  useEffect(() => {
+    if (!contextMenu) return;
+
+    const close = () => setContextMenu(null);
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") close();
+    };
+
+    window.addEventListener("pointerdown", close);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("blur", close);
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("pointerdown", close);
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("blur", close);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [contextMenu]);
 
   return (
     <>
       <div className="flex justify-end mb-4 gap-2">
-        <div className="max-w-[75%] rounded-[22px] rounded-br-md border border-stone-300/80 bg-stone-200/80 px-4 py-3 text-sm leading-relaxed text-stone-800 shadow-[0_8px_20px_rgba(15,23,42,0.04)] dark:border-stone-700 dark:bg-stone-800/90 dark:text-stone-100">
-          {/* 画像サムネイル */}
-          {hasImages && (
-            <div className="flex flex-wrap gap-2 mb-2">
-              {imageUrls.map((url, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => setLightboxUrl(url)}
-                  className="group relative overflow-hidden rounded-xl ring-1 ring-stone-300/70 transition-all hover:ring-stone-400 dark:ring-stone-700 dark:hover:ring-stone-500"
-                >
-                  <img
-                    src={url}
-                    alt={`添付画像 ${i + 1}`}
-                    className="h-24 w-24 object-cover"
-                  />
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                    <ZoomIn
-                      size={16}
-                      className="text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow"
+        <div className="group/user max-w-[75%]">
+          <div
+            ref={messageRef}
+            onContextMenu={handleContextMenu}
+            className="rounded-[22px] rounded-br-md border border-stone-300/80 bg-stone-200/80 px-4 py-3 text-sm leading-relaxed text-stone-800 shadow-[0_8px_20px_rgba(15,23,42,0.04)] dark:border-stone-700 dark:bg-stone-800/90 dark:text-stone-100"
+          >
+            {/* 画像サムネイル */}
+            {hasImages && (
+              <div className="flex flex-wrap gap-2 mb-2">
+                {imageUrls.map((url, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => setLightboxUrl(url)}
+                    className="group relative overflow-hidden rounded-xl ring-1 ring-stone-300/70 transition-all hover:ring-stone-400 dark:ring-stone-700 dark:hover:ring-stone-500"
+                  >
+                    <img
+                      src={url}
+                      alt={`添付画像 ${i + 1}`}
+                      className="h-24 w-24 object-cover"
                     />
-                  </div>
-                </button>
-              ))}
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                      <ZoomIn
+                        size={16}
+                        className="text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow"
+                      />
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="whitespace-pre-wrap">
+              {searchQuery ? highlightInText(text, searchQuery) : text}
             </div>
-          )}
-          <div className="whitespace-pre-wrap">
-            {searchQuery ? highlightInText(text, searchQuery) : text}
+          </div>
+          <div className="mt-1.5 flex justify-end opacity-0 transition-opacity group-hover/user:opacity-100">
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-white/90 px-2 py-1 text-xs font-medium text-stone-600 shadow-sm transition-colors hover:bg-white hover:text-stone-900 dark:border-stone-700 dark:bg-stone-900/90 dark:text-stone-300 dark:hover:bg-stone-900 dark:hover:text-stone-100"
+            >
+              {copied ? (
+                <>
+                  <Check size={12} className="text-emerald-500" />
+                  コピー済み
+                </>
+              ) : (
+                <>
+                  <Copy size={12} />
+                  コピー
+                </>
+              )}
+            </button>
           </div>
         </div>
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-stone-200 bg-white text-stone-500 shadow-sm dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300">
           <User size={16} />
         </div>
       </div>
+
+      {contextMenu && (
+        <div
+          role="menu"
+          aria-label="ユーザーメッセージのメニュー"
+          className="fixed z-50 min-w-36 overflow-hidden rounded-xl border border-stone-200 bg-white py-1 text-sm shadow-xl shadow-stone-900/10 dark:border-stone-700 dark:bg-stone-900 dark:shadow-black/30"
+          style={{
+            left: contextMenu.x,
+            top: contextMenu.y,
+          }}
+          onPointerDown={(event) => event.stopPropagation()}
+          onContextMenu={(event) => event.preventDefault()}
+        >
+          <button
+            type="button"
+            role="menuitem"
+            onClick={handleContextCopy}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-stone-700 transition-colors hover:bg-stone-100 dark:text-stone-200 dark:hover:bg-stone-800"
+          >
+            <Copy size={14} />
+            コピー
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={handleContextCopyAll}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-stone-700 transition-colors hover:bg-stone-100 dark:text-stone-200 dark:hover:bg-stone-800"
+          >
+            <Copy size={14} />
+            すべてコピー
+          </button>
+        </div>
+      )}
 
       {/* Lightbox */}
       {lightboxUrl && (
@@ -260,23 +424,9 @@ function AssistantMessage({
   const codeBlocks = extractCodeBlocks(text);
 
   const handleCopy = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // fallback for non-secure contexts
-      const ta = document.createElement("textarea");
-      ta.value = text;
-      ta.style.position = "fixed";
-      ta.style.opacity = "0";
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand("copy");
-      document.body.removeChild(ta);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
+    await copyTextToClipboard(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   }, [text]);
 
   const handleOpenCodeBlock = useCallback(

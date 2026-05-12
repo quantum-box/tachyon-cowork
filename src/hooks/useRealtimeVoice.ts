@@ -14,6 +14,7 @@ type RealtimeVoiceOptions = {
   getAgentChatContext?: () => string;
   onSetAgentChatDraft?: (text: string) => void;
   onSubmitAgentChatDraft?: (text: string) => Promise<void> | void;
+  soundEnabled?: boolean;
 };
 
 type RealtimeVoiceState = {
@@ -605,6 +606,14 @@ export function useRealtimeVoice(
     optionsRef.current = options;
   }, [options]);
 
+  const playCue = useCallback(
+    (kind: "start" | "stop" | "error" | "thinking") => {
+      if (optionsRef.current.soundEnabled === false) return;
+      playRealtimeCue(kind);
+    },
+    [],
+  );
+
   const stop = useCallback(() => {
     const shouldPlayStopCue = playedConnectedCueRef.current;
 
@@ -631,9 +640,9 @@ export function useRealtimeVoice(
     setStatus("idle");
 
     if (shouldPlayStopCue) {
-      playRealtimeCue("stop");
+      playCue("stop");
     }
-  }, []);
+  }, [playCue]);
 
   const appendTranscript = useCallback((message: RealtimeTranscriptMessage) => {
     if (!message.text.trim()) return;
@@ -783,7 +792,7 @@ export function useRealtimeVoice(
   const start = useCallback(async () => {
     if (!client) {
       setError("ログイン後に音声会話を開始できます。");
-      playRealtimeCue("error");
+      playCue("error");
       return;
     }
     if (status !== "idle") return;
@@ -826,7 +835,7 @@ export function useRealtimeVoice(
         if (pc.connectionState === "connected") {
           if (!playedConnectedCueRef.current) {
             playedConnectedCueRef.current = true;
-            playRealtimeCue("start");
+            playCue("start");
           }
           setStatus("connected");
           return;
@@ -857,7 +866,7 @@ export function useRealtimeVoice(
       };
       dataChannel.onerror = () => {
         setError("音声会話の接続でエラーが発生しました。再接続してください。");
-        playRealtimeCue("error");
+        playCue("error");
       };
       dataChannel.onmessage = (event) => {
         handleRealtimeEvent(event.data);
@@ -888,11 +897,11 @@ export function useRealtimeVoice(
       });
     } catch (err) {
       stop();
-      playRealtimeCue("error");
+      playCue("error");
       console.error("Failed to start realtime voice", err);
       setError(toUserFacingRealtimeError(err));
     }
-  }, [client, handleRealtimeEvent, status, stop]);
+  }, [client, handleRealtimeEvent, playCue, status, stop]);
 
   const clearTranscripts = useCallback(() => {
     transcriptTextByIdRef.current.clear();
