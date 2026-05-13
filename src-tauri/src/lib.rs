@@ -5,6 +5,173 @@ mod runtime_auth;
 mod sandbox;
 mod tools;
 
+#[cfg(target_os = "macos")]
+fn install_floating_voice_fn_listener(app: tauri::AppHandle) {
+    std::thread::Builder::new()
+        .name("floating-voice-fn-listener".to_string())
+        .spawn(move || {
+            use core_foundation::runloop::CFRunLoop;
+            use core_graphics::event::{
+                CallbackResult, CGEventFlags, CGEventTap, CGEventTapLocation, CGEventTapOptions,
+                CGEventTapPlacement, CGEventType,
+            };
+            use std::sync::{
+                atomic::{AtomicBool, AtomicU64, Ordering},
+                Arc,
+            };
+            use std::time::{SystemTime, UNIX_EPOCH};
+            use tauri::Emitter;
+
+            let fn_down = Arc::new(AtomicBool::new(false));
+            let fn_down_for_tap = Arc::clone(&fn_down);
+            let last_start_at_ms = Arc::new(AtomicU64::new(0));
+            let last_start_at_ms_for_tap = Arc::clone(&last_start_at_ms);
+            let app_for_tap = app.clone();
+
+            let result = CGEventTap::with_enabled(
+                CGEventTapLocation::HID,
+                CGEventTapPlacement::HeadInsertEventTap,
+                CGEventTapOptions::ListenOnly,
+                vec![CGEventType::FlagsChanged],
+                move |_proxy, _event_type, event| {
+                    let is_down = event
+                        .get_flags()
+                        .contains(CGEventFlags::CGEventFlagSecondaryFn);
+                    let was_down = fn_down_for_tap.swap(is_down, Ordering::Relaxed);
+
+                    if is_down && !was_down {
+                        let now_ms = SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .map(|duration| duration.as_millis() as u64)
+                            .unwrap_or(0);
+                        let last_ms = last_start_at_ms_for_tap.load(Ordering::Relaxed);
+
+                        if now_ms.saturating_sub(last_ms) >= 1000 {
+                            last_start_at_ms_for_tap.store(now_ms, Ordering::Relaxed);
+                            let _ = app_for_tap.emit_to("main", "floating-voice:start", ());
+                        }
+                    }
+
+                    CallbackResult::Keep
+                },
+                CFRunLoop::run_current,
+            );
+
+            if result.is_err() {
+                eprintln!(
+                    "Failed to install Fn key event tap. Accessibility or Input Monitoring permission may be required."
+                );
+            }
+        })
+        .expect("failed to spawn floating voice Fn listener");
+}
+
+#[cfg(desktop)]
+fn install_floating_voice_tray(app: &tauri::App) -> tauri::Result<()> {
+    use tauri::{
+        menu::{Menu, MenuItem, PredefinedMenuItem},
+        tray::TrayIconBuilder,
+        Emitter, Manager,
+    };
+
+    let new_chat = MenuItem::with_id(
+        app,
+        "voice_dot_new_chat",
+        "新規チャット",
+        true,
+        None::<&str>,
+    )?;
+    let open_main = MenuItem::with_id(
+        app,
+        "voice_dot_open_main",
+        "Tachyon Cowork を開く",
+        true,
+        None::<&str>,
+    )?;
+    let open_voice = MenuItem::with_id(
+        app,
+        "voice_dot_open",
+        "Voice Dot を開始",
+        true,
+        None::<&str>,
+    )?;
+    let hide_voice = MenuItem::with_id(
+        app,
+        "voice_dot_hide",
+        "Voice Dot を隠す",
+        true,
+        None::<&str>,
+    )?;
+    let settings = MenuItem::with_id(app, "voice_dot_settings", "設定", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "voice_dot_quit", "終了", true, None::<&str>)?;
+    let menu = Menu::with_items(
+        app,
+        &[
+            &new_chat,
+            &open_main,
+            &PredefinedMenuItem::separator(app)?,
+            &open_voice,
+            &hide_voice,
+            &PredefinedMenuItem::separator(app)?,
+            &settings,
+            &PredefinedMenuItem::separator(app)?,
+            &quit,
+        ],
+    )?;
+    let icon = tauri::image::Image::from_bytes(include_bytes!("../icons/menubar-template.png"))
+        .ok()
+        .or_else(|| app.default_window_icon().cloned());
+
+    let mut tray = TrayIconBuilder::with_id("voice_dot")
+        .menu(&menu)
+        .tooltip("Voice Dot")
+        .show_menu_on_left_click(true)
+        .on_menu_event(|app, event| match event.id().as_ref() {
+            "voice_dot_new_chat" => {
+                show_main_window(app);
+                let _ = app.emit_to("main", "voice-dot:new-chat", ());
+            }
+            "voice_dot_open_main" => {
+                show_main_window(app);
+            }
+            "voice_dot_open" => {
+                show_main_window(app);
+                let _ = app.emit_to("main", "floating-voice:start", ());
+            }
+            "voice_dot_hide" => {
+                let _ = app.emit_to("voice-input", "floating-voice:stop-and-hide", ());
+                if let Some(window) = app.get_webview_window("voice-input") {
+                    let _ = window.hide();
+                }
+            }
+            "voice_dot_settings" => {
+                show_main_window(app);
+                let _ = app.emit_to("main", "voice-dot:open-settings", ());
+            }
+            "voice_dot_quit" => {
+                app.exit(0);
+            }
+            _ => {}
+        });
+
+    if let Some(icon) = icon {
+        tray = tray.icon(icon).icon_as_template(true);
+    }
+
+    tray.build(app)?;
+    Ok(())
+}
+
+#[cfg(desktop)]
+fn show_main_window(app: &tauri::AppHandle) {
+    use tauri::Manager;
+
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     #[allow(unused_mut)]
@@ -47,6 +214,14 @@ pub fn run() {
                 });
             }
 
+            #[cfg(target_os = "macos")]
+            install_floating_voice_fn_listener(app.handle().clone());
+
+            #[cfg(desktop)]
+            if let Err(error) = install_floating_voice_tray(app) {
+                eprintln!("Failed to install floating voice tray icon: {error}");
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -82,6 +257,9 @@ pub fn run() {
             commands::host_fs::host_execute_command,
             commands::system::get_system_info,
             commands::system::show_in_folder,
+            commands::system::insert_text_to_focused_app,
+            commands::system::apply_voice_dot_window_shape,
+            commands::system::set_voice_dot_tray_visible,
             commands::pdf::read_pdf,
             commands::docx::read_docx,
             commands::sandbox::execute_code,

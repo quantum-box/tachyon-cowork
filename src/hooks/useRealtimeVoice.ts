@@ -15,6 +15,7 @@ type RealtimeVoiceOptions = {
   onSetAgentChatDraft?: (text: string) => void;
   onSubmitAgentChatDraft?: (text: string) => Promise<void> | void;
   soundEnabled?: boolean;
+  instructions?: string;
 };
 
 type RealtimeVoiceState = {
@@ -107,7 +108,9 @@ function getBrowserAudioContext(): BrowserAudioContextConstructor | null {
   return audioWindow.AudioContext ?? audioWindow.webkitAudioContext ?? null;
 }
 
-export function playRealtimeCue(kind: "start" | "stop" | "error" | "thinking") {
+export function playRealtimeCue(
+  kind: "ready" | "start" | "stop" | "error" | "thinking",
+) {
   const AudioContextConstructor = getBrowserAudioContext();
   if (!AudioContextConstructor) return;
 
@@ -121,13 +124,17 @@ export function playRealtimeCue(kind: "start" | "stop" | "error" | "thinking") {
     gain.connect(audioContext.destination);
 
     const tonesByKind = {
+      ready: [
+        { frequency: 587, offset: 0, duration: 0.075 },
+        { frequency: 880, offset: 0.075, duration: 0.11 },
+      ],
       start: [
-        { frequency: 660, offset: 0, duration: 0.08 },
-        { frequency: 880, offset: 0.09, duration: 0.08 },
+        { frequency: 587, offset: 0, duration: 0.075 },
+        { frequency: 880, offset: 0.075, duration: 0.11 },
       ],
       stop: [
-        { frequency: 520, offset: 0, duration: 0.08 },
-        { frequency: 330, offset: 0.1, duration: 0.08 },
+        { frequency: 880, offset: 0, duration: 0.075 },
+        { frequency: 587, offset: 0.075, duration: 0.11 },
       ],
       error: [
         { frequency: 220, offset: 0, duration: 0.11 },
@@ -139,7 +146,7 @@ export function playRealtimeCue(kind: "start" | "stop" | "error" | "thinking") {
         { frequency: 659, offset: 0.2, duration: 0.1 },
       ],
     } satisfies Record<
-      "start" | "stop" | "error" | "thinking",
+      "ready" | "start" | "stop" | "error" | "thinking",
       Array<{ frequency: number; offset: number; duration: number }>
     >;
 
@@ -155,7 +162,14 @@ export function playRealtimeCue(kind: "start" | "stop" | "error" | "thinking") {
       oscillator.stop(audioContext.currentTime + tone.offset + tone.duration);
     }
 
-    const peakGain = kind === "start" ? 0.3 : kind === "thinking" ? 0.18 : 0.04;
+    const peakGain =
+      kind === "ready" || kind === "start"
+        ? 0.16
+        : kind === "stop"
+          ? 0.13
+          : kind === "thinking"
+            ? 0.18
+            : 0.04;
     gain.gain.exponentialRampToValueAtTime(
       peakGain,
       audioContext.currentTime + 0.015,
@@ -328,11 +342,22 @@ export function buildRealtimeAgentChatContext(chunks: AgentChunk[]): string {
 }
 
 export function buildRealtimeToolSessionConfig(agentChatContext?: string) {
+  return buildRealtimeToolSessionConfigWithInstructions(
+    REALTIME_AGENT_CHAT_INSTRUCTIONS,
+    agentChatContext,
+  );
+}
+
+function buildRealtimeToolSessionConfigWithInstructions(
+  instructions: string,
+  agentChatContext?: string,
+  contextLabel = "Current Agent chat context for this Realtime session",
+) {
   const trimmedContext = agentChatContext?.trim();
   return {
     instructions: trimmedContext
-      ? `${REALTIME_AGENT_CHAT_INSTRUCTIONS}\n\nCurrent Agent chat context for this Realtime session:\n${trimmedContext.slice(0, 6000)}`
-      : REALTIME_AGENT_CHAT_INSTRUCTIONS,
+      ? `${instructions}\n\n${contextLabel}:\n${trimmedContext.slice(0, 6000)}`
+      : instructions,
     tool_choice: "auto",
     tools: AGENT_CHAT_DRAFT_TOOLS,
   } as const;
@@ -601,13 +626,14 @@ export function useRealtimeVoice(
   const handledToolCallIdsRef = useRef<Set<string>>(new Set());
   const playedConnectedCueRef = useRef(false);
   const realtimeVadModeRef = useRef<"ambient" | "playback">("ambient");
+  const startInFlightRef = useRef(false);
 
   useEffect(() => {
     optionsRef.current = options;
   }, [options]);
 
   const playCue = useCallback(
-    (kind: "start" | "stop" | "error" | "thinking") => {
+    (kind: "ready" | "start" | "stop" | "error" | "thinking") => {
       if (optionsRef.current.soundEnabled === false) return;
       playRealtimeCue(kind);
     },
@@ -616,6 +642,8 @@ export function useRealtimeVoice(
 
   const stop = useCallback(() => {
     const shouldPlayStopCue = playedConnectedCueRef.current;
+
+    startInFlightRef.current = false;
 
     dataChannelRef.current?.close();
     dataChannelRef.current = null;
@@ -795,8 +823,16 @@ export function useRealtimeVoice(
       playCue("error");
       return;
     }
-    if (status !== "idle") return;
+    if (
+      status !== "idle" ||
+      startInFlightRef.current ||
+      peerConnectionRef.current ||
+      mediaStreamRef.current
+    ) {
+      return;
+    }
 
+    startInFlightRef.current = true;
     setError(null);
     setStatus("connecting");
     transcriptTextByIdRef.current.clear();
@@ -808,12 +844,20 @@ export function useRealtimeVoice(
       }
 
       const agentChatContext = optionsRef.current.getAgentChatContext?.();
+      const realtimeInstructions =
+        optionsRef.current.instructions ?? REALTIME_AGENT_CHAT_INSTRUCTIONS;
       const secret = await client.issueRealtimeClientSecret({
         voice: "marin",
         instruction_preset: "cowork_assistant",
         transcription: "ja",
         vad: REALTIME_VAD_PRESET,
-        ...buildRealtimeToolSessionConfig(agentChatContext),
+        ...buildRealtimeToolSessionConfigWithInstructions(
+          realtimeInstructions,
+          agentChatContext,
+          optionsRef.current.instructions
+            ? "Current context for this Realtime session"
+            : undefined,
+        ),
       });
 
       const pc = new RTCPeerConnection();
@@ -831,13 +875,24 @@ export function useRealtimeVoice(
         void audio.play().catch(() => undefined);
       };
 
+      const markReadyIfConversationCanStart = () => {
+        if (
+          pc.connectionState !== "connected" ||
+          dataChannelRef.current?.readyState !== "open"
+        ) {
+          return;
+        }
+
+        setStatus("connected");
+        if (!playedConnectedCueRef.current) {
+          playedConnectedCueRef.current = true;
+          playCue("ready");
+        }
+      };
+
       pc.onconnectionstatechange = () => {
         if (pc.connectionState === "connected") {
-          if (!playedConnectedCueRef.current) {
-            playedConnectedCueRef.current = true;
-            playCue("start");
-          }
-          setStatus("connected");
+          markReadyIfConversationCanStart();
           return;
         }
         if (
@@ -861,8 +916,18 @@ export function useRealtimeVoice(
       dataChannelRef.current = dataChannel;
       dataChannel.onopen = () => {
         dataChannel.send(
-          JSON.stringify(buildRealtimeToolSessionUpdate(agentChatContext)),
+          JSON.stringify({
+            type: "session.update",
+            session: buildRealtimeToolSessionConfigWithInstructions(
+              realtimeInstructions,
+              agentChatContext,
+              optionsRef.current.instructions
+                ? "Current context for this Realtime session"
+                : undefined,
+            ),
+          }),
         );
+        markReadyIfConversationCanStart();
       };
       dataChannel.onerror = () => {
         setError("音声会話の接続でエラーが発生しました。再接続してください。");
@@ -900,6 +965,8 @@ export function useRealtimeVoice(
       playCue("error");
       console.error("Failed to start realtime voice", err);
       setError(toUserFacingRealtimeError(err));
+    } finally {
+      startInFlightRef.current = false;
     }
   }, [client, handleRealtimeEvent, playCue, status, stop]);
 

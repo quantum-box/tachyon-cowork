@@ -12,7 +12,7 @@ crate-type = ["lib", "cdylib", "staticlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["tray-icon"] }
+tauri = { version = "2", features = ["image-png", "tray-icon"] }
 tauri-plugin-shell = "2"
 tauri-plugin-opener = "2.5.4"
 tauri-plugin-dialog = "2"
@@ -34,6 +34,11 @@ walkdir = "2"
 blake3 = "1"
 mime_guess = "2"
 chrono = { version = "0.4", features = ["serde"] }
+core-graphics = "0.25"
+core-foundation = "0.10"
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", default-features = false, features = ["NSColor", "NSView", "NSWindow", "objc2-quartz-core"] }
+objc2-quartz-core = { version = "0.3", default-features = false, features = ["CALayer", "objc2-core-foundation"] }
 dirs = "6"
 lopdf = "0.34"
 tauri-plugin-deep-link = "2.0.0"
