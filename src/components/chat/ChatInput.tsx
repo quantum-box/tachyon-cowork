@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useEffect,
   useLayoutEffect,
   useRef,
   type ChangeEvent,
@@ -27,6 +28,7 @@ type ChatInputProps = {
   onFileRemove: (id: string) => void;
   showPromptTemplates?: boolean;
   sendKey?: SendKeyMode;
+  focusRequest?: number;
   realtimeVoice?: ReturnType<typeof useRealtimeVoice>;
 };
 
@@ -42,6 +44,7 @@ export function ChatInput({
   showPromptTemplates,
   sendKey = "enter",
   isDisabled = false,
+  focusRequest,
   realtimeVoice,
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -56,6 +59,14 @@ export function ChatInput({
     if (!el) return;
     resizeTextarea(el);
   }, [input, resizeTextarea]);
+
+  useEffect(() => {
+    if (!focusRequest || isDisabled) return;
+
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+    });
+  }, [focusRequest, isDisabled]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {

@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 
 interface ShortcutHandlers {
   onNewChat?: () => void;
+  onNewRealtimeChat?: () => void;
   onSearch?: () => void;
   onSettings?: () => void;
 }
@@ -11,7 +12,10 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
     const handleKeyDown = (e: KeyboardEvent) => {
       const isMod = e.metaKey || e.ctrlKey;
 
-      if (isMod && e.key === 'n') {
+      if (isMod && e.shiftKey && e.key === 'n') {
+        e.preventDefault();
+        handlers.onNewRealtimeChat?.();
+      } else if (isMod && e.key === 'n') {
         e.preventDefault();
         handlers.onNewChat?.();
       }

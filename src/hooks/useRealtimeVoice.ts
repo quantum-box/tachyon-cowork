@@ -24,7 +24,7 @@ type RealtimeVoiceState = {
   status: RealtimeVoiceStatus;
   error: string | null;
   transcripts: RealtimeTranscriptMessage[];
-  start: () => Promise<void>;
+  start: () => Promise<boolean>;
   stop: () => void;
   appendTranscript: (message: RealtimeTranscriptMessage) => void;
   clearTranscripts: () => void;
@@ -857,7 +857,7 @@ export function useRealtimeVoice(
     if (!client) {
       setError("ログイン後に音声会話を開始できます。");
       playCue("error");
-      return;
+      return false;
     }
     if (
       status !== "idle" ||
@@ -865,7 +865,7 @@ export function useRealtimeVoice(
       peerConnectionRef.current ||
       mediaStreamRef.current
     ) {
-      return;
+      return true;
     }
 
     startInFlightRef.current = true;
@@ -996,11 +996,13 @@ export function useRealtimeVoice(
         type: "answer",
         sdp: await sdpResponse.text(),
       });
+      return true;
     } catch (err) {
       stop();
       playCue("error");
       console.error("Failed to start realtime voice", err);
       setError(toUserFacingRealtimeError(err));
+      return false;
     } finally {
       startInFlightRef.current = false;
     }

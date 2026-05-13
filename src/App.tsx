@@ -129,6 +129,7 @@ export default function App() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [floatingVoiceDraft, setFloatingVoiceDraft] = useState("");
+  const [chatInputFocusRequest, setChatInputFocusRequest] = useState(0);
   const [availableModels, setAvailableModels] = useState<ModelInfo[] | null>(
     null,
   );
@@ -431,11 +432,11 @@ export default function App() {
   const realtimePausedForAgentRef = useRef(false);
   const realtimeControlRef = useRef<{
     status: "idle" | "connecting" | "connected";
-    start: () => Promise<void>;
+    start: () => Promise<boolean>;
     stop: () => void;
   }>({
     status: "idle",
-    start: async () => undefined,
+    start: async () => false,
     stop: () => undefined,
   });
 
@@ -905,10 +906,28 @@ export default function App() {
 
   const handleNewChat = useCallback(() => {
     chat.newChat();
-    artifactState.closeCanvas();
+    closeCanvas();
     navigate("/");
     handleMobileSidebarClose();
-  }, [artifactState.closeCanvas, chat, handleMobileSidebarClose, navigate]);
+    setChatInputFocusRequest((current) => current + 1);
+  }, [chat, closeCanvas, handleMobileSidebarClose, navigate]);
+
+  const handleNewRealtimeChat = useCallback(async () => {
+    handleNewChat();
+    const didStart = await startRealtimeVoice();
+    if (didStart) {
+      setRealtimeVoiceEnabled(true);
+      return;
+    }
+    if (realtimeVoiceEnabled) {
+      setRealtimeVoiceEnabled(false);
+    }
+  }, [
+    handleNewChat,
+    realtimeVoiceEnabled,
+    setRealtimeVoiceEnabled,
+    startRealtimeVoice,
+  ]);
 
   const handleStartChatFromWorkFolder = useCallback(() => {
     handleNewChat();
@@ -1052,6 +1071,11 @@ export default function App() {
             handleNewChat();
           }
         },
+        onNewRealtimeChat: () => {
+          if (auth) {
+            handleNewRealtimeChat();
+          }
+        },
         onSearch: () => {
           if (auth) setSearchOpen((prev) => !prev);
         },
@@ -1061,11 +1085,7 @@ export default function App() {
           }
         },
       }),
-      [
-        auth,
-        handleNewChat,
-        searchOpen,
-      ],
+      [auth, handleNewChat, handleNewRealtimeChat, searchOpen],
     ),
   );
 
@@ -1204,6 +1224,7 @@ export default function App() {
                       ? () => setSidebarCollapsed((prev) => !prev)
                       : undefined
                   }
+                  focusRequest={chatInputFocusRequest}
                   realtimeVoice={
                     realtimeVoiceEnabled ? realtimeVoice : undefined
                   }

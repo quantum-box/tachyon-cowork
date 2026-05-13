@@ -42,6 +42,7 @@ type Props = {
   onOpenTools?: () => void;
   projectContext?: ProjectContext | null;
   onToggleSidebar?: () => void;
+  focusRequest?: number;
   realtimeVoice?: ReturnType<typeof useRealtimeVoice>;
 };
 
@@ -76,6 +77,7 @@ export function ChatPanel({
   onOpenTools,
   projectContext,
   onToggleSidebar,
+  focusRequest,
   realtimeVoice,
 }: Props) {
   const [searchQuery] = useState("");
@@ -285,6 +287,7 @@ export function ChatPanel({
           showPromptTemplates={chat.chunks.length === 0}
           sendKey={sendKey}
           isDisabled={isOffline}
+          focusRequest={focusRequest}
           realtimeVoice={realtimeVoice}
           placeholder={
             isOffline
