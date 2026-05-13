@@ -14,6 +14,8 @@ type RealtimeVoiceOptions = {
   getAgentChatContext?: () => string;
   onSetAgentChatDraft?: (text: string) => void;
   onSubmitAgentChatDraft?: (text: string) => Promise<void> | void;
+  onSubmitFocusedForm?: () => Promise<void> | void;
+  onStopRealtimeVoice?: () => Promise<void> | void;
   soundEnabled?: boolean;
   instructions?: string;
 };
@@ -194,6 +196,7 @@ type RealtimeToolName =
   | "set_agent_chat_draft"
   | "update_agent_chat_draft"
   | "submit_agent_chat_draft"
+  | "submit_focused_form"
   | "read_agent_chat_context"
   | "stop_realtime_voice";
 
@@ -279,13 +282,25 @@ const AGENT_CHAT_DRAFT_TOOLS = [
       additionalProperties: false,
     },
   },
+  {
+    type: "function",
+    name: "submit_focused_form",
+    description:
+      "Press Cmd+Enter in the previously focused macOS form field. Use this in Voice Dot form-input mode when the user asks to send or submit the target form after text has been inserted.",
+    parameters: {
+      type: "object",
+      properties: {},
+      required: [],
+      additionalProperties: false,
+    },
+  },
 ] as const;
 
 const REALTIME_AGENT_CHAT_INSTRUCTIONS = [
   "You are primarily a voice-driven text input assistant for the normal Agent chat.",
   "Always speak, transcribe, draft, revise, and submit in Japanese. Do not switch languages unless the user explicitly asks for translation or non-Japanese output.",
-  "You have five client tools available: read_agent_chat_context, stop_realtime_voice, set_agent_chat_draft, update_agent_chat_draft, and submit_agent_chat_draft.",
-  "If the user asks what tools you can use, briefly explain these five tools: one reads the current Agent chat context, one ends Realtime voice mode, and three control the Agent chat input form.",
+  "You have six client tools available: read_agent_chat_context, stop_realtime_voice, set_agent_chat_draft, update_agent_chat_draft, submit_agent_chat_draft, and submit_focused_form.",
+  "If the user asks what tools you can use, briefly explain these tools: one reads the current Agent chat context, one ends Realtime voice mode, three control the Agent chat input form, and one can press Cmd+Enter in the focused macOS form when available.",
   "Keep Realtime voice conversation separate from Agent chat history unless the user explicitly asks to send something to Agent chat.",
   "When resuming after Agent chat work, use the provided Agent chat context or call read_agent_chat_context before explaining the result to the user.",
   "When you draft, revise, or submit text to Agent chat, write it in Japanese unless the user explicitly asks for translation or a different language.",
@@ -413,6 +428,7 @@ function isRealtimeToolName(value: unknown): value is RealtimeToolName {
     value === "set_agent_chat_draft" ||
     value === "update_agent_chat_draft" ||
     value === "submit_agent_chat_draft" ||
+    value === "submit_focused_form" ||
     value === "read_agent_chat_context" ||
     value === "stop_realtime_voice"
   );
@@ -708,7 +724,17 @@ export function useRealtimeVoice(
           };
         } else if (toolCall.name === "stop_realtime_voice") {
           output = { ok: true, stopped: true };
-          window.setTimeout(() => stop(), 0);
+          window.setTimeout(() => {
+            stop();
+            void Promise.resolve(
+              optionsRef.current.onStopRealtimeVoice?.(),
+            ).catch((error) => {
+              console.error(
+                "Failed to run realtime voice stop handler.",
+                error,
+              );
+            });
+          }, 0);
         } else if (
           toolCall.name === "set_agent_chat_draft" ||
           toolCall.name === "update_agent_chat_draft"
@@ -718,6 +744,16 @@ export function useRealtimeVoice(
           } else {
             optionsRef.current.onSetAgentChatDraft?.(textArg);
             output = { ok: true, draft: textArg };
+          }
+        } else if (toolCall.name === "submit_focused_form") {
+          if (!optionsRef.current.onSubmitFocusedForm) {
+            output = {
+              ok: false,
+              error: "focused form submit is unavailable",
+            };
+          } else {
+            await optionsRef.current.onSubmitFocusedForm();
+            output = { ok: true, submitted: true };
           }
         } else {
           const draft = (

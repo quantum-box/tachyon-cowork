@@ -6,6 +6,27 @@ mod sandbox;
 mod tools;
 
 #[cfg(target_os = "macos")]
+fn ensure_input_monitoring_permission_requested() {
+    use core_foundation::base::Boolean;
+
+    #[link(name = "CoreGraphics", kind = "framework")]
+    extern "C" {
+        fn CGPreflightListenEventAccess() -> Boolean;
+        fn CGRequestListenEventAccess() -> Boolean;
+    }
+
+    let has_access = unsafe { CGPreflightListenEventAccess() != 0 };
+    if has_access {
+        return;
+    }
+
+    let was_granted = unsafe { CGRequestListenEventAccess() != 0 };
+    if !was_granted {
+        eprintln!("Input Monitoring permission is required for the floating voice Fn shortcut.");
+    }
+}
+
+#[cfg(target_os = "macos")]
 fn install_floating_voice_fn_listener(app: tauri::AppHandle) {
     std::thread::Builder::new()
         .name("floating-voice-fn-listener".to_string())
@@ -59,7 +80,7 @@ fn install_floating_voice_fn_listener(app: tauri::AppHandle) {
 
             if result.is_err() {
                 eprintln!(
-                    "Failed to install Fn key event tap. Accessibility or Input Monitoring permission may be required."
+                    "Failed to install Fn key event tap. Input Monitoring permission may be required."
                 );
             }
         })
@@ -215,7 +236,10 @@ pub fn run() {
             }
 
             #[cfg(target_os = "macos")]
-            install_floating_voice_fn_listener(app.handle().clone());
+            {
+                ensure_input_monitoring_permission_requested();
+                install_floating_voice_fn_listener(app.handle().clone());
+            }
 
             #[cfg(desktop)]
             if let Err(error) = install_floating_voice_tray(app) {
@@ -258,6 +282,7 @@ pub fn run() {
             commands::system::get_system_info,
             commands::system::show_in_folder,
             commands::system::insert_text_to_focused_app,
+            commands::system::press_cmd_enter_to_focused_app,
             commands::system::apply_voice_dot_window_shape,
             commands::system::set_voice_dot_tray_visible,
             commands::pdf::read_pdf,

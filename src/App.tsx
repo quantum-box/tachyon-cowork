@@ -59,6 +59,7 @@ import { HelpPanel } from "./components/layout/HelpPanel";
 import type { ModelInfo, SessionSummary } from "./lib/types";
 import {
   clearTauriRuntimeAuth,
+  hideCurrentTauriWindow,
   insertTextToFocusedApp,
   isTauri,
   isTauriDesktop,
@@ -68,6 +69,7 @@ import {
   listenVoiceDotOpenSettings,
   openAndStartFloatingVoiceInput,
   openFloatingVoiceInputWindow,
+  pressCmdEnterToFocusedApp,
   registerFloatingVoiceShortcut,
   setVoiceDotMenuBarIconVisible,
   type ProjectContext,
@@ -96,9 +98,12 @@ const MOBILE_DRAWER_SWIPE_DOMINANCE_RATIO = 1.2;
 const FLOATING_VOICE_INPUT_INSTRUCTIONS = [
   "You are a voice-driven text input assistant for the previously focused macOS form field.",
   "Always speak, transcribe, draft, revise, and submit in Japanese unless the user explicitly asks for another language.",
+  "By default, keep spoken replies brief: use a short acknowledgement or one concise sentence. Only give longer, conversational answers when the user is asking for consultation, brainstorming, or help thinking through something.",
   "Use set_agent_chat_draft and update_agent_chat_draft to maintain the exact text that should be inserted into the form.",
-  "Use submit_agent_chat_draft when the user asks to input, insert, paste, submit, commit, or finish the dictated text.",
-  "Use stop_realtime_voice when the user asks to stop, close, hide, finish the conversation, or end Voice Dot.",
+  "Use submit_agent_chat_draft when the user asks to input, insert, paste, or commit the dictated text.",
+  "Use submit_focused_form to press Cmd+Enter in the target form when the user asks to send or submit the form. If the user asks to send dictated text, insert the text first, then submit the focused form.",
+  "After submit_agent_chat_draft, keep listening for the next user request. Do not stop or hide Voice Dot unless the user explicitly asks to close it.",
+  "Use stop_realtime_voice when the user asks to stop, close, hide, end Voice Dot, or says they are done.",
   "Do not describe Agent chat. In this mode, submit_agent_chat_draft inserts the text into the user's previous form field.",
   "Keep the final inserted text clean and do not include meta commentary unless the user dictates it.",
 ].join(" ");
@@ -463,7 +468,6 @@ export default function App() {
       if (isFloatingVoiceInput) {
         floatingVoiceDraftRef.current = "";
         setFloatingVoiceDraft("");
-        realtimeControlRef.current.stop();
         void insertTextToFocusedApp(message).catch((error) => {
           console.warn("Failed to insert floating voice text.", error);
         });
@@ -493,6 +497,12 @@ export default function App() {
         : buildRealtimeAgentChatContext(agentChunksRef.current),
     onSetAgentChatDraft: setAgentChatDraftFromRealtime,
     onSubmitAgentChatDraft: submitAgentChatDraftFromRealtime,
+    onSubmitFocusedForm: isFloatingVoiceInput
+      ? () => pressCmdEnterToFocusedApp()
+      : undefined,
+    onStopRealtimeVoice: isFloatingVoiceInput
+      ? () => hideCurrentTauriWindow()
+      : undefined,
     soundEnabled: realtimeSoundEnabled,
     instructions: isFloatingVoiceInput
       ? FLOATING_VOICE_INPUT_INSTRUCTIONS

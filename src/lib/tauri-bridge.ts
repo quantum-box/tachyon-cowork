@@ -142,8 +142,7 @@ async function getFloatingVoiceBottomCenterPosition(height: number): Promise<{
   const workHeight = workArea.size.height / scaleFactor;
   const x =
     workX + Math.round((workWidth - FLOATING_VOICE_WINDOW_SIZE.width) / 2);
-  const y =
-    workY + Math.round(workHeight - height - 12);
+  const y = workY + Math.round(workHeight - height - 12);
 
   return { x, y };
 }
@@ -174,13 +173,17 @@ async function setFloatingVoiceWindowSize(
   await placeFloatingVoiceWindowNearBottomCenter(window, height);
 }
 
-async function applyVoiceDotNativeWindowShape(): Promise<void> {
+async function applyVoiceDotNativeWindowShape(
+  height: number = FLOATING_VOICE_WINDOW_SIZE.idleHeight,
+): Promise<void> {
   if (!isTauriMacOS()) {
     return;
   }
 
   try {
-    await tauriInvoke<void>("apply_voice_dot_window_shape");
+    await tauriInvoke<void>("apply_voice_dot_window_shape", {
+      radius: Math.max(1, height / 2),
+    });
   } catch (error) {
     console.warn("Failed to apply Voice Dot native window shape:", error);
   }
@@ -208,7 +211,7 @@ export async function openFloatingVoiceInputWindow(): Promise<void> {
     await existing.show();
     await existing.setAlwaysOnTop(true);
     await existing.setFocusable(false);
-    await applyVoiceDotNativeWindowShape();
+    await applyVoiceDotNativeWindowShape(FLOATING_VOICE_WINDOW_SIZE.idleHeight);
     return;
   }
 
@@ -227,8 +230,8 @@ export async function openFloatingVoiceInputWindow(): Promise<void> {
     decorations: false,
     alwaysOnTop: true,
     skipTaskbar: true,
-    transparent: false,
-    backgroundColor: "#111111",
+    transparent: true,
+    backgroundColor: "#00000000",
     shadow: true,
     visible: true,
     focus: false,
@@ -244,7 +247,7 @@ export async function openFloatingVoiceInputWindow(): Promise<void> {
   await voiceWindow.setAlwaysOnTop(true);
   await voiceWindow.setFocusable(false);
   await placeFloatingVoiceWindowNearBottomCenter(voiceWindow);
-  await applyVoiceDotNativeWindowShape();
+  await applyVoiceDotNativeWindowShape(FLOATING_VOICE_WINDOW_SIZE.idleHeight);
 }
 
 export async function resizeCurrentFloatingVoiceInputWindow(
@@ -261,7 +264,11 @@ export async function resizeCurrentFloatingVoiceInputWindow(
       ? FLOATING_VOICE_WINDOW_SIZE.activeHeight
       : FLOATING_VOICE_WINDOW_SIZE.idleHeight,
   );
-  await applyVoiceDotNativeWindowShape();
+  await applyVoiceDotNativeWindowShape(
+    isActive
+      ? FLOATING_VOICE_WINDOW_SIZE.activeHeight
+      : FLOATING_VOICE_WINDOW_SIZE.idleHeight,
+  );
 }
 
 export async function openAndStartFloatingVoiceInput(): Promise<void> {
@@ -460,6 +467,14 @@ export async function insertTextToFocusedApp(text: string): Promise<void> {
   }
 
   await tauriInvoke<void>("insert_text_to_focused_app", { text });
+}
+
+export async function pressCmdEnterToFocusedApp(): Promise<void> {
+  if (!isTauriDesktop()) {
+    throw new Error("external form submission is only available in Tauri");
+  }
+
+  await tauriInvoke<void>("press_cmd_enter_to_focused_app");
 }
 
 /** Lazy wrapper around `@tauri-apps/api/core` invoke. */
