@@ -58,6 +58,34 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+html.voice-input-transparent,
+html.voice-input-transparent body,
+html.voice-input-transparent #root {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
+@keyframes voice-dot-wave {
+  0%,
+  100% {
+    transform: translateY(0) scale(0.72);
+    opacity: 0.45;
+  }
+  35% {
+    transform: translateY(-2px) scale(1);
+    opacity: 1;
+  }
+  70% {
+    transform: translateY(2px) scale(0.82);
+    opacity: 0.72;
+  }
+}
+
+.voice-dot-wave {
+  animation: voice-dot-wave 720ms ease-in-out infinite;
+}
+
 .dark body {
   background-image: radial-gradient(
     circle at top left,

@@ -255,6 +255,31 @@ describe("useAgentChat tool flow", () => {
     );
   });
 
+  it("surfaces a premature final-report say as a server error", async () => {
+    const client = buildClient([
+      {
+        id: "chunk-say-report",
+        type: "say",
+        text: "十分な情報が集まりました。まとめを作成します。",
+        created_at: "2026-04-20T00:00:01.000Z",
+      },
+    ]);
+
+    const { result } = renderHook(() => useAgentChat(client));
+
+    await act(async () => {
+      await result.current.sendMessage("最新情報を調べてレポートして");
+    });
+
+    expect(result.current.error).toEqual(
+      expect.objectContaining({
+        kind: "server",
+        message:
+          "Agent API が最終レポート本文の前に停止しました。「続けて」と送ると再開できます。",
+      }),
+    );
+  });
+
   it("handles chained client tool calls emitted after a tool result", async () => {
     vi.mocked(executeClientTool)
       .mockResolvedValueOnce({

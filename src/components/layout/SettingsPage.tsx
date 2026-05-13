@@ -35,6 +35,11 @@ type Props = {
   onRealtimeVoiceEnabledChange: (enabled: boolean) => void;
   realtimeSoundEnabled: boolean;
   onRealtimeSoundEnabledChange: (enabled: boolean) => void;
+  floatingVoiceOpenOnStartup: boolean;
+  onFloatingVoiceOpenOnStartupChange: (enabled: boolean) => void;
+  voiceDotMenuBarIconEnabled: boolean;
+  onVoiceDotMenuBarIconEnabledChange: (enabled: boolean) => void;
+  onOpenFloatingVoiceInput?: () => void;
   globalCustomInstructions: string;
   onGlobalCustomInstructionsChange: (value: string) => void;
   maxRequests: number;
@@ -43,8 +48,8 @@ type Props = {
 
 function getShortcuts(sendKey: SendKeyMode) {
   return [
-    { key: "Ctrl + N", description: "新しいチャット" },
-    { key: "Ctrl + F", description: "チャット内検索" },
+    { key: "⌘/Ctrl + N", description: "新しいチャット" },
+    { key: "⌘/Ctrl + F", description: "チャット内検索" },
     { key: "Escape", description: "検索を閉じる" },
     {
       key: sendKey === "cmd-enter" ? "⌘/Ctrl + Enter" : "Enter",
@@ -75,6 +80,11 @@ export function SettingsPage({
   onRealtimeVoiceEnabledChange,
   realtimeSoundEnabled,
   onRealtimeSoundEnabledChange,
+  floatingVoiceOpenOnStartup,
+  onFloatingVoiceOpenOnStartupChange,
+  voiceDotMenuBarIconEnabled,
+  onVoiceDotMenuBarIconEnabledChange,
+  onOpenFloatingVoiceInput,
   globalCustomInstructions,
   onGlobalCustomInstructionsChange,
   maxRequests,
@@ -155,7 +165,8 @@ export function SettingsPage({
               </h3>
             </div>
             <p className="mb-3 text-xs text-stone-500 dark:text-stone-400">
-              Agent loop の最大反復回数です。調査や複数ファイル操作では大きめの値が必要になる場合があります。
+              Agent loop
+              の最大反復回数です。調査や複数ファイル操作では大きめの値が必要になる場合があります。
             </p>
             <input
               type="number"
@@ -211,6 +222,42 @@ export function SettingsPage({
                 type="checkbox"
                 checked={realtimeVoiceEnabled}
                 onChange={(e) => onRealtimeVoiceEnabledChange(e.target.checked)}
+                className="h-4 w-4 accent-stone-900 dark:accent-stone-100"
+              />
+            </label>
+            {onOpenFloatingVoiceInput && (
+              <button
+                type="button"
+                onClick={onOpenFloatingVoiceInput}
+                className="notion-button mt-2 flex min-h-10 w-full items-center justify-center gap-2 rounded-2xl px-3 text-sm font-medium"
+              >
+                <Mic size={16} />
+                音声入力の小窓を開く
+              </button>
+            )}
+            <label className="notion-input mt-2 flex cursor-pointer items-center justify-between gap-3 rounded-2xl px-3 py-2.5">
+              <span className="min-w-0 text-sm text-stone-700 dark:text-stone-200">
+                起動時に音声入力の小窓を開く
+              </span>
+              <input
+                type="checkbox"
+                checked={floatingVoiceOpenOnStartup}
+                onChange={(e) =>
+                  onFloatingVoiceOpenOnStartupChange(e.target.checked)
+                }
+                className="h-4 w-4 accent-stone-900 dark:accent-stone-100"
+              />
+            </label>
+            <label className="notion-input mt-2 flex cursor-pointer items-center justify-between gap-3 rounded-2xl px-3 py-2.5">
+              <span className="min-w-0 text-sm text-stone-700 dark:text-stone-200">
+                メニューバーに Voice Dot アイコンを表示
+              </span>
+              <input
+                type="checkbox"
+                checked={voiceDotMenuBarIconEnabled}
+                onChange={(e) =>
+                  onVoiceDotMenuBarIconEnabledChange(e.target.checked)
+                }
                 className="h-4 w-4 accent-stone-900 dark:accent-stone-100"
               />
             </label>

@@ -126,17 +126,36 @@ function findMatchingModel(
   });
 }
 
+function toModelOption(model: ModelInfo): ModelOption {
+  return {
+    id: model.id,
+    label: model.name || model.id,
+  };
+}
+
 export function resolveModelOptions(
   availableModels?: ModelInfo[] | null,
 ): ModelOption[] {
-  return PREFERRED_MODELS.flatMap((preferredModel) => {
-    const matchedModel = findMatchingModel(preferredModel, availableModels);
+  if (!availableModels) {
+    return FALLBACK_MODEL_OPTIONS;
+  }
 
+  const selectedIds = new Set<string>();
+  const preferredOptions = PREFERRED_MODELS.flatMap((preferredModel) => {
+    const matchedModel = findMatchingModel(preferredModel, availableModels);
+    if (!matchedModel) return [];
+    selectedIds.add(matchedModel.id);
     return {
-      id: matchedModel?.id ?? preferredModel.id,
+      id: matchedModel.id,
       label: preferredModel.label,
     };
   });
+
+  const remainingOptions = availableModels
+    .filter((model) => !selectedIds.has(model.id))
+    .map(toModelOption);
+
+  return [...preferredOptions, ...remainingOptions];
 }
 
 export function hasModelOption(

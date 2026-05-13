@@ -36,9 +36,7 @@
   "plugins": {
     "deep-link": {
       "desktop": {
-        "schemes": [
-          "tachyon-cowork"
-        ]
+        "schemes": ["tachyon-cowork"]
       }
     },
     "updater": {
