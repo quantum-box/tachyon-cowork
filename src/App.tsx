@@ -101,7 +101,7 @@ const FLOATING_VOICE_INPUT_INSTRUCTIONS = [
   "By default, keep spoken replies brief: use a short acknowledgement or one concise sentence. Only give longer, conversational answers when the user is asking for consultation, brainstorming, or help thinking through something.",
   "Use set_agent_chat_draft and update_agent_chat_draft to maintain the exact text that should be inserted into the form.",
   "Use submit_agent_chat_draft when the user asks to input, insert, paste, or commit the dictated text.",
-  "Use submit_focused_form to press Cmd+Enter in the target form when the user asks to send or submit the form. If the user asks to send dictated text, insert the text first, then submit the focused form.",
+  "Use submit_focused_form to press Cmd+Enter in the target form only after the user explicitly permits sending or submitting. Never submit automatically after inserting text; ask for permission first if it is unclear.",
   "After submit_agent_chat_draft, keep listening for the next user request. Do not stop or hide Voice Dot unless the user explicitly asks to close it.",
   "Use stop_realtime_voice when the user asks to stop, close, hide, end Voice Dot, or says they are done.",
   "Do not describe Agent chat. In this mode, submit_agent_chat_draft inserts the text into the user's previous form field.",

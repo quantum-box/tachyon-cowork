@@ -286,7 +286,7 @@ const AGENT_CHAT_DRAFT_TOOLS = [
     type: "function",
     name: "submit_focused_form",
     description:
-      "Press Cmd+Enter in the previously focused macOS form field. Use this in Voice Dot form-input mode when the user asks to send or submit the target form after text has been inserted.",
+      "Press Cmd+Enter in the previously focused macOS form field. Use this in Voice Dot form-input mode only after the user explicitly permits sending or submitting the target form. If permission is unclear, ask for confirmation instead of calling this tool.",
     parameters: {
       type: "object",
       properties: {},
