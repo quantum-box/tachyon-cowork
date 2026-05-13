@@ -28,7 +28,7 @@ fn ensure_input_monitoring_permission_requested() {
 
 #[cfg(target_os = "macos")]
 fn install_floating_voice_fn_listener(app: tauri::AppHandle) {
-    const LONG_PRESS_THRESHOLD_MS: u64 = 280;
+    const LONG_PRESS_THRESHOLD_MS: u64 = 450;
 
     std::thread::Builder::new()
         .name("floating-voice-fn-listener".to_string())
@@ -43,7 +43,7 @@ fn install_floating_voice_fn_listener(app: tauri::AppHandle) {
                 Arc,
             };
             use std::time::Duration;
-            use tauri::Emitter;
+            use tauri::{Emitter, Manager};
 
             let fn_down = Arc::new(AtomicBool::new(false));
             let fn_down_for_tap = Arc::clone(&fn_down);
@@ -73,14 +73,28 @@ fn install_floating_voice_fn_listener(app: tauri::AppHandle) {
                             if fn_down_for_hold.load(Ordering::Relaxed)
                                 && !hold_started_for_hold.swap(true, Ordering::Relaxed)
                             {
-                                let _ = app_for_hold
-                                    .emit_to("main", "floating-voice:hold-start", ());
+                                if app_for_hold.get_webview_window("voice-input").is_some() {
+                                    let _ = app_for_hold.emit_to(
+                                        "voice-input",
+                                        "floating-voice:hold-start",
+                                        (),
+                                    );
+                                } else {
+                                    let _ = app_for_hold.emit_to(
+                                        "main",
+                                        "floating-voice:hold-start",
+                                        (),
+                                    );
+                                }
                             }
                         });
                     } else if !is_down && was_down {
                         if hold_started_for_tap.swap(false, Ordering::Relaxed) {
                             let _ = app_for_tap.emit_to("main", "floating-voice:hold-stop", ());
-                            let _ = app_for_tap.emit_to("voice-input", "floating-voice:hold-stop", ());
+                            let _ =
+                                app_for_tap.emit_to("voice-input", "floating-voice:hold-stop", ());
+                        } else if app_for_tap.get_webview_window("voice-input").is_some() {
+                            let _ = app_for_tap.emit_to("voice-input", "floating-voice:toggle", ());
                         } else {
                             let _ = app_for_tap.emit_to("main", "floating-voice:toggle", ());
                         }
