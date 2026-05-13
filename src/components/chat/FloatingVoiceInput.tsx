@@ -4,8 +4,11 @@ import type { useRealtimeVoice } from "../../hooks/useRealtimeVoice";
 import {
   hideCurrentTauriWindow,
   interceptCurrentTauriWindowClose,
+  listenFloatingVoiceHoldStart,
+  listenFloatingVoiceHoldStop,
   listenFloatingVoiceStart,
   listenFloatingVoiceStopAndHide,
+  listenFloatingVoiceToggle,
   resizeCurrentFloatingVoiceInputWindow,
 } from "../../lib/tauri-bridge";
 
@@ -68,13 +71,12 @@ export function FloatingVoiceInput({
     };
   }, []);
 
-  const toggleVoice = useCallback(async () => {
+  const startVoice = useCallback(async () => {
     const currentRealtimeVoice = realtimeVoiceRef.current;
     if (
       currentRealtimeVoice.status === "connecting" ||
       currentRealtimeVoice.status === "connected"
     ) {
-      currentRealtimeVoice.stop();
       return;
     }
 
@@ -85,31 +87,64 @@ export function FloatingVoiceInput({
     await currentRealtimeVoice.start();
   }, []);
 
+  const stopVoice = useCallback(() => {
+    realtimeVoiceRef.current.stop();
+  }, []);
+
+  const toggleVoice = useCallback(async () => {
+    const currentRealtimeVoice = realtimeVoiceRef.current;
+    if (
+      currentRealtimeVoice.status === "connecting" ||
+      currentRealtimeVoice.status === "connected"
+    ) {
+      currentRealtimeVoice.stop();
+      return;
+    }
+
+    await startVoice();
+  }, [startVoice]);
+
   useEffect(() => {
     let disposed = false;
-    let unlisten: (() => void) | undefined;
-    const handleStart = () => {
-      void toggleVoice();
-    };
+    const unlisteners: Array<() => void> = [];
+    const listeners = [
+      listenFloatingVoiceStart(() => {
+        void startVoice();
+      }),
+      listenFloatingVoiceToggle(() => {
+        void toggleVoice();
+      }),
+      listenFloatingVoiceHoldStart(() => {
+        void startVoice();
+      }),
+      listenFloatingVoiceHoldStop(() => {
+        stopVoice();
+      }),
+    ];
 
-    void listenFloatingVoiceStart(handleStart).then((fn) => {
-      if (disposed) {
-        fn();
-        return;
-      }
-      unlisten = fn;
-    });
+    for (const listener of listeners) {
+      void listener.then((fn) => {
+        if (disposed) {
+          fn();
+          return;
+        }
+        unlisteners.push(fn);
+      });
+    }
+
     return () => {
       disposed = true;
-      unlisten?.();
+      for (const unlisten of unlisteners) {
+        unlisten();
+      }
     };
-  }, [toggleVoice]);
+  }, [startVoice, stopVoice, toggleVoice]);
 
   useEffect(() => {
     let disposed = false;
     let unlisten: (() => void) | undefined;
     void listenFloatingVoiceStopAndHide(() => {
-      realtimeVoiceRef.current.stop();
+      stopVoice();
       void hideCurrentTauriWindow();
     }).then((fn) => {
       if (disposed) {
@@ -122,7 +157,7 @@ export function FloatingVoiceInput({
       disposed = true;
       unlisten?.();
     };
-  }, []);
+  }, [stopVoice]);
 
   return (
     <div

@@ -63,10 +63,16 @@ import {
   isTauri,
   isTauriDesktop,
   isTauriMacOS,
+  listenFloatingVoiceHoldStart,
+  listenFloatingVoiceHoldStop,
   listenFloatingVoiceStart,
+  listenFloatingVoiceToggle,
   listenVoiceDotNewChat,
   listenVoiceDotOpenSettings,
+  notifyFloatingVoiceHoldStopped,
+  openAndHoldStartFloatingVoiceInput,
   openAndStartFloatingVoiceInput,
+  openAndToggleFloatingVoiceInput,
   openFloatingVoiceInputWindow,
   pressCmdEnterToFocusedApp,
   registerFloatingVoiceShortcut,
@@ -623,16 +629,41 @@ export default function App() {
         );
       });
     };
+    const toggleFromFn = () => {
+      void openAndToggleFloatingVoiceInput().catch((error) => {
+        console.warn("Failed to toggle floating voice input from Fn.", error);
+      });
+    };
+    const holdStartFromFn = () => {
+      void openAndHoldStartFloatingVoiceInput().catch((error) => {
+        console.warn(
+          "Failed to start floating voice input from Fn hold.",
+          error,
+        );
+      });
+    };
+    const holdStopFromFn = () => {
+      notifyFloatingVoiceHoldStopped();
+    };
     let disposed = false;
     const unlisteners: Array<() => void> = [];
 
-    void listenFloatingVoiceStart(openFromShortcut).then((unlisten) => {
-      if (disposed) {
-        unlisten();
-        return;
-      }
-      unlisteners.push(unlisten);
-    });
+    const listeners = [
+      listenFloatingVoiceStart(openFromShortcut),
+      listenFloatingVoiceToggle(toggleFromFn),
+      listenFloatingVoiceHoldStart(holdStartFromFn),
+      listenFloatingVoiceHoldStop(holdStopFromFn),
+    ];
+
+    for (const listener of listeners) {
+      void listener.then((unlisten) => {
+        if (disposed) {
+          unlisten();
+          return;
+        }
+        unlisteners.push(unlisten);
+      });
+    }
 
     if (!didRegisterFloatingVoiceShortcutRef.current) {
       didRegisterFloatingVoiceShortcutRef.current = true;

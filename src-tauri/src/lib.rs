@@ -28,6 +28,8 @@ fn ensure_input_monitoring_permission_requested() {
 
 #[cfg(target_os = "macos")]
 fn install_floating_voice_fn_listener(app: tauri::AppHandle) {
+    const LONG_PRESS_THRESHOLD_MS: u64 = 280;
+
     std::thread::Builder::new()
         .name("floating-voice-fn-listener".to_string())
         .spawn(move || {
@@ -37,16 +39,16 @@ fn install_floating_voice_fn_listener(app: tauri::AppHandle) {
                 CGEventTapPlacement, CGEventType,
             };
             use std::sync::{
-                atomic::{AtomicBool, AtomicU64, Ordering},
+                atomic::{AtomicBool, Ordering},
                 Arc,
             };
-            use std::time::{SystemTime, UNIX_EPOCH};
+            use std::time::Duration;
             use tauri::Emitter;
 
             let fn_down = Arc::new(AtomicBool::new(false));
             let fn_down_for_tap = Arc::clone(&fn_down);
-            let last_start_at_ms = Arc::new(AtomicU64::new(0));
-            let last_start_at_ms_for_tap = Arc::clone(&last_start_at_ms);
+            let hold_started = Arc::new(AtomicBool::new(false));
+            let hold_started_for_tap = Arc::clone(&hold_started);
             let app_for_tap = app.clone();
 
             let result = CGEventTap::with_enabled(
@@ -61,15 +63,26 @@ fn install_floating_voice_fn_listener(app: tauri::AppHandle) {
                     let was_down = fn_down_for_tap.swap(is_down, Ordering::Relaxed);
 
                     if is_down && !was_down {
-                        let now_ms = SystemTime::now()
-                            .duration_since(UNIX_EPOCH)
-                            .map(|duration| duration.as_millis() as u64)
-                            .unwrap_or(0);
-                        let last_ms = last_start_at_ms_for_tap.load(Ordering::Relaxed);
+                        hold_started_for_tap.store(false, Ordering::Relaxed);
+                        let app_for_hold = app_for_tap.clone();
+                        let fn_down_for_hold = Arc::clone(&fn_down_for_tap);
+                        let hold_started_for_hold = Arc::clone(&hold_started_for_tap);
 
-                        if now_ms.saturating_sub(last_ms) >= 1000 {
-                            last_start_at_ms_for_tap.store(now_ms, Ordering::Relaxed);
-                            let _ = app_for_tap.emit_to("main", "floating-voice:start", ());
+                        std::thread::spawn(move || {
+                            std::thread::sleep(Duration::from_millis(LONG_PRESS_THRESHOLD_MS));
+                            if fn_down_for_hold.load(Ordering::Relaxed)
+                                && !hold_started_for_hold.swap(true, Ordering::Relaxed)
+                            {
+                                let _ = app_for_hold
+                                    .emit_to("main", "floating-voice:hold-start", ());
+                            }
+                        });
+                    } else if !is_down && was_down {
+                        if hold_started_for_tap.swap(false, Ordering::Relaxed) {
+                            let _ = app_for_tap.emit_to("main", "floating-voice:hold-stop", ());
+                            let _ = app_for_tap.emit_to("voice-input", "floating-voice:hold-stop", ());
+                        } else {
+                            let _ = app_for_tap.emit_to("main", "floating-voice:toggle", ());
                         }
                     }
 

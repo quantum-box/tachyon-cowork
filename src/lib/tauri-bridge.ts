@@ -113,11 +113,14 @@ const FLOATING_VOICE_WINDOW_LABEL = "voice-input";
 const FLOATING_VOICE_SET_DRAFT_EVENT = "floating-voice:set-draft";
 const FLOATING_VOICE_SUBMIT_DRAFT_EVENT = "floating-voice:submit-draft";
 const FLOATING_VOICE_START_EVENT = "floating-voice:start";
+const FLOATING_VOICE_TOGGLE_EVENT = "floating-voice:toggle";
+const FLOATING_VOICE_HOLD_START_EVENT = "floating-voice:hold-start";
+const FLOATING_VOICE_HOLD_STOP_EVENT = "floating-voice:hold-stop";
 const FLOATING_VOICE_STOP_AND_HIDE_EVENT = "floating-voice:stop-and-hide";
 const VOICE_DOT_NEW_CHAT_EVENT = "voice-dot:new-chat";
 const VOICE_DOT_OPEN_SETTINGS_EVENT = "voice-dot:open-settings";
-let floatingVoiceStartRequestInFlight = false;
-let lastFloatingVoiceStartRequestAt = 0;
+let floatingVoiceOpenRequestInFlight = false;
+let floatingVoiceHoldReleaseCount = 0;
 const FLOATING_VOICE_WINDOW_SIZE = {
   width: 48,
   idleHeight: 6,
@@ -271,26 +274,45 @@ export async function resizeCurrentFloatingVoiceInputWindow(
   );
 }
 
-export async function openAndStartFloatingVoiceInput(): Promise<void> {
-  const now = Date.now();
-  if (
-    floatingVoiceStartRequestInFlight ||
-    now - lastFloatingVoiceStartRequestAt < 1000
-  ) {
+async function openAndEmitFloatingVoiceInputEvent(
+  event: string,
+  shouldEmit: () => boolean = () => true,
+): Promise<void> {
+  if (floatingVoiceOpenRequestInFlight) {
     return;
   }
 
-  floatingVoiceStartRequestInFlight = true;
-  lastFloatingVoiceStartRequestAt = now;
+  floatingVoiceOpenRequestInFlight = true;
   try {
     await openFloatingVoiceInputWindow();
     await new Promise((resolve) => globalThis.setTimeout(resolve, 300));
-    await emitFloatingVoiceStart();
+    if (!shouldEmit()) {
+      return;
+    }
+    await emitFloatingVoiceEvent(event);
   } finally {
-    globalThis.setTimeout(() => {
-      floatingVoiceStartRequestInFlight = false;
-    }, 1000);
+    floatingVoiceOpenRequestInFlight = false;
   }
+}
+
+export async function openAndStartFloatingVoiceInput(): Promise<void> {
+  await openAndEmitFloatingVoiceInputEvent(FLOATING_VOICE_START_EVENT);
+}
+
+export async function openAndToggleFloatingVoiceInput(): Promise<void> {
+  await openAndEmitFloatingVoiceInputEvent(FLOATING_VOICE_TOGGLE_EVENT);
+}
+
+export async function openAndHoldStartFloatingVoiceInput(): Promise<void> {
+  const releaseCountAtStart = floatingVoiceHoldReleaseCount;
+  await openAndEmitFloatingVoiceInputEvent(
+    FLOATING_VOICE_HOLD_START_EVENT,
+    () => releaseCountAtStart === floatingVoiceHoldReleaseCount,
+  );
+}
+
+export function notifyFloatingVoiceHoldStopped(): void {
+  floatingVoiceHoldReleaseCount += 1;
 }
 
 export async function emitFloatingVoiceSetDraft(text: string): Promise<void> {
@@ -322,12 +344,16 @@ export async function emitFloatingVoiceSubmitDraft(
 }
 
 export async function emitFloatingVoiceStart(): Promise<void> {
+  await emitFloatingVoiceEvent(FLOATING_VOICE_START_EVENT);
+}
+
+async function emitFloatingVoiceEvent(event: string): Promise<void> {
   if (!isTauriDesktop()) {
     return;
   }
 
   const { getCurrentWindow } = await import("@tauri-apps/api/window");
-  await getCurrentWindow().emitTo("voice-input", FLOATING_VOICE_START_EVENT);
+  await getCurrentWindow().emitTo("voice-input", event);
 }
 
 function isFloatingVoiceDraftPayload(
@@ -386,6 +412,45 @@ export async function listenFloatingVoiceStart(
 
   const { getCurrentWindow } = await import("@tauri-apps/api/window");
   return getCurrentWindow().listen(FLOATING_VOICE_START_EVENT, () => handler());
+}
+
+export async function listenFloatingVoiceToggle(
+  handler: () => void,
+): Promise<() => void> {
+  if (!isTauriDesktop()) {
+    return () => undefined;
+  }
+
+  const { getCurrentWindow } = await import("@tauri-apps/api/window");
+  return getCurrentWindow().listen(FLOATING_VOICE_TOGGLE_EVENT, () =>
+    handler(),
+  );
+}
+
+export async function listenFloatingVoiceHoldStart(
+  handler: () => void,
+): Promise<() => void> {
+  if (!isTauriDesktop()) {
+    return () => undefined;
+  }
+
+  const { getCurrentWindow } = await import("@tauri-apps/api/window");
+  return getCurrentWindow().listen(FLOATING_VOICE_HOLD_START_EVENT, () =>
+    handler(),
+  );
+}
+
+export async function listenFloatingVoiceHoldStop(
+  handler: () => void,
+): Promise<() => void> {
+  if (!isTauriDesktop()) {
+    return () => undefined;
+  }
+
+  const { getCurrentWindow } = await import("@tauri-apps/api/window");
+  return getCurrentWindow().listen(FLOATING_VOICE_HOLD_STOP_EVENT, () =>
+    handler(),
+  );
 }
 
 export async function listenFloatingVoiceStopAndHide(
