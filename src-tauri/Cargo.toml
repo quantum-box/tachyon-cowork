@@ -12,7 +12,7 @@ crate-type = ["lib", "cdylib", "staticlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["image-png", "macos-private-api", "tray-icon"] }
+tauri = { version = "2", features = ["image-png", "tray-icon"] }
 tauri-plugin-shell = "2"
 tauri-plugin-opener = "2.5.4"
 tauri-plugin-dialog = "2"
