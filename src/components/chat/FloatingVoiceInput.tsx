@@ -68,17 +68,20 @@ export function FloatingVoiceInput({
     };
   }, []);
 
-  const startVoice = useCallback(async () => {
+  const toggleVoice = useCallback(async () => {
     const currentRealtimeVoice = realtimeVoiceRef.current;
-    if (!isEnabledRef.current) {
-      onEnableRef.current();
-    }
     if (
       currentRealtimeVoice.status === "connecting" ||
       currentRealtimeVoice.status === "connected"
     ) {
+      currentRealtimeVoice.stop();
       return;
     }
+
+    if (!isEnabledRef.current) {
+      onEnableRef.current();
+    }
+
     await currentRealtimeVoice.start();
   }, []);
 
@@ -86,7 +89,7 @@ export function FloatingVoiceInput({
     let disposed = false;
     let unlisten: (() => void) | undefined;
     const handleStart = () => {
-      void startVoice();
+      void toggleVoice();
     };
 
     void listenFloatingVoiceStart(handleStart).then((fn) => {
@@ -100,7 +103,7 @@ export function FloatingVoiceInput({
       disposed = true;
       unlisten?.();
     };
-  }, [startVoice]);
+  }, [toggleVoice]);
 
   useEffect(() => {
     let disposed = false;
