@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { useWindowDrag } from "../../hooks/useWindowDrag";
 import type { useRealtimeVoice } from "../../hooks/useRealtimeVoice";
 import {
+  type FloatingVoiceStartPayload,
   hideCurrentTauriWindow,
   interceptCurrentTauriWindowClose,
   listenFloatingVoiceStart,
@@ -68,7 +69,7 @@ export function FloatingVoiceInput({
     };
   }, []);
 
-  const startVoice = useCallback(async () => {
+  const startVoice = useCallback(async (payload: FloatingVoiceStartPayload) => {
     const currentRealtimeVoice = realtimeVoiceRef.current;
     if (!isEnabledRef.current) {
       onEnableRef.current();
@@ -79,14 +80,16 @@ export function FloatingVoiceInput({
     ) {
       return;
     }
-    await currentRealtimeVoice.start();
+    await currentRealtimeVoice.start(payload.mode, {
+      autoStopAfterCommit: payload.autoStopAfterCommit,
+    });
   }, []);
 
   useEffect(() => {
     let disposed = false;
     let unlisten: (() => void) | undefined;
-    const handleStart = () => {
-      void startVoice();
+    const handleStart = (payload: FloatingVoiceStartPayload) => {
+      void startVoice(payload);
     };
 
     void listenFloatingVoiceStart(handleStart).then((fn) => {

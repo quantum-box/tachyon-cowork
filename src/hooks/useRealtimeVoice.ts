@@ -4,7 +4,9 @@ import type {
   AgentChunk,
   RealtimeTranscriptMessage,
   RealtimeTranscriptRole,
+  RealtimeVoiceMode,
 } from "../lib/types";
+import { REALTIME_VOICE_MODE_MODEL_MAP } from "./useRealtimeVoiceSettings";
 
 export type RealtimeVoiceStatus = "idle" | "connecting" | "connected";
 
@@ -14,17 +16,22 @@ type RealtimeVoiceOptions = {
   getAgentChatContext?: () => string;
   onSetAgentChatDraft?: (text: string) => void;
   onSubmitAgentChatDraft?: (text: string) => Promise<void> | void;
+  onCommitRealtimeInputText?: (text: string) => Promise<void> | void;
   onSubmitFocusedForm?: () => Promise<void> | void;
   onStopRealtimeVoice?: () => Promise<void> | void;
   soundEnabled?: boolean;
   instructions?: string;
+  mode?: RealtimeVoiceMode;
 };
 
 type RealtimeVoiceState = {
   status: RealtimeVoiceStatus;
   error: string | null;
   transcripts: RealtimeTranscriptMessage[];
-  start: () => Promise<boolean>;
+  start: (
+    modeOverride?: RealtimeVoiceMode,
+    options?: { autoStopAfterCommit?: boolean },
+  ) => Promise<boolean>;
   stop: () => void;
   appendTranscript: (message: RealtimeTranscriptMessage) => void;
   clearTranscripts: () => void;
@@ -640,6 +647,9 @@ export function useRealtimeVoice(
   const optionsRef = useRef(options);
   const transcriptTextByIdRef = useRef<Map<string, string>>(new Map());
   const handledToolCallIdsRef = useRef<Set<string>>(new Set());
+  const committedInputTextIdsRef = useRef<Set<string>>(new Set());
+  const activeModeRef = useRef<RealtimeVoiceMode>("conversation");
+  const autoStopAfterCommitRef = useRef(false);
   const playedConnectedCueRef = useRef(false);
   const realtimeVadModeRef = useRef<"ambient" | "playback">("ambient");
   const startInFlightRef = useRef(false);
@@ -679,6 +689,9 @@ export function useRealtimeVoice(
     }
     transcriptTextByIdRef.current.clear();
     handledToolCallIdsRef.current.clear();
+    committedInputTextIdsRef.current.clear();
+    activeModeRef.current = "conversation";
+    autoStopAfterCommitRef.current = false;
     playedConnectedCueRef.current = false;
     realtimeVadModeRef.current = "ambient";
     setStatus("idle");
@@ -811,6 +824,42 @@ export function useRealtimeVoice(
     realtimeVadModeRef.current = mode;
   }, []);
 
+  const commitRealtimeInputText = useCallback(
+    (update: RealtimeTranscriptUpdate, text: string) => {
+      const mode = activeModeRef.current;
+      if (mode === "conversation" || !update.isFinal) return;
+      if (committedInputTextIdsRef.current.has(update.id)) return;
+      if (mode === "whisper" && update.role !== "user") return;
+      if (mode === "translate" && update.role !== "assistant") return;
+
+      const trimmedText = text.trim();
+      if (!trimmedText) return;
+
+      committedInputTextIdsRef.current.add(update.id);
+      void Promise.resolve(
+        optionsRef.current.onCommitRealtimeInputText?.(trimmedText),
+      )
+        .then(() => {
+          if (!autoStopAfterCommitRef.current) return;
+          window.setTimeout(() => {
+            stop();
+            void Promise.resolve(
+              optionsRef.current.onStopRealtimeVoice?.(),
+            ).catch((error) => {
+              console.error(
+                "Failed to run realtime voice stop handler.",
+                error,
+              );
+            });
+          }, 0);
+        })
+        .catch((error) => {
+          console.error("Failed to commit realtime input text.", error);
+        });
+    },
+    [stop],
+  );
+
   const handleRealtimeEvent = useCallback(
     (rawData: unknown) => {
       let parsed: unknown = rawData;
@@ -849,164 +898,189 @@ export function useRealtimeVoice(
         text,
         isFinal: update.isFinal,
       });
+      commitRealtimeInputText(update, text);
     },
-    [appendTranscript, handleRealtimeToolCall, updateRealtimeVadMode],
+    [
+      appendTranscript,
+      commitRealtimeInputText,
+      handleRealtimeToolCall,
+      updateRealtimeVadMode,
+    ],
   );
 
-  const start = useCallback(async () => {
-    if (!client) {
-      setError("ログイン後に音声会話を開始できます。");
-      playCue("error");
-      return false;
-    }
-    if (
-      status !== "idle" ||
-      startInFlightRef.current ||
-      peerConnectionRef.current ||
-      mediaStreamRef.current
-    ) {
-      return true;
-    }
-
-    startInFlightRef.current = true;
-    setError(null);
-    setStatus("connecting");
-    transcriptTextByIdRef.current.clear();
-    setTranscripts([]);
-
-    try {
-      if (!navigator.mediaDevices?.getUserMedia) {
-        throw new Error("media devices are not available");
-      }
-
-      const agentChatContext = optionsRef.current.getAgentChatContext?.();
-      const realtimeInstructions =
-        optionsRef.current.instructions ?? REALTIME_AGENT_CHAT_INSTRUCTIONS;
-      const secret = await client.issueRealtimeClientSecret({
-        voice: "marin",
-        instruction_preset: "cowork_assistant",
-        transcription: "ja",
-        vad: REALTIME_VAD_PRESET,
-        ...buildRealtimeToolSessionConfigWithInstructions(
-          realtimeInstructions,
-          agentChatContext,
-          optionsRef.current.instructions
-            ? "Current context for this Realtime session"
-            : undefined,
-        ),
-      });
-
-      const pc = new RTCPeerConnection();
-      peerConnectionRef.current = pc;
-
-      const audio = document.createElement("audio");
-      audio.autoplay = true;
-      audio.setAttribute("playsinline", "true");
-      audio.style.display = "none";
-      document.body.appendChild(audio);
-      audioRef.current = audio;
-
-      pc.ontrack = (event) => {
-        audio.srcObject = event.streams[0] ?? null;
-        void audio.play().catch(() => undefined);
-      };
-
-      const markReadyIfConversationCanStart = () => {
-        if (
-          pc.connectionState !== "connected" ||
-          dataChannelRef.current?.readyState !== "open"
-        ) {
-          return;
-        }
-
-        setStatus("connected");
-        if (!playedConnectedCueRef.current) {
-          playedConnectedCueRef.current = true;
-          playCue("ready");
-        }
-      };
-
-      pc.onconnectionstatechange = () => {
-        if (pc.connectionState === "connected") {
-          markReadyIfConversationCanStart();
-          return;
-        }
-        if (
-          pc.connectionState === "failed" ||
-          pc.connectionState === "disconnected" ||
-          pc.connectionState === "closed"
-        ) {
-          stop();
-        }
-      };
-
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: buildRealtimeAudioConstraints(),
-      });
-      mediaStreamRef.current = stream;
-      for (const track of stream.getTracks()) {
-        pc.addTrack(track, stream);
-      }
-
-      const dataChannel = pc.createDataChannel("oai-events");
-      dataChannelRef.current = dataChannel;
-      dataChannel.onopen = () => {
-        dataChannel.send(
-          JSON.stringify({
-            type: "session.update",
-            session: buildRealtimeToolSessionConfigWithInstructions(
-              realtimeInstructions,
-              agentChatContext,
-              optionsRef.current.instructions
-                ? "Current context for this Realtime session"
-                : undefined,
-            ),
-          }),
-        );
-        markReadyIfConversationCanStart();
-      };
-      dataChannel.onerror = () => {
-        setError("音声会話の接続でエラーが発生しました。再接続してください。");
+  const start = useCallback(
+    async (
+      modeOverride?: RealtimeVoiceMode,
+      startOptions: { autoStopAfterCommit?: boolean } = {},
+    ) => {
+      if (!client) {
+        setError("ログイン後に音声会話を開始できます。");
         playCue("error");
-      };
-      dataChannel.onmessage = (event) => {
-        handleRealtimeEvent(event.data);
-      };
-
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-
-      const sdpResponse = await fetch(REALTIME_CALL_URL, {
-        method: "POST",
-        body: offer.sdp,
-        headers: {
-          Authorization: `Bearer ${secret.client_secret}`,
-          "Content-Type": "application/sdp",
-        },
-      });
-
-      if (!sdpResponse.ok) {
-        const body = await sdpResponse.text().catch(() => "");
-        throw new Error(
-          `Voice SDP exchange failed: ${sdpResponse.status} ${body}`,
-        );
+        return false;
+      }
+      if (
+        status !== "idle" ||
+        startInFlightRef.current ||
+        peerConnectionRef.current ||
+        mediaStreamRef.current
+      ) {
+        return true;
       }
 
-      await pc.setRemoteDescription({
-        type: "answer",
-        sdp: await sdpResponse.text(),
-      });
-      return true;
-    } catch (err) {
-      stop();
-      playCue("error");
-      console.error("Failed to start realtime voice", err);
-      setError(toUserFacingRealtimeError(err));
-      return false;
-    } finally {
-      startInFlightRef.current = false;
-    }
-  }, [client, handleRealtimeEvent, playCue, status, stop]);
+      startInFlightRef.current = true;
+      setError(null);
+      setStatus("connecting");
+      transcriptTextByIdRef.current.clear();
+      committedInputTextIdsRef.current.clear();
+      setTranscripts([]);
+
+      try {
+        if (!navigator.mediaDevices?.getUserMedia) {
+          throw new Error("media devices are not available");
+        }
+
+        const agentChatContext = optionsRef.current.getAgentChatContext?.();
+        const realtimeInstructions =
+          optionsRef.current.instructions ?? REALTIME_AGENT_CHAT_INSTRUCTIONS;
+        const realtimeMode =
+          modeOverride ?? optionsRef.current.mode ?? "conversation";
+        activeModeRef.current = realtimeMode;
+        autoStopAfterCommitRef.current =
+          startOptions.autoStopAfterCommit === true;
+        const realtimeModel = REALTIME_VOICE_MODE_MODEL_MAP[realtimeMode];
+        const secret = await client.issueRealtimeClientSecret({
+          model: realtimeModel,
+          mode: realtimeMode,
+          voice: "marin",
+          instruction_preset: "cowork_assistant",
+          transcription: "ja",
+          vad: REALTIME_VAD_PRESET,
+          ...buildRealtimeToolSessionConfigWithInstructions(
+            realtimeInstructions,
+            agentChatContext,
+            optionsRef.current.instructions
+              ? "Current context for this Realtime session"
+              : undefined,
+          ),
+        });
+
+        const pc = new RTCPeerConnection();
+        peerConnectionRef.current = pc;
+
+        const audio = document.createElement("audio");
+        audio.autoplay = true;
+        audio.setAttribute("playsinline", "true");
+        audio.style.display = "none";
+        document.body.appendChild(audio);
+        audioRef.current = audio;
+
+        pc.ontrack = (event) => {
+          audio.srcObject = event.streams[0] ?? null;
+          void audio.play().catch(() => undefined);
+        };
+
+        const markReadyIfConversationCanStart = () => {
+          if (
+            pc.connectionState !== "connected" ||
+            dataChannelRef.current?.readyState !== "open"
+          ) {
+            return;
+          }
+
+          setStatus("connected");
+          if (!playedConnectedCueRef.current) {
+            playedConnectedCueRef.current = true;
+            playCue("ready");
+          }
+        };
+
+        pc.onconnectionstatechange = () => {
+          if (pc.connectionState === "connected") {
+            markReadyIfConversationCanStart();
+            return;
+          }
+          if (
+            pc.connectionState === "failed" ||
+            pc.connectionState === "disconnected" ||
+            pc.connectionState === "closed"
+          ) {
+            stop();
+          }
+        };
+
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: buildRealtimeAudioConstraints(),
+        });
+        mediaStreamRef.current = stream;
+        for (const track of stream.getTracks()) {
+          pc.addTrack(track, stream);
+        }
+
+        const dataChannel = pc.createDataChannel("oai-events");
+        dataChannelRef.current = dataChannel;
+        dataChannel.onopen = () => {
+          if (realtimeMode !== "whisper") {
+            dataChannel.send(
+              JSON.stringify({
+                type: "session.update",
+                session: buildRealtimeToolSessionConfigWithInstructions(
+                  realtimeInstructions,
+                  agentChatContext,
+                  optionsRef.current.instructions
+                    ? "Current context for this Realtime session"
+                    : undefined,
+                ),
+              }),
+            );
+          }
+          markReadyIfConversationCanStart();
+        };
+        dataChannel.onerror = () => {
+          setError(
+            "音声会話の接続でエラーが発生しました。再接続してください。",
+          );
+          playCue("error");
+        };
+        dataChannel.onmessage = (event) => {
+          handleRealtimeEvent(event.data);
+        };
+
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+
+        const sdpResponse = await fetch(REALTIME_CALL_URL, {
+          method: "POST",
+          body: offer.sdp,
+          headers: {
+            Authorization: `Bearer ${secret.client_secret}`,
+            "Content-Type": "application/sdp",
+          },
+        });
+
+        if (!sdpResponse.ok) {
+          const body = await sdpResponse.text().catch(() => "");
+          throw new Error(
+            `Voice SDP exchange failed: ${sdpResponse.status} ${body}`,
+          );
+        }
+
+        await pc.setRemoteDescription({
+          type: "answer",
+          sdp: await sdpResponse.text(),
+        });
+        return true;
+      } catch (err) {
+        stop();
+        playCue("error");
+        console.error("Failed to start realtime voice", err);
+        setError(toUserFacingRealtimeError(err));
+        return false;
+      } finally {
+        startInFlightRef.current = false;
+      }
+    },
+    [client, handleRealtimeEvent, playCue, status, stop],
+  );
 
   const clearTranscripts = useCallback(() => {
     transcriptTextByIdRef.current.clear();

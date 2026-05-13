@@ -43,8 +43,12 @@ fn install_floating_voice_fn_listener(app: tauri::AppHandle) {
             use std::time::{SystemTime, UNIX_EPOCH};
             use tauri::Emitter;
 
+            const FN_LONG_PRESS_MS: u64 = 450;
+
             let fn_down = Arc::new(AtomicBool::new(false));
             let fn_down_for_tap = Arc::clone(&fn_down);
+            let fn_down_at_ms = Arc::new(AtomicU64::new(0));
+            let fn_down_at_ms_for_tap = Arc::clone(&fn_down_at_ms);
             let last_start_at_ms = Arc::new(AtomicU64::new(0));
             let last_start_at_ms_for_tap = Arc::clone(&last_start_at_ms);
             let app_for_tap = app.clone();
@@ -60,16 +64,29 @@ fn install_floating_voice_fn_listener(app: tauri::AppHandle) {
                         .contains(CGEventFlags::CGEventFlagSecondaryFn);
                     let was_down = fn_down_for_tap.swap(is_down, Ordering::Relaxed);
 
+                    let now_ms = SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .map(|duration| duration.as_millis() as u64)
+                        .unwrap_or(0);
+
                     if is_down && !was_down {
-                        let now_ms = SystemTime::now()
-                            .duration_since(UNIX_EPOCH)
-                            .map(|duration| duration.as_millis() as u64)
-                            .unwrap_or(0);
+                        fn_down_at_ms_for_tap.store(now_ms, Ordering::Relaxed);
+                    } else if !is_down && was_down {
+                        let down_at_ms = fn_down_at_ms_for_tap.swap(0, Ordering::Relaxed);
                         let last_ms = last_start_at_ms_for_tap.load(Ordering::Relaxed);
 
-                        if now_ms.saturating_sub(last_ms) >= 1000 {
+                        if down_at_ms > 0 && now_ms.saturating_sub(last_ms) >= 1000 {
                             last_start_at_ms_for_tap.store(now_ms, Ordering::Relaxed);
-                            let _ = app_for_tap.emit_to("main", "floating-voice:start", ());
+                            let is_long_press =
+                                now_ms.saturating_sub(down_at_ms) >= FN_LONG_PRESS_MS;
+                            let _ = app_for_tap.emit_to(
+                                "main",
+                                "floating-voice:start",
+                                serde_json::json!({
+                                    "pressKind": if is_long_press { "long" } else { "short" },
+                                    "autoStopAfterCommit": is_long_press,
+                                }),
+                            );
                         }
                     }
 
@@ -157,7 +174,11 @@ fn install_floating_voice_tray(app: &tauri::App) -> tauri::Result<()> {
             }
             "voice_dot_open" => {
                 show_main_window(app);
-                let _ = app.emit_to("main", "floating-voice:start", ());
+                let _ = app.emit_to(
+                    "main",
+                    "floating-voice:start",
+                    serde_json::json!({ "pressKind": "short" }),
+                );
             }
             "voice_dot_hide" => {
                 let _ = app.emit_to("voice-input", "floating-voice:stop-and-hide", ());

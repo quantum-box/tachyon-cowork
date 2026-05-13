@@ -14,10 +14,25 @@ import {
   shouldDisableRealtimeAutoGainControl,
   useRealtimeVoice,
 } from "../useRealtimeVoice";
+import {
+  REALTIME_VOICE_MODE_MODEL_MAP,
+  resolveRealtimeVoiceMode,
+} from "../useRealtimeVoiceSettings";
 
 describe("realtime voice session defaults", () => {
   it("uses the ambient-noise VAD preset issued by Tachyon API", () => {
     expect(REALTIME_VAD_PRESET).toBe("server_vad_ambient");
+  });
+
+  it("maps stored realtime modes to Tachyon backend aliases", () => {
+    expect(resolveRealtimeVoiceMode("translate")).toBe("translate");
+    expect(resolveRealtimeVoiceMode("whisper")).toBe("whisper");
+    expect(resolveRealtimeVoiceMode("unsupported")).toBe("conversation");
+    expect(REALTIME_VOICE_MODE_MODEL_MAP).toEqual({
+      conversation: "gpt-realtime-2",
+      translate: "gpt-realtime-translate",
+      whisper: "gpt-realtime-whisper",
+    });
   });
 
   it("disables browser auto gain control on mobile-like devices", () => {

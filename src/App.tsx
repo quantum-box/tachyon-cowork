@@ -72,6 +72,7 @@ import {
   pressCmdEnterToFocusedApp,
   registerFloatingVoiceShortcut,
   setVoiceDotMenuBarIconVisible,
+  type FloatingVoiceStartPayload,
   type ProjectContext,
   type ProjectEntry,
   setTauriRuntimeAuth,
@@ -154,6 +155,12 @@ export default function App() {
     setFloatingVoiceOpenOnStartup,
     voiceDotMenuBarIconEnabled,
     setVoiceDotMenuBarIconEnabled,
+    realtimeVoiceMode,
+    setRealtimeVoiceMode,
+    voiceDotShortPressMode,
+    setVoiceDotShortPressMode,
+    voiceDotLongPressMode,
+    setVoiceDotLongPressMode,
   } = useRealtimeVoiceSettings();
   const { globalCustomInstructions, setGlobalCustomInstructions } =
     useGlobalCustomInstructions();
@@ -417,6 +424,8 @@ export default function App() {
   const floatingVoiceDraftRef = useRef(floatingVoiceDraft);
   const selectedModelRef = useRef(selectedModel);
   const agentChunksRef = useRef(chunks);
+  const voiceDotShortPressModeRef = useRef(voiceDotShortPressMode);
+  const voiceDotLongPressModeRef = useRef(voiceDotLongPressMode);
   useEffect(() => {
     agentChatDraftRef.current = chatInput;
   }, [chatInput]);
@@ -429,6 +438,12 @@ export default function App() {
   useEffect(() => {
     agentChunksRef.current = chunks;
   }, [chunks]);
+  useEffect(() => {
+    voiceDotShortPressModeRef.current = voiceDotShortPressMode;
+  }, [voiceDotShortPressMode]);
+  useEffect(() => {
+    voiceDotLongPressModeRef.current = voiceDotLongPressMode;
+  }, [voiceDotLongPressMode]);
   const realtimePausedForAgentRef = useRef(false);
   const realtimeControlRef = useRef<{
     status: "idle" | "connecting" | "connected";
@@ -487,6 +502,24 @@ export default function App() {
     ],
   );
 
+  const commitRealtimeInputText = useCallback(
+    (text: string) => {
+      const message = text.trim();
+      if (!message) return;
+      if (isFloatingVoiceInput) {
+        floatingVoiceDraftRef.current = message;
+        setFloatingVoiceDraft(message);
+        void insertTextToFocusedApp(message).catch((error) => {
+          console.warn("Failed to insert realtime input text.", error);
+        });
+        return;
+      }
+      agentChatDraftRef.current = message;
+      setChatInput(message);
+    },
+    [isFloatingVoiceInput, setChatInput],
+  );
+
   const realtimeVoice = useRealtimeVoice(client, {
     getAgentChatDraft: () =>
       isFloatingVoiceInput
@@ -498,6 +531,7 @@ export default function App() {
         : buildRealtimeAgentChatContext(agentChunksRef.current),
     onSetAgentChatDraft: setAgentChatDraftFromRealtime,
     onSubmitAgentChatDraft: submitAgentChatDraftFromRealtime,
+    onCommitRealtimeInputText: commitRealtimeInputText,
     onSubmitFocusedForm: isFloatingVoiceInput
       ? () => pressCmdEnterToFocusedApp()
       : undefined,
@@ -508,6 +542,7 @@ export default function App() {
     instructions: isFloatingVoiceInput
       ? FLOATING_VOICE_INPUT_INSTRUCTIONS
       : undefined,
+    mode: realtimeVoiceMode,
   });
   const realtimeVoiceStatus = realtimeVoice.status;
   const startRealtimeVoice = realtimeVoice.start;
@@ -601,8 +636,17 @@ export default function App() {
       return;
     }
 
-    const openFromShortcut = () => {
-      void openAndStartFloatingVoiceInput().catch((error) => {
+    const openFromShortcut = (payload: FloatingVoiceStartPayload) => {
+      const mode =
+        payload.mode ??
+        (payload.pressKind === "long"
+          ? voiceDotLongPressModeRef.current
+          : voiceDotShortPressModeRef.current);
+      void openAndStartFloatingVoiceInput({
+        mode,
+        pressKind: payload.pressKind,
+        autoStopAfterCommit: payload.autoStopAfterCommit,
+      }).catch((error) => {
         console.warn(
           "Failed to open floating voice input from shortcut.",
           error,
@@ -1281,6 +1325,12 @@ export default function App() {
                   onRealtimeVoiceEnabledChange={setRealtimeVoiceEnabled}
                   realtimeSoundEnabled={realtimeSoundEnabled}
                   onRealtimeSoundEnabledChange={setRealtimeSoundEnabled}
+                  realtimeVoiceMode={realtimeVoiceMode}
+                  onRealtimeVoiceModeChange={setRealtimeVoiceMode}
+                  voiceDotShortPressMode={voiceDotShortPressMode}
+                  onVoiceDotShortPressModeChange={setVoiceDotShortPressMode}
+                  voiceDotLongPressMode={voiceDotLongPressMode}
+                  onVoiceDotLongPressModeChange={setVoiceDotLongPressMode}
                   floatingVoiceOpenOnStartup={floatingVoiceOpenOnStartup}
                   onFloatingVoiceOpenOnStartupChange={
                     setFloatingVoiceOpenOnStartup
