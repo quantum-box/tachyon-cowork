@@ -117,7 +117,11 @@ export type RealtimeVadPreset =
   | "server_vad_ambient"
   | "semantic_vad";
 
+export type RealtimeVoiceMode = "conversation" | "translate" | "whisper";
+
 export type RealtimeClientSecretRequest = {
+  model?: string;
+  mode?: RealtimeVoiceMode;
   voice?: string;
   instruction_preset?: string;
   instructions?: string;
@@ -131,6 +135,7 @@ export type RealtimeClientSecretResponse = {
   client_secret: string;
   expires_at?: number;
   model: string;
+  mode: RealtimeVoiceMode;
   voice: string;
 };
 

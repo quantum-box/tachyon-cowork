@@ -296,6 +296,10 @@ export class AgentChatClient {
       expires_at:
         typeof data.expires_at === "number" ? data.expires_at : undefined,
       model: typeof data.model === "string" ? data.model : "gpt-realtime-2",
+      mode:
+        data.mode === "translate" || data.mode === "whisper"
+          ? data.mode
+          : "conversation",
       voice: typeof data.voice === "string" ? data.voice : "marin",
     };
   }

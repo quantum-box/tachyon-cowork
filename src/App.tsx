@@ -59,6 +59,7 @@ import { HelpPanel } from "./components/layout/HelpPanel";
 import type { ModelInfo, SessionSummary } from "./lib/types";
 import {
   clearTauriRuntimeAuth,
+  hideCurrentTauriWindow,
   insertTextToFocusedApp,
   isTauri,
   isTauriDesktop,
@@ -68,8 +69,10 @@ import {
   listenVoiceDotOpenSettings,
   openAndStartFloatingVoiceInput,
   openFloatingVoiceInputWindow,
+  pressCmdEnterToFocusedApp,
   registerFloatingVoiceShortcut,
   setVoiceDotMenuBarIconVisible,
+  type FloatingVoiceStartPayload,
   type ProjectContext,
   type ProjectEntry,
   setTauriRuntimeAuth,
@@ -96,9 +99,12 @@ const MOBILE_DRAWER_SWIPE_DOMINANCE_RATIO = 1.2;
 const FLOATING_VOICE_INPUT_INSTRUCTIONS = [
   "You are a voice-driven text input assistant for the previously focused macOS form field.",
   "Always speak, transcribe, draft, revise, and submit in Japanese unless the user explicitly asks for another language.",
+  "By default, keep spoken replies brief: use a short acknowledgement or one concise sentence. Only give longer, conversational answers when the user is asking for consultation, brainstorming, or help thinking through something.",
   "Use set_agent_chat_draft and update_agent_chat_draft to maintain the exact text that should be inserted into the form.",
-  "Use submit_agent_chat_draft when the user asks to input, insert, paste, submit, commit, or finish the dictated text.",
-  "Use stop_realtime_voice when the user asks to stop, close, hide, finish the conversation, or end Voice Dot.",
+  "Use submit_agent_chat_draft when the user asks to input, insert, paste, or commit the dictated text.",
+  "Use submit_focused_form to press Cmd+Enter in the target form only after the user explicitly permits sending or submitting. Never submit automatically after inserting text; ask for permission first if it is unclear.",
+  "After submit_agent_chat_draft, keep listening for the next user request. Do not stop or hide Voice Dot unless the user explicitly asks to close it.",
+  "Use stop_realtime_voice when the user asks to stop, close, hide, end Voice Dot, or says they are done.",
   "Do not describe Agent chat. In this mode, submit_agent_chat_draft inserts the text into the user's previous form field.",
   "Keep the final inserted text clean and do not include meta commentary unless the user dictates it.",
 ].join(" ");
@@ -124,6 +130,7 @@ export default function App() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [floatingVoiceDraft, setFloatingVoiceDraft] = useState("");
+  const [chatInputFocusRequest, setChatInputFocusRequest] = useState(0);
   const [availableModels, setAvailableModels] = useState<ModelInfo[] | null>(
     null,
   );
@@ -148,6 +155,12 @@ export default function App() {
     setFloatingVoiceOpenOnStartup,
     voiceDotMenuBarIconEnabled,
     setVoiceDotMenuBarIconEnabled,
+    realtimeVoiceMode,
+    setRealtimeVoiceMode,
+    voiceDotShortPressMode,
+    setVoiceDotShortPressMode,
+    voiceDotLongPressMode,
+    setVoiceDotLongPressMode,
   } = useRealtimeVoiceSettings();
   const { globalCustomInstructions, setGlobalCustomInstructions } =
     useGlobalCustomInstructions();
@@ -411,6 +424,8 @@ export default function App() {
   const floatingVoiceDraftRef = useRef(floatingVoiceDraft);
   const selectedModelRef = useRef(selectedModel);
   const agentChunksRef = useRef(chunks);
+  const voiceDotShortPressModeRef = useRef(voiceDotShortPressMode);
+  const voiceDotLongPressModeRef = useRef(voiceDotLongPressMode);
   useEffect(() => {
     agentChatDraftRef.current = chatInput;
   }, [chatInput]);
@@ -423,14 +438,20 @@ export default function App() {
   useEffect(() => {
     agentChunksRef.current = chunks;
   }, [chunks]);
+  useEffect(() => {
+    voiceDotShortPressModeRef.current = voiceDotShortPressMode;
+  }, [voiceDotShortPressMode]);
+  useEffect(() => {
+    voiceDotLongPressModeRef.current = voiceDotLongPressMode;
+  }, [voiceDotLongPressMode]);
   const realtimePausedForAgentRef = useRef(false);
   const realtimeControlRef = useRef<{
     status: "idle" | "connecting" | "connected";
-    start: () => Promise<void>;
+    start: () => Promise<boolean>;
     stop: () => void;
   }>({
     status: "idle",
-    start: async () => undefined,
+    start: async () => false,
     stop: () => undefined,
   });
 
@@ -463,7 +484,6 @@ export default function App() {
       if (isFloatingVoiceInput) {
         floatingVoiceDraftRef.current = "";
         setFloatingVoiceDraft("");
-        realtimeControlRef.current.stop();
         void insertTextToFocusedApp(message).catch((error) => {
           console.warn("Failed to insert floating voice text.", error);
         });
@@ -482,6 +502,24 @@ export default function App() {
     ],
   );
 
+  const commitRealtimeInputText = useCallback(
+    (text: string) => {
+      const message = text.trim();
+      if (!message) return;
+      if (isFloatingVoiceInput) {
+        floatingVoiceDraftRef.current = message;
+        setFloatingVoiceDraft(message);
+        void insertTextToFocusedApp(message).catch((error) => {
+          console.warn("Failed to insert realtime input text.", error);
+        });
+        return;
+      }
+      agentChatDraftRef.current = message;
+      setChatInput(message);
+    },
+    [isFloatingVoiceInput, setChatInput],
+  );
+
   const realtimeVoice = useRealtimeVoice(client, {
     getAgentChatDraft: () =>
       isFloatingVoiceInput
@@ -493,10 +531,18 @@ export default function App() {
         : buildRealtimeAgentChatContext(agentChunksRef.current),
     onSetAgentChatDraft: setAgentChatDraftFromRealtime,
     onSubmitAgentChatDraft: submitAgentChatDraftFromRealtime,
+    onCommitRealtimeInputText: commitRealtimeInputText,
+    onSubmitFocusedForm: isFloatingVoiceInput
+      ? () => pressCmdEnterToFocusedApp()
+      : undefined,
+    onStopRealtimeVoice: isFloatingVoiceInput
+      ? () => hideCurrentTauriWindow()
+      : undefined,
     soundEnabled: realtimeSoundEnabled,
     instructions: isFloatingVoiceInput
       ? FLOATING_VOICE_INPUT_INSTRUCTIONS
       : undefined,
+    mode: realtimeVoiceMode,
   });
   const realtimeVoiceStatus = realtimeVoice.status;
   const startRealtimeVoice = realtimeVoice.start;
@@ -590,8 +636,17 @@ export default function App() {
       return;
     }
 
-    const openFromShortcut = () => {
-      void openAndStartFloatingVoiceInput().catch((error) => {
+    const openFromShortcut = (payload: FloatingVoiceStartPayload) => {
+      const mode =
+        payload.mode ??
+        (payload.pressKind === "long"
+          ? voiceDotLongPressModeRef.current
+          : voiceDotShortPressModeRef.current);
+      void openAndStartFloatingVoiceInput({
+        mode,
+        pressKind: payload.pressKind,
+        autoStopAfterCommit: payload.autoStopAfterCommit,
+      }).catch((error) => {
         console.warn(
           "Failed to open floating voice input from shortcut.",
           error,
@@ -895,10 +950,28 @@ export default function App() {
 
   const handleNewChat = useCallback(() => {
     chat.newChat();
-    artifactState.closeCanvas();
+    closeCanvas();
     navigate("/");
     handleMobileSidebarClose();
-  }, [artifactState.closeCanvas, chat, handleMobileSidebarClose, navigate]);
+    setChatInputFocusRequest((current) => current + 1);
+  }, [chat, closeCanvas, handleMobileSidebarClose, navigate]);
+
+  const handleNewRealtimeChat = useCallback(async () => {
+    handleNewChat();
+    const didStart = await startRealtimeVoice();
+    if (didStart) {
+      setRealtimeVoiceEnabled(true);
+      return;
+    }
+    if (realtimeVoiceEnabled) {
+      setRealtimeVoiceEnabled(false);
+    }
+  }, [
+    handleNewChat,
+    realtimeVoiceEnabled,
+    setRealtimeVoiceEnabled,
+    startRealtimeVoice,
+  ]);
 
   const handleStartChatFromWorkFolder = useCallback(() => {
     handleNewChat();
@@ -1042,6 +1115,11 @@ export default function App() {
             handleNewChat();
           }
         },
+        onNewRealtimeChat: () => {
+          if (auth) {
+            handleNewRealtimeChat();
+          }
+        },
         onSearch: () => {
           if (auth) setSearchOpen((prev) => !prev);
         },
@@ -1051,11 +1129,7 @@ export default function App() {
           }
         },
       }),
-      [
-        auth,
-        handleNewChat,
-        searchOpen,
-      ],
+      [auth, handleNewChat, handleNewRealtimeChat, searchOpen],
     ),
   );
 
@@ -1194,6 +1268,7 @@ export default function App() {
                       ? () => setSidebarCollapsed((prev) => !prev)
                       : undefined
                   }
+                  focusRequest={chatInputFocusRequest}
                   realtimeVoice={
                     realtimeVoiceEnabled ? realtimeVoice : undefined
                   }
@@ -1250,6 +1325,12 @@ export default function App() {
                   onRealtimeVoiceEnabledChange={setRealtimeVoiceEnabled}
                   realtimeSoundEnabled={realtimeSoundEnabled}
                   onRealtimeSoundEnabledChange={setRealtimeSoundEnabled}
+                  realtimeVoiceMode={realtimeVoiceMode}
+                  onRealtimeVoiceModeChange={setRealtimeVoiceMode}
+                  voiceDotShortPressMode={voiceDotShortPressMode}
+                  onVoiceDotShortPressModeChange={setVoiceDotShortPressMode}
+                  voiceDotLongPressMode={voiceDotLongPressMode}
+                  onVoiceDotLongPressModeChange={setVoiceDotLongPressMode}
                   floatingVoiceOpenOnStartup={floatingVoiceOpenOnStartup}
                   onFloatingVoiceOpenOnStartupChange={
                     setFloatingVoiceOpenOnStartup

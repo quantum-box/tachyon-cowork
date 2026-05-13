@@ -23,16 +23,22 @@ describe("AgentChatClient.submitToolResult", () => {
     const fetchMock = vi.mocked(fetch);
     fetchMock
       .mockResolvedValueOnce(
-        new Response('{"error":"No pending tool call found for the given tool_id"}', {
-          status: 404,
-          statusText: "Not Found",
-        }),
+        new Response(
+          '{"error":"No pending tool call found for the given tool_id"}',
+          {
+            status: 404,
+            statusText: "Not Found",
+          },
+        ),
       )
       .mockResolvedValueOnce(
-        new Response('{"error":"No pending tool call found for the given tool_id"}', {
-          status: 404,
-          statusText: "Not Found",
-        }),
+        new Response(
+          '{"error":"No pending tool call found for the given tool_id"}',
+          {
+            status: 404,
+            statusText: "Not Found",
+          },
+        ),
       )
       .mockResolvedValueOnce(
         new Response("", {
@@ -92,6 +98,7 @@ describe("AgentChatClient.issueRealtimeClientSecret", () => {
           client_secret: "ek_test",
           expires_at: 123,
           model: "gpt-realtime-2",
+          mode: "conversation",
           voice: "marin",
         }),
         {
@@ -105,6 +112,8 @@ describe("AgentChatClient.issueRealtimeClientSecret", () => {
     const client = new AgentChatClient(authConfig);
     await expect(
       client.issueRealtimeClientSecret({
+        model: "gpt-realtime-translate",
+        mode: "translate",
         instructions: "Use the available tools.",
         tool_choice: "auto",
         tools: [{ type: "function", name: "set_agent_chat_draft" }],
@@ -113,18 +122,19 @@ describe("AgentChatClient.issueRealtimeClientSecret", () => {
     ).resolves.toMatchObject({
       client_secret: "ek_test",
       model: "gpt-realtime-2",
+      mode: "conversation",
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0] ?? [];
-    expect(url).toBe(
-      "https://api.test.local/v1/llms/realtime/client-secret",
-    );
+    expect(url).toBe("https://api.test.local/v1/llms/realtime/client-secret");
     const headers = new Headers(init?.headers);
     expect(headers.get("Authorization")).toBe("Bearer token");
     expect(headers.get("x-operator-id")).toBe("tenant");
     expect(headers.get("Content-Type")).toBe("application/json");
     expect(JSON.parse(String(init?.body))).toEqual({
+      model: "gpt-realtime-translate",
+      mode: "translate",
       instructions: "Use the available tools.",
       tool_choice: "auto",
       tools: [{ type: "function", name: "set_agent_chat_draft" }],

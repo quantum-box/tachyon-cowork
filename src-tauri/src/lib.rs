@@ -6,6 +6,27 @@ mod sandbox;
 mod tools;
 
 #[cfg(target_os = "macos")]
+fn ensure_input_monitoring_permission_requested() {
+    use core_foundation::base::Boolean;
+
+    #[link(name = "CoreGraphics", kind = "framework")]
+    extern "C" {
+        fn CGPreflightListenEventAccess() -> Boolean;
+        fn CGRequestListenEventAccess() -> Boolean;
+    }
+
+    let has_access = unsafe { CGPreflightListenEventAccess() != 0 };
+    if has_access {
+        return;
+    }
+
+    let was_granted = unsafe { CGRequestListenEventAccess() != 0 };
+    if !was_granted {
+        eprintln!("Input Monitoring permission is required for the floating voice Fn shortcut.");
+    }
+}
+
+#[cfg(target_os = "macos")]
 fn install_floating_voice_fn_listener(app: tauri::AppHandle) {
     std::thread::Builder::new()
         .name("floating-voice-fn-listener".to_string())
@@ -22,8 +43,12 @@ fn install_floating_voice_fn_listener(app: tauri::AppHandle) {
             use std::time::{SystemTime, UNIX_EPOCH};
             use tauri::Emitter;
 
+            const FN_LONG_PRESS_MS: u64 = 450;
+
             let fn_down = Arc::new(AtomicBool::new(false));
             let fn_down_for_tap = Arc::clone(&fn_down);
+            let fn_down_at_ms = Arc::new(AtomicU64::new(0));
+            let fn_down_at_ms_for_tap = Arc::clone(&fn_down_at_ms);
             let last_start_at_ms = Arc::new(AtomicU64::new(0));
             let last_start_at_ms_for_tap = Arc::clone(&last_start_at_ms);
             let app_for_tap = app.clone();
@@ -39,16 +64,29 @@ fn install_floating_voice_fn_listener(app: tauri::AppHandle) {
                         .contains(CGEventFlags::CGEventFlagSecondaryFn);
                     let was_down = fn_down_for_tap.swap(is_down, Ordering::Relaxed);
 
+                    let now_ms = SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .map(|duration| duration.as_millis() as u64)
+                        .unwrap_or(0);
+
                     if is_down && !was_down {
-                        let now_ms = SystemTime::now()
-                            .duration_since(UNIX_EPOCH)
-                            .map(|duration| duration.as_millis() as u64)
-                            .unwrap_or(0);
+                        fn_down_at_ms_for_tap.store(now_ms, Ordering::Relaxed);
+                    } else if !is_down && was_down {
+                        let down_at_ms = fn_down_at_ms_for_tap.swap(0, Ordering::Relaxed);
                         let last_ms = last_start_at_ms_for_tap.load(Ordering::Relaxed);
 
-                        if now_ms.saturating_sub(last_ms) >= 1000 {
+                        if down_at_ms > 0 && now_ms.saturating_sub(last_ms) >= 1000 {
                             last_start_at_ms_for_tap.store(now_ms, Ordering::Relaxed);
-                            let _ = app_for_tap.emit_to("main", "floating-voice:start", ());
+                            let is_long_press =
+                                now_ms.saturating_sub(down_at_ms) >= FN_LONG_PRESS_MS;
+                            let _ = app_for_tap.emit_to(
+                                "main",
+                                "floating-voice:start",
+                                serde_json::json!({
+                                    "pressKind": if is_long_press { "long" } else { "short" },
+                                    "autoStopAfterCommit": is_long_press,
+                                }),
+                            );
                         }
                     }
 
@@ -59,7 +97,7 @@ fn install_floating_voice_fn_listener(app: tauri::AppHandle) {
 
             if result.is_err() {
                 eprintln!(
-                    "Failed to install Fn key event tap. Accessibility or Input Monitoring permission may be required."
+                    "Failed to install Fn key event tap. Input Monitoring permission may be required."
                 );
             }
         })
@@ -136,7 +174,11 @@ fn install_floating_voice_tray(app: &tauri::App) -> tauri::Result<()> {
             }
             "voice_dot_open" => {
                 show_main_window(app);
-                let _ = app.emit_to("main", "floating-voice:start", ());
+                let _ = app.emit_to(
+                    "main",
+                    "floating-voice:start",
+                    serde_json::json!({ "pressKind": "short" }),
+                );
             }
             "voice_dot_hide" => {
                 let _ = app.emit_to("voice-input", "floating-voice:stop-and-hide", ());
@@ -215,7 +257,10 @@ pub fn run() {
             }
 
             #[cfg(target_os = "macos")]
-            install_floating_voice_fn_listener(app.handle().clone());
+            {
+                ensure_input_monitoring_permission_requested();
+                install_floating_voice_fn_listener(app.handle().clone());
+            }
 
             #[cfg(desktop)]
             if let Err(error) = install_floating_voice_tray(app) {
@@ -258,6 +303,7 @@ pub fn run() {
             commands::system::get_system_info,
             commands::system::show_in_folder,
             commands::system::insert_text_to_focused_app,
+            commands::system::press_cmd_enter_to_focused_app,
             commands::system::apply_voice_dot_window_shape,
             commands::system::set_voice_dot_tray_visible,
             commands::pdf::read_pdf,

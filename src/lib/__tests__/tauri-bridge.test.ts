@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getTauriPlatform, isTauri, isTauriMobile } from "../tauri-bridge";
+import {
+  getTauriPlatform,
+  isTauri,
+  isTauriMobile,
+  resolveFloatingVoiceShortcutMode,
+} from "../tauri-bridge";
 
 type TestTauriGlobal = typeof globalThis & {
   isTauri?: boolean;
@@ -43,5 +48,12 @@ describe("tauri bridge environment detection", () => {
 
     expect(getTauriPlatform()).toBe("ios");
     expect(isTauriMobile()).toBe(true);
+  });
+
+  it("maps Fn shortcut press duration to the default Voice Dot mode", () => {
+    expect(resolveFloatingVoiceShortcutMode(120)).toBe("conversation");
+    expect(resolveFloatingVoiceShortcutMode(449)).toBe("conversation");
+    expect(resolveFloatingVoiceShortcutMode(450)).toBe("whisper");
+    expect(resolveFloatingVoiceShortcutMode(900)).toBe("whisper");
   });
 });

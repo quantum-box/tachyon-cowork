@@ -1,5 +1,5 @@
 #[cfg(target_os = "macos")]
-use core_graphics::event::{CGEvent, CGEventTapLocation};
+use core_graphics::event::{CGEvent, CGEventFlags, CGEventTapLocation};
 #[cfg(target_os = "macos")]
 use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
 use serde::Serialize;
@@ -95,9 +95,28 @@ pub async fn insert_text_to_focused_app(text: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn apply_voice_dot_window_shape(app: tauri::AppHandle) -> Result<(), String> {
+pub async fn press_cmd_enter_to_focused_app() -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
+        tauri::async_runtime::spawn_blocking(press_cmd_enter_to_focused_app_macos)
+            .await
+            .map_err(|e| e.to_string())?
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        Err("任意フォームの Cmd+Enter 送信は現在 macOS のみ対応です。".to_string())
+    }
+}
+
+#[tauri::command]
+pub async fn apply_voice_dot_window_shape(
+    app: tauri::AppHandle,
+    radius: Option<f64>,
+) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let radius = radius.unwrap_or(6.0).clamp(1.0, 24.0);
         let window = app
             .get_webview_window("voice-input")
             .ok_or_else(|| "Voice Dot window is not available.".to_string())?;
@@ -106,7 +125,7 @@ pub async fn apply_voice_dot_window_shape(app: tauri::AppHandle) -> Result<(), S
         window
             .clone()
             .run_on_main_thread(move || {
-                let _ = tx.send(apply_voice_dot_window_shape_macos(&window));
+                let _ = tx.send(apply_voice_dot_window_shape_macos(&window, radius));
             })
             .map_err(|e| e.to_string())?;
 
@@ -116,6 +135,7 @@ pub async fn apply_voice_dot_window_shape(app: tauri::AppHandle) -> Result<(), S
     #[cfg(not(target_os = "macos"))]
     {
         let _ = app;
+        let _ = radius;
         Ok(())
     }
 }
@@ -142,11 +162,12 @@ pub async fn set_voice_dot_tray_visible(
 }
 
 #[cfg(target_os = "macos")]
-fn apply_voice_dot_window_shape_macos(window: &tauri::WebviewWindow) -> Result<(), String> {
+fn apply_voice_dot_window_shape_macos(
+    window: &tauri::WebviewWindow,
+    radius: f64,
+) -> Result<(), String> {
     use objc2::rc::Retained;
     use objc2_app_kit::{NSColor, NSView, NSWindow};
-
-    const VOICE_DOT_CORNER_RADIUS: f64 = 6.0;
 
     unsafe {
         let ns_window = window
@@ -162,11 +183,11 @@ fn apply_voice_dot_window_shape_macos(window: &tauri::WebviewWindow) -> Result<(
         (*ns_window).setBackgroundColor(Some(&NSColor::clearColor()));
         (*ns_window).setHasShadow(true);
 
-        apply_corner_radius_to_view(ns_view, VOICE_DOT_CORNER_RADIUS)?;
+        apply_corner_radius_to_view(ns_view, radius)?;
         if let Some(content_view) = (*ns_window).contentView() {
             apply_corner_radius_to_view(
                 Retained::<NSView>::as_ptr(&content_view) as *mut NSView,
-                VOICE_DOT_CORNER_RADIUS,
+                radius,
             )?;
         }
     }
@@ -189,6 +210,29 @@ unsafe fn apply_corner_radius_to_view(
         .ok_or_else(|| "Voice Dot native view layer is not available.".to_string())?;
     layer.setCornerRadius(radius);
     layer.setMasksToBounds(true);
+
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn press_cmd_enter_to_focused_app_macos() -> Result<(), String> {
+    let source = CGEventSource::new(CGEventSourceStateID::HIDSystemState)
+        .or_else(|_| CGEventSource::new(CGEventSourceStateID::CombinedSessionState))
+        .map_err(|_| "CGEventSource の作成に失敗しました。".to_string())?;
+    let flags = CGEventFlags::CGEventFlagCommand;
+    let enter_keycode = 36;
+
+    let key_down = CGEvent::new_keyboard_event(source.clone(), enter_keycode, true)
+        .map_err(|_| "Cmd+Enter キー入力イベントの作成に失敗しました。".to_string())?;
+    key_down.set_flags(flags);
+    key_down.post(CGEventTapLocation::HID);
+
+    std::thread::sleep(std::time::Duration::from_millis(25));
+
+    let key_up = CGEvent::new_keyboard_event(source, enter_keycode, false)
+        .map_err(|_| "Cmd+Enter キー入力イベントの作成に失敗しました。".to_string())?;
+    key_up.set_flags(flags);
+    key_up.post(CGEventTapLocation::HID);
 
     Ok(())
 }

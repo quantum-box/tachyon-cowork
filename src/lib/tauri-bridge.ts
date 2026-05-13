@@ -5,7 +5,7 @@
  * in a plain browser without the @tauri-apps packages being present.
  */
 
-import type { ToolCall, ToolResult } from "./types";
+import type { RealtimeVoiceMode, ToolCall, ToolResult } from "./types";
 import type { AuthState } from "./auth";
 import { getConfiguredApiBaseUrl } from "./auth-config";
 import type { WebviewWindow } from "@tauri-apps/api/webviewWindow";
@@ -116,6 +116,7 @@ const FLOATING_VOICE_START_EVENT = "floating-voice:start";
 const FLOATING_VOICE_STOP_AND_HIDE_EVENT = "floating-voice:stop-and-hide";
 const VOICE_DOT_NEW_CHAT_EVENT = "voice-dot:new-chat";
 const VOICE_DOT_OPEN_SETTINGS_EVENT = "voice-dot:open-settings";
+const FLOATING_VOICE_LONG_PRESS_MS = 450;
 let floatingVoiceStartRequestInFlight = false;
 let lastFloatingVoiceStartRequestAt = 0;
 const FLOATING_VOICE_WINDOW_SIZE = {
@@ -125,6 +126,19 @@ const FLOATING_VOICE_WINDOW_SIZE = {
 } as const;
 
 type PositionedTauriWindow = Pick<WebviewWindow, "setPosition">;
+export type FloatingVoiceStartPayload = {
+  mode?: RealtimeVoiceMode;
+  pressKind?: "short" | "long";
+  autoStopAfterCommit?: boolean;
+};
+
+export function resolveFloatingVoiceShortcutMode(
+  durationMs: number,
+): RealtimeVoiceMode {
+  return durationMs >= FLOATING_VOICE_LONG_PRESS_MS
+    ? "whisper"
+    : "conversation";
+}
 
 async function getFloatingVoiceBottomCenterPosition(height: number): Promise<{
   x: number;
@@ -142,8 +156,7 @@ async function getFloatingVoiceBottomCenterPosition(height: number): Promise<{
   const workHeight = workArea.size.height / scaleFactor;
   const x =
     workX + Math.round((workWidth - FLOATING_VOICE_WINDOW_SIZE.width) / 2);
-  const y =
-    workY + Math.round(workHeight - height - 12);
+  const y = workY + Math.round(workHeight - height - 12);
 
   return { x, y };
 }
@@ -174,13 +187,17 @@ async function setFloatingVoiceWindowSize(
   await placeFloatingVoiceWindowNearBottomCenter(window, height);
 }
 
-async function applyVoiceDotNativeWindowShape(): Promise<void> {
+async function applyVoiceDotNativeWindowShape(
+  height: number = FLOATING_VOICE_WINDOW_SIZE.idleHeight,
+): Promise<void> {
   if (!isTauriMacOS()) {
     return;
   }
 
   try {
-    await tauriInvoke<void>("apply_voice_dot_window_shape");
+    await tauriInvoke<void>("apply_voice_dot_window_shape", {
+      radius: Math.max(1, height / 2),
+    });
   } catch (error) {
     console.warn("Failed to apply Voice Dot native window shape:", error);
   }
@@ -208,7 +225,7 @@ export async function openFloatingVoiceInputWindow(): Promise<void> {
     await existing.show();
     await existing.setAlwaysOnTop(true);
     await existing.setFocusable(false);
-    await applyVoiceDotNativeWindowShape();
+    await applyVoiceDotNativeWindowShape(FLOATING_VOICE_WINDOW_SIZE.idleHeight);
     return;
   }
 
@@ -227,8 +244,8 @@ export async function openFloatingVoiceInputWindow(): Promise<void> {
     decorations: false,
     alwaysOnTop: true,
     skipTaskbar: true,
-    transparent: false,
-    backgroundColor: "#111111",
+    transparent: true,
+    backgroundColor: "#00000000",
     shadow: true,
     visible: true,
     focus: false,
@@ -244,7 +261,7 @@ export async function openFloatingVoiceInputWindow(): Promise<void> {
   await voiceWindow.setAlwaysOnTop(true);
   await voiceWindow.setFocusable(false);
   await placeFloatingVoiceWindowNearBottomCenter(voiceWindow);
-  await applyVoiceDotNativeWindowShape();
+  await applyVoiceDotNativeWindowShape(FLOATING_VOICE_WINDOW_SIZE.idleHeight);
 }
 
 export async function resizeCurrentFloatingVoiceInputWindow(
@@ -261,10 +278,16 @@ export async function resizeCurrentFloatingVoiceInputWindow(
       ? FLOATING_VOICE_WINDOW_SIZE.activeHeight
       : FLOATING_VOICE_WINDOW_SIZE.idleHeight,
   );
-  await applyVoiceDotNativeWindowShape();
+  await applyVoiceDotNativeWindowShape(
+    isActive
+      ? FLOATING_VOICE_WINDOW_SIZE.activeHeight
+      : FLOATING_VOICE_WINDOW_SIZE.idleHeight,
+  );
 }
 
-export async function openAndStartFloatingVoiceInput(): Promise<void> {
+export async function openAndStartFloatingVoiceInput(
+  payload: FloatingVoiceStartPayload = { mode: "conversation" },
+): Promise<void> {
   const now = Date.now();
   if (
     floatingVoiceStartRequestInFlight ||
@@ -278,7 +301,7 @@ export async function openAndStartFloatingVoiceInput(): Promise<void> {
   try {
     await openFloatingVoiceInputWindow();
     await new Promise((resolve) => globalThis.setTimeout(resolve, 300));
-    await emitFloatingVoiceStart();
+    await emitFloatingVoiceStart(payload);
   } finally {
     globalThis.setTimeout(() => {
       floatingVoiceStartRequestInFlight = false;
@@ -314,13 +337,38 @@ export async function emitFloatingVoiceSubmitDraft(
   );
 }
 
-export async function emitFloatingVoiceStart(): Promise<void> {
+export async function emitFloatingVoiceStart(
+  payload: FloatingVoiceStartPayload = {},
+): Promise<void> {
   if (!isTauriDesktop()) {
     return;
   }
 
   const { getCurrentWindow } = await import("@tauri-apps/api/window");
-  await getCurrentWindow().emitTo("voice-input", FLOATING_VOICE_START_EVENT);
+  await getCurrentWindow().emitTo(
+    "voice-input",
+    FLOATING_VOICE_START_EVENT,
+    payload,
+  );
+}
+
+function isFloatingVoiceStartPayload(
+  payload: unknown,
+): payload is FloatingVoiceStartPayload {
+  return (
+    typeof payload === "object" &&
+    payload !== null &&
+    (("mode" in payload &&
+      ((payload as { mode?: unknown }).mode === "conversation" ||
+        (payload as { mode?: unknown }).mode === "translate" ||
+        (payload as { mode?: unknown }).mode === "whisper")) ||
+      ("pressKind" in payload &&
+        ((payload as { pressKind?: unknown }).pressKind === "short" ||
+          (payload as { pressKind?: unknown }).pressKind === "long")) ||
+      ("autoStopAfterCommit" in payload &&
+        typeof (payload as { autoStopAfterCommit?: unknown })
+          .autoStopAfterCommit === "boolean"))
+  );
 }
 
 function isFloatingVoiceDraftPayload(
@@ -371,14 +419,22 @@ export async function listenFloatingVoiceSubmitDraft(
 }
 
 export async function listenFloatingVoiceStart(
-  handler: () => void,
+  handler: (payload: FloatingVoiceStartPayload) => void,
 ): Promise<() => void> {
   if (!isTauriDesktop()) {
     return () => undefined;
   }
 
   const { getCurrentWindow } = await import("@tauri-apps/api/window");
-  return getCurrentWindow().listen(FLOATING_VOICE_START_EVENT, () => handler());
+  return getCurrentWindow().listen<unknown>(
+    FLOATING_VOICE_START_EVENT,
+    (event) =>
+      handler(
+        isFloatingVoiceStartPayload(event.payload)
+          ? event.payload
+          : { mode: "conversation" },
+      ),
+  );
 }
 
 export async function listenFloatingVoiceStopAndHide(
@@ -429,7 +485,7 @@ export async function setVoiceDotMenuBarIconVisible(
 }
 
 export async function registerFloatingVoiceShortcut(
-  handler: () => void,
+  handler: (payload: FloatingVoiceStartPayload) => void,
 ): Promise<string | null> {
   if (!isTauriDesktop()) {
     return null;
@@ -437,12 +493,22 @@ export async function registerFloatingVoiceShortcut(
 
   const { register } = await import("@tauri-apps/plugin-global-shortcut");
   const candidates = ["Fn", "F19", "CommandOrControl+Shift+Space"];
+  let pressedAt = 0;
 
   for (const shortcut of candidates) {
     try {
       await register(shortcut, (event) => {
         if (event.state === "Pressed") {
-          handler();
+          pressedAt = Date.now();
+        } else if (event.state === "Released") {
+          const duration = pressedAt > 0 ? Date.now() - pressedAt : 0;
+          pressedAt = 0;
+          const isLongPress =
+            resolveFloatingVoiceShortcutMode(duration) === "whisper";
+          handler({
+            pressKind: isLongPress ? "long" : "short",
+            autoStopAfterCommit: isLongPress,
+          });
         }
       });
       return shortcut;
@@ -460,6 +526,14 @@ export async function insertTextToFocusedApp(text: string): Promise<void> {
   }
 
   await tauriInvoke<void>("insert_text_to_focused_app", { text });
+}
+
+export async function pressCmdEnterToFocusedApp(): Promise<void> {
+  if (!isTauriDesktop()) {
+    throw new Error("external form submission is only available in Tauri");
+  }
+
+  await tauriInvoke<void>("press_cmd_enter_to_focused_app");
 }
 
 /** Lazy wrapper around `@tauri-apps/api/core` invoke. */

@@ -13,6 +13,7 @@ import { ThemeToggle } from "./ThemeToggle";
 import { McpSettingsSection } from "./McpSettingsSection";
 import { useWindowDrag } from "../../hooks/useWindowDrag";
 import type { SendKeyMode } from "../../hooks/useSendKey";
+import type { RealtimeVoiceMode } from "../../lib/types";
 import type { ModelOption } from "../../lib/models";
 
 type Theme = "light" | "dark" | "system";
@@ -35,6 +36,12 @@ type Props = {
   onRealtimeVoiceEnabledChange: (enabled: boolean) => void;
   realtimeSoundEnabled: boolean;
   onRealtimeSoundEnabledChange: (enabled: boolean) => void;
+  realtimeVoiceMode: RealtimeVoiceMode;
+  onRealtimeVoiceModeChange: (mode: RealtimeVoiceMode) => void;
+  voiceDotShortPressMode: RealtimeVoiceMode;
+  onVoiceDotShortPressModeChange: (mode: RealtimeVoiceMode) => void;
+  voiceDotLongPressMode: RealtimeVoiceMode;
+  onVoiceDotLongPressModeChange: (mode: RealtimeVoiceMode) => void;
   floatingVoiceOpenOnStartup: boolean;
   onFloatingVoiceOpenOnStartupChange: (enabled: boolean) => void;
   voiceDotMenuBarIconEnabled: boolean;
@@ -49,6 +56,7 @@ type Props = {
 function getShortcuts(sendKey: SendKeyMode) {
   return [
     { key: "⌘/Ctrl + N", description: "新しいチャット" },
+    { key: "⌘/Ctrl + Shift + N", description: "音声会話で新しいチャット" },
     { key: "⌘/Ctrl + F", description: "チャット内検索" },
     { key: "Escape", description: "検索を閉じる" },
     {
@@ -60,6 +68,29 @@ function getShortcuts(sendKey: SendKeyMode) {
       description: "改行",
     },
   ];
+}
+
+function RealtimeModeSelect({
+  id,
+  value,
+  onChange,
+}: {
+  id: string;
+  value: RealtimeVoiceMode;
+  onChange: (mode: RealtimeVoiceMode) => void;
+}) {
+  return (
+    <select
+      id={id}
+      value={value}
+      onChange={(e) => onChange(e.currentTarget.value as RealtimeVoiceMode)}
+      className="notion-input w-full rounded-2xl px-3 py-2 text-sm"
+    >
+      <option value="conversation">GPT-Realtime-2</option>
+      <option value="translate">GPT-Realtime-Translate</option>
+      <option value="whisper">GPT-Realtime-Whisper</option>
+    </select>
+  );
 }
 
 export function SettingsPage({
@@ -80,6 +111,12 @@ export function SettingsPage({
   onRealtimeVoiceEnabledChange,
   realtimeSoundEnabled,
   onRealtimeSoundEnabledChange,
+  realtimeVoiceMode,
+  onRealtimeVoiceModeChange,
+  voiceDotShortPressMode,
+  onVoiceDotShortPressModeChange,
+  voiceDotLongPressMode,
+  onVoiceDotLongPressModeChange,
   floatingVoiceOpenOnStartup,
   onFloatingVoiceOpenOnStartupChange,
   voiceDotMenuBarIconEnabled,
@@ -225,6 +262,51 @@ export function SettingsPage({
                 className="h-4 w-4 accent-stone-900 dark:accent-stone-100"
               />
             </label>
+            <div className="mt-2 grid gap-2 md:grid-cols-3">
+              <div>
+                <label
+                  htmlFor="realtime-voice-mode"
+                  className="mb-1.5 block text-xs font-medium text-stone-600 dark:text-stone-300"
+                >
+                  マイクボタン
+                </label>
+                <RealtimeModeSelect
+                  id="realtime-voice-mode"
+                  value={realtimeVoiceMode}
+                  onChange={onRealtimeVoiceModeChange}
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="voice-dot-short-press-mode"
+                  className="mb-1.5 block text-xs font-medium text-stone-600 dark:text-stone-300"
+                >
+                  Fn 短押し
+                </label>
+                <RealtimeModeSelect
+                  id="voice-dot-short-press-mode"
+                  value={voiceDotShortPressMode}
+                  onChange={onVoiceDotShortPressModeChange}
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="voice-dot-long-press-mode"
+                  className="mb-1.5 block text-xs font-medium text-stone-600 dark:text-stone-300"
+                >
+                  Fn 長押し
+                </label>
+                <RealtimeModeSelect
+                  id="voice-dot-long-press-mode"
+                  value={voiceDotLongPressMode}
+                  onChange={onVoiceDotLongPressModeChange}
+                />
+              </div>
+            </div>
+            <p className="mt-1.5 text-[11px] leading-relaxed text-stone-500 dark:text-stone-400">
+              Fn 長押しは発話が確定したら自動で停止します。Translate / Whisper
+              は確定した翻訳・文字起こしを入力結果として反映します。
+            </p>
             {onOpenFloatingVoiceInput && (
               <button
                 type="button"

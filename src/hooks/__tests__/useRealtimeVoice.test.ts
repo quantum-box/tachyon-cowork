@@ -14,10 +14,25 @@ import {
   shouldDisableRealtimeAutoGainControl,
   useRealtimeVoice,
 } from "../useRealtimeVoice";
+import {
+  REALTIME_VOICE_MODE_MODEL_MAP,
+  resolveRealtimeVoiceMode,
+} from "../useRealtimeVoiceSettings";
 
 describe("realtime voice session defaults", () => {
   it("uses the ambient-noise VAD preset issued by Tachyon API", () => {
     expect(REALTIME_VAD_PRESET).toBe("server_vad_ambient");
+  });
+
+  it("maps stored realtime modes to Tachyon backend aliases", () => {
+    expect(resolveRealtimeVoiceMode("translate")).toBe("translate");
+    expect(resolveRealtimeVoiceMode("whisper")).toBe("whisper");
+    expect(resolveRealtimeVoiceMode("unsupported")).toBe("conversation");
+    expect(REALTIME_VOICE_MODE_MODEL_MAP).toEqual({
+      conversation: "gpt-realtime-2",
+      translate: "gpt-realtime-translate",
+      whisper: "gpt-realtime-whisper",
+    });
   });
 
   it("disables browser auto gain control on mobile-like devices", () => {
@@ -152,6 +167,7 @@ describe("realtime agent chat tools", () => {
         expect.objectContaining({ name: "set_agent_chat_draft" }),
         expect.objectContaining({ name: "update_agent_chat_draft" }),
         expect.objectContaining({ name: "submit_agent_chat_draft" }),
+        expect.objectContaining({ name: "submit_focused_form" }),
       ],
     });
     expect(sessionConfig.instructions).toContain("what tools you can use");
@@ -179,6 +195,7 @@ describe("realtime agent chat tools", () => {
           expect.objectContaining({ name: "set_agent_chat_draft" }),
           expect.objectContaining({ name: "update_agent_chat_draft" }),
           expect.objectContaining({ name: "submit_agent_chat_draft" }),
+          expect.objectContaining({ name: "submit_focused_form" }),
         ],
       },
     });
@@ -218,6 +235,21 @@ describe("realtime agent chat tools", () => {
     ).toEqual({
       callId: "call-2",
       name: "read_agent_chat_context",
+      argumentsJson: "{}",
+    });
+  });
+
+  it("extracts focused form submit tool calls", () => {
+    expect(
+      extractRealtimeToolCall({
+        type: "response.function_call_arguments.done",
+        call_id: "call-submit-form",
+        name: "submit_focused_form",
+        arguments: "{}",
+      }),
+    ).toEqual({
+      callId: "call-submit-form",
+      name: "submit_focused_form",
       argumentsJson: "{}",
     });
   });
