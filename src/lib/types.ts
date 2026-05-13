@@ -134,7 +134,7 @@ export type RealtimeClientSecretResponse = {
   voice: string;
 };
 
-export type RealtimeTranscriptRole = "user" | "assistant";
+export type RealtimeTranscriptRole = "user" | "assistant" | "tool";
 
 export type RealtimeTranscriptMessage = {
   role: RealtimeTranscriptRole;

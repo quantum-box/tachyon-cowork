@@ -469,6 +469,20 @@ export async function insertTextToFocusedApp(text: string): Promise<void> {
   await tauriInvoke<void>("insert_text_to_focused_app", { text });
 }
 
+export async function replaceTextInFocusedApp(
+  previousText: string,
+  text: string,
+): Promise<void> {
+  if (!isTauriDesktop()) {
+    throw new Error("external text replacement is only available in Tauri");
+  }
+
+  await tauriInvoke<void>("replace_text_in_focused_app", {
+    previousText,
+    text,
+  });
+}
+
 export async function pressCmdEnterToFocusedApp(): Promise<void> {
   if (!isTauriDesktop()) {
     throw new Error("external form submission is only available in Tauri");

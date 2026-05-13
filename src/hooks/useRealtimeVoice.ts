@@ -423,6 +423,14 @@ function readNumber(value: unknown): number | undefined {
   return typeof value === "number" ? value : undefined;
 }
 
+function formatRealtimeToolLog(
+  toolCall: RealtimeToolCall,
+  output: Record<string, unknown>,
+): string {
+  const status = output.ok === false ? "failed" : "completed";
+  return `tool ${toolCall.name} ${status}`;
+}
+
 function isRealtimeToolName(value: unknown): value is RealtimeToolName {
   return (
     value === "set_agent_chat_draft" ||
@@ -777,6 +785,13 @@ export function useRealtimeVoice(
         };
       }
 
+      appendTranscript({
+        role: "tool",
+        id: `tool:${toolCall.callId}`,
+        text: formatRealtimeToolLog(toolCall, output),
+        isFinal: true,
+      });
+
       const dataChannel = dataChannelRef.current;
       if (!dataChannel || dataChannel.readyState !== "open") return;
 
@@ -792,7 +807,7 @@ export function useRealtimeVoice(
       );
       dataChannel.send(JSON.stringify({ type: "response.create" }));
     },
-    [stop],
+    [appendTranscript, stop],
   );
 
   const updateRealtimeVadMode = useCallback((mode: "ambient" | "playback") => {

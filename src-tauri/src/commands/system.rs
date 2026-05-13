@@ -95,6 +95,32 @@ pub async fn insert_text_to_focused_app(text: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub async fn replace_text_in_focused_app(
+    previous_text: String,
+    text: String,
+) -> Result<(), String> {
+    if text.trim().is_empty() {
+        return Err("入力するテキストが空です。".to_string());
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        tauri::async_runtime::spawn_blocking(move || {
+            replace_text_in_focused_app_macos(&previous_text, &text)
+        })
+        .await
+        .map_err(|e| e.to_string())?
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = previous_text;
+        let _ = text;
+        Err("任意フォームへの音声入力は現在 macOS のみ対応です。".to_string())
+    }
+}
+
+#[tauri::command]
 pub async fn press_cmd_enter_to_focused_app() -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
@@ -215,6 +241,15 @@ unsafe fn apply_corner_radius_to_view(
 }
 
 #[cfg(target_os = "macos")]
+fn replace_text_in_focused_app_macos(previous_text: &str, text: &str) -> Result<(), String> {
+    if !previous_text.is_empty() {
+        press_backspace_in_focused_app_macos(previous_text.chars().count())?;
+    }
+
+    insert_text_to_focused_app_macos(text)
+}
+
+#[cfg(target_os = "macos")]
 fn press_cmd_enter_to_focused_app_macos() -> Result<(), String> {
     let source = CGEventSource::new(CGEventSourceStateID::HIDSystemState)
         .or_else(|_| CGEventSource::new(CGEventSourceStateID::CombinedSessionState))
@@ -233,6 +268,30 @@ fn press_cmd_enter_to_focused_app_macos() -> Result<(), String> {
         .map_err(|_| "Cmd+Enter キー入力イベントの作成に失敗しました。".to_string())?;
     key_up.set_flags(flags);
     key_up.post(CGEventTapLocation::HID);
+
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn press_backspace_in_focused_app_macos(count: usize) -> Result<(), String> {
+    let source = CGEventSource::new(CGEventSourceStateID::HIDSystemState)
+        .or_else(|_| CGEventSource::new(CGEventSourceStateID::CombinedSessionState))
+        .map_err(|_| "CGEventSource の作成に失敗しました。".to_string())?;
+    let backspace_keycode = 51;
+
+    for _ in 0..count {
+        let key_down = CGEvent::new_keyboard_event(source.clone(), backspace_keycode, true)
+            .map_err(|_| "Backspace キー入力イベントの作成に失敗しました。".to_string())?;
+        key_down.post(CGEventTapLocation::HID);
+
+        let key_up = CGEvent::new_keyboard_event(source.clone(), backspace_keycode, false)
+            .map_err(|_| "Backspace キー入力イベントの作成に失敗しました。".to_string())?;
+        key_up.post(CGEventTapLocation::HID);
+    }
+
+    if count > 0 {
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
 
     Ok(())
 }

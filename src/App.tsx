@@ -60,7 +60,6 @@ import type { ModelInfo, SessionSummary } from "./lib/types";
 import {
   clearTauriRuntimeAuth,
   hideCurrentTauriWindow,
-  insertTextToFocusedApp,
   isTauri,
   isTauriDesktop,
   isTauriMacOS,
@@ -71,6 +70,7 @@ import {
   openFloatingVoiceInputWindow,
   pressCmdEnterToFocusedApp,
   registerFloatingVoiceShortcut,
+  replaceTextInFocusedApp,
   setVoiceDotMenuBarIconVisible,
   type ProjectContext,
   type ProjectEntry,
@@ -100,7 +100,7 @@ const FLOATING_VOICE_INPUT_INSTRUCTIONS = [
   "Always speak, transcribe, draft, revise, and submit in Japanese unless the user explicitly asks for another language.",
   "By default, keep spoken replies brief: use a short acknowledgement or one concise sentence. Only give longer, conversational answers when the user is asking for consultation, brainstorming, or help thinking through something.",
   "Use set_agent_chat_draft and update_agent_chat_draft to maintain the exact text that should be inserted into the form.",
-  "Use submit_agent_chat_draft when the user asks to input, insert, paste, or commit the dictated text.",
+  "Use submit_agent_chat_draft when the user asks to input, insert, paste, or commit the dictated text. If previous Voice Dot text was already inserted, the app will delete only that text and insert the revised text.",
   "Use submit_focused_form to press Cmd+Enter in the target form only after the user explicitly permits sending or submitting. Never submit automatically after inserting text; ask for permission first if it is unclear.",
   "After submit_agent_chat_draft, keep listening for the next user request. Do not stop or hide Voice Dot unless the user explicitly asks to close it.",
   "Use stop_realtime_voice when the user asks to stop, close, hide, end Voice Dot, or says they are done.",
@@ -429,6 +429,7 @@ export default function App() {
     agentChunksRef.current = chunks;
   }, [chunks]);
   const realtimePausedForAgentRef = useRef(false);
+  const lastFloatingVoiceInsertedTextRef = useRef("");
   const realtimeControlRef = useRef<{
     status: "idle" | "connecting" | "connected";
     start: () => Promise<void>;
@@ -468,9 +469,14 @@ export default function App() {
       if (isFloatingVoiceInput) {
         floatingVoiceDraftRef.current = "";
         setFloatingVoiceDraft("");
-        void insertTextToFocusedApp(message).catch((error) => {
-          console.warn("Failed to insert floating voice text.", error);
-        });
+        const previousText = lastFloatingVoiceInsertedTextRef.current;
+        void replaceTextInFocusedApp(previousText, message)
+          .then(() => {
+            lastFloatingVoiceInsertedTextRef.current = message;
+          })
+          .catch((error) => {
+            console.warn("Failed to insert floating voice text.", error);
+          });
         return;
       }
       pauseRealtimeForAgentTurn();
@@ -501,7 +507,10 @@ export default function App() {
       ? () => pressCmdEnterToFocusedApp()
       : undefined,
     onStopRealtimeVoice: isFloatingVoiceInput
-      ? () => hideCurrentTauriWindow()
+      ? () => {
+          lastFloatingVoiceInsertedTextRef.current = "";
+          return hideCurrentTauriWindow();
+        }
       : undefined,
     soundEnabled: realtimeSoundEnabled,
     instructions: isFloatingVoiceInput
@@ -514,6 +523,12 @@ export default function App() {
   const realtimeTranscripts = realtimeVoice.transcripts;
   const appendRealtimeTranscript = realtimeVoice.appendTranscript;
   const previousChatErrorRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (isFloatingVoiceInput && realtimeVoiceStatus === "idle") {
+      lastFloatingVoiceInsertedTextRef.current = "";
+    }
+  }, [isFloatingVoiceInput, realtimeVoiceStatus]);
 
   useEffect(() => {
     realtimeControlRef.current = {
@@ -1061,11 +1076,7 @@ export default function App() {
           }
         },
       }),
-      [
-        auth,
-        handleNewChat,
-        searchOpen,
-      ],
+      [auth, handleNewChat, searchOpen],
     ),
   );
 

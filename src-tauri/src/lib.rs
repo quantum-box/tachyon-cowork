@@ -282,6 +282,7 @@ pub fn run() {
             commands::system::get_system_info,
             commands::system::show_in_folder,
             commands::system::insert_text_to_focused_app,
+            commands::system::replace_text_in_focused_app,
             commands::system::press_cmd_enter_to_focused_app,
             commands::system::apply_voice_dot_window_shape,
             commands::system::set_voice_dot_tray_visible,
