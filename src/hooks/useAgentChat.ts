@@ -36,6 +36,16 @@ const MAX_RETRIES = 2;
 /** Base delay for exponential backoff (ms) */
 const RETRY_BASE_DELAY_MS = 1_000;
 
+const FINAL_ANSWER_INSTRUCTION =
+  "調査や情報収集が完了したら、「まとめます」「レポートを作成します」のような途中経過だけで応答を終えず、同じ応答内で必ず最終回答本文まで出力してください。";
+
+const PREMATURE_FINAL_SAY_PATTERNS = [
+  /まとめ(?:を)?作成します/,
+  /レポート(?:を)?(?:作成|完成)させます/,
+  /整理して(?:、)?(?:まとめ|レポート)/,
+  /十分な情報が集まりました/,
+];
+
 function waitForNextPaint(): Promise<void> {
   if (typeof requestAnimationFrame === "function") {
     return new Promise((resolve) => {
@@ -437,6 +447,7 @@ function buildAgentCustomInstructions(
     "現在のローカル環境や連携フォルダの状態確認では、ディレクトリ一覧、ファイル検索、ファイル読み取り、メタデータ確認、PDF/DOCX 読み取り、安全なホストコマンド実行、サンドボックスコード実行などに client_tools を優先してください。",
     "現在のローカル環境、ワークスペース内容、生成済みファイルについて答える前に、可能な限り関連する client tool で確認してください。",
     "実際に client tool で確認していないローカルファイル、フォルダ、コマンド、文書内容について、確認済みだと述べないでください。",
+    FINAL_ANSWER_INSTRUCTION,
     activeProjectPath
       ? `現在の連携フォルダ: ${activeProjectPath}`
       : "現在の連携フォルダは未選択です。フォルダ相対のファイル操作が必要で場所が不明な場合は、先にフォルダ選択を促してください。",
@@ -559,6 +570,24 @@ function isStreamingTextChunk(chunk: AgentChunk): boolean {
     chunk.type === "completion" ||
     chunk.type === "thinking"
   );
+}
+
+function getChunkText(chunk: AgentChunk): string {
+  return chunk.text || chunk.content || chunk.result || "";
+}
+
+function isFinalAnswerChunk(chunk: AgentChunk): boolean {
+  return (
+    chunk.type === "assistant" ||
+    chunk.type === "attempt_completion" ||
+    chunk.type === "completion"
+  );
+}
+
+function isLikelyPrematureFinalSay(chunk: AgentChunk | null): boolean {
+  if (!chunk || chunk.type !== "say") return false;
+  const text = getChunkText(chunk);
+  return PREMATURE_FINAL_SAY_PATTERNS.some((pattern) => pattern.test(text));
 }
 
 function withStreamScopedId(
@@ -1028,6 +1057,8 @@ export function useAgentChat(
         lastGroup: null,
       };
       let receivedStreamChunk = false;
+      let lastStreamChunk: AgentChunk | null = null;
+      let sawFinalAnswerChunk = false;
 
       // Track server-side tool_call metadata so we can detect file-write results
       const toolCallMeta = new Map<
@@ -1090,6 +1121,10 @@ export function useAgentChat(
           streamScopeState,
         );
         receivedStreamChunk = true;
+        lastStreamChunk = normalized;
+        if (isFinalAnswerChunk(normalized)) {
+          sawFinalAnswerChunk = true;
+        }
         if (isStreamingTextChunk(chunk)) {
           flushSync(() => {
             setChunks((prev) => upsertChunk(prev, chunk));
@@ -1264,6 +1299,17 @@ export function useAgentChat(
 
       try {
         await executeWithRetry(0);
+        if (
+          !ac.signal.aborted &&
+          !sawFinalAnswerChunk &&
+          isLikelyPrematureFinalSay(lastStreamChunk)
+        ) {
+          setError({
+            kind: "server",
+            message:
+              "Agent API が最終レポート本文の前に停止しました。「続けて」と送ると再開できます。",
+          });
+        }
       } catch (e) {
         if (e instanceof Error && e.name !== "AbortError") {
           setError(toChatError(e));

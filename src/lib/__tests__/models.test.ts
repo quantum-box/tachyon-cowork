@@ -67,7 +67,7 @@ describe("resolveModelOptions", () => {
     ]);
   });
 
-  it("falls back per model when the API only returns a subset", () => {
+  it("uses only API-backed models when the API returns a subset", () => {
     const availableModels = [
       buildModel(
         "anthropic/claude-sonnet-4.6",
@@ -82,22 +82,39 @@ describe("resolveModelOptions", () => {
         id: "anthropic/claude-sonnet-4.6",
         label: "Claude Sonnet 4.6 (Anthropic API)",
       },
-      {
-        id: "anthropic/claude-opus-4-6",
-        label: "Claude Opus 4.6 (Anthropic API)",
-      },
-      {
-        id: "anthropic/claude-haiku-4-5",
-        label: "Claude Haiku 4.5 (Anthropic API)",
-      },
-      {
-        id: "bedrock/claude-4-5-sonnet",
-        label: "Claude Sonnet 4.5 (Bedrock)",
-      },
       { id: "openai/gpt-5-4", label: "GPT-5.4" },
-      { id: "google/gemini-3.1-pro", label: "Gemini 3.1 Pro" },
-      { id: "google/gemini-3.1-flash", label: "Gemini 3.1 Flash" },
     ]);
+  });
+
+  it("does not re-add unavailable provider fallbacks when API models are loaded", () => {
+    const availableModels = [
+      buildModel(
+        "anthropic/claude-sonnet-4.6",
+        "Claude Sonnet 4.6",
+        "anthropic",
+      ),
+      buildModel(
+        "vertex_ai/gemini-2.5-flash",
+        "Gemini 2.5 Flash",
+        "vertex_ai",
+      ),
+    ];
+
+    expect(resolveModelOptions(availableModels)).toEqual([
+      {
+        id: "anthropic/claude-sonnet-4.6",
+        label: "Claude Sonnet 4.6 (Anthropic API)",
+      },
+      {
+        id: "vertex_ai/gemini-2.5-flash",
+        label: "Gemini 2.5 Flash",
+      },
+    ]);
+    expect(
+      resolveModelOptions(availableModels).some((model) =>
+        model.id.startsWith("openai/"),
+      ),
+    ).toBe(false);
   });
 
   it("exposes Bedrock Sonnet 4.5 in the fallback list", () => {
@@ -123,7 +140,7 @@ describe("resolveModelOptions", () => {
 
     const resolvedModels = resolveModelOptions(availableModels);
 
-    expect(resolvedModels[0]).toEqual({
+    expect(resolvedModels).not.toContainEqual({
       id: "anthropic/claude-sonnet-4-6",
       label: "Claude Sonnet 4.6 (Anthropic API)",
     });
