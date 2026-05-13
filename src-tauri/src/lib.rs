@@ -36,19 +36,25 @@ fn install_floating_voice_fn_listener(app: tauri::AppHandle) {
             use core_foundation::runloop::CFRunLoop;
             use core_graphics::event::{
                 CallbackResult, CGEventFlags, CGEventTap, CGEventTapLocation, CGEventTapOptions,
-                CGEventTapPlacement, CGEventType,
+                CGEventTapPlacement, CGEventType, EventField,
             };
             use std::sync::{
-                atomic::{AtomicBool, Ordering},
-                Arc,
+                atomic::{AtomicBool, AtomicU64, Ordering},
+                Arc, Mutex,
             };
-            use std::time::Duration;
+            use std::time::{Duration, Instant};
             use tauri::{Emitter, Manager};
+
+            const FN_KEYCODE: i64 = 63;
 
             let fn_down = Arc::new(AtomicBool::new(false));
             let fn_down_for_tap = Arc::clone(&fn_down);
             let hold_started = Arc::new(AtomicBool::new(false));
             let hold_started_for_tap = Arc::clone(&hold_started);
+            let press_started_at = Arc::new(Mutex::new(None::<Instant>));
+            let press_started_at_for_tap = Arc::clone(&press_started_at);
+            let press_sequence = Arc::new(AtomicU64::new(0));
+            let press_sequence_for_tap = Arc::clone(&press_sequence);
             let app_for_tap = app.clone();
 
             let result = CGEventTap::with_enabled(
@@ -57,6 +63,11 @@ fn install_floating_voice_fn_listener(app: tauri::AppHandle) {
                 CGEventTapOptions::ListenOnly,
                 vec![CGEventType::FlagsChanged],
                 move |_proxy, _event_type, event| {
+                    let keycode = event.get_integer_value_field(EventField::KEYBOARD_EVENT_KEYCODE);
+                    if keycode != FN_KEYCODE {
+                        return CallbackResult::Keep;
+                    }
+
                     let is_down = event
                         .get_flags()
                         .contains(CGEventFlags::CGEventFlagSecondaryFn);
@@ -64,13 +75,20 @@ fn install_floating_voice_fn_listener(app: tauri::AppHandle) {
 
                     if is_down && !was_down {
                         hold_started_for_tap.store(false, Ordering::Relaxed);
+                        if let Ok(mut started_at) = press_started_at_for_tap.lock() {
+                            *started_at = Some(Instant::now());
+                        }
+                        let sequence =
+                            press_sequence_for_tap.fetch_add(1, Ordering::Relaxed) + 1;
                         let app_for_hold = app_for_tap.clone();
                         let fn_down_for_hold = Arc::clone(&fn_down_for_tap);
                         let hold_started_for_hold = Arc::clone(&hold_started_for_tap);
+                        let press_sequence_for_hold = Arc::clone(&press_sequence_for_tap);
 
                         std::thread::spawn(move || {
                             std::thread::sleep(Duration::from_millis(LONG_PRESS_THRESHOLD_MS));
                             if fn_down_for_hold.load(Ordering::Relaxed)
+                                && press_sequence_for_hold.load(Ordering::Relaxed) == sequence
                                 && !hold_started_for_hold.swap(true, Ordering::Relaxed)
                             {
                                 if app_for_hold.get_webview_window("voice-input").is_some() {
@@ -89,7 +107,20 @@ fn install_floating_voice_fn_listener(app: tauri::AppHandle) {
                             }
                         });
                     } else if !is_down && was_down {
+                        press_sequence_for_tap.fetch_add(1, Ordering::Relaxed);
+                        let press_duration = press_started_at_for_tap
+                            .lock()
+                            .ok()
+                            .and_then(|mut started_at| started_at.take())
+                            .map(|started_at| started_at.elapsed());
+
                         if hold_started_for_tap.swap(false, Ordering::Relaxed) {
+                            let _ = app_for_tap.emit_to("main", "floating-voice:hold-stop", ());
+                            let _ =
+                                app_for_tap.emit_to("voice-input", "floating-voice:hold-stop", ());
+                        } else if press_duration
+                            .is_some_and(|duration| duration.as_millis() >= LONG_PRESS_THRESHOLD_MS as u128)
+                        {
                             let _ = app_for_tap.emit_to("main", "floating-voice:hold-stop", ());
                             let _ =
                                 app_for_tap.emit_to("voice-input", "floating-voice:hold-stop", ());
