@@ -443,7 +443,7 @@ export async function registerFloatingVoiceShortcut(
   }
 
   const { register } = await import("@tauri-apps/plugin-global-shortcut");
-  const candidates = ["Fn", "F19", "CommandOrControl+Shift+Space"];
+  const candidates = ["F19", "CommandOrControl+Shift+Space"];
 
   for (const shortcut of candidates) {
     try {
