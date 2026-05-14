@@ -38,6 +38,7 @@ fn install_floating_voice_fn_listener(app: tauri::AppHandle) {
                 CallbackResult, CGEventFlags, CGEventTap, CGEventTapLocation, CGEventTapOptions,
                 CGEventTapPlacement, CGEventType, EventField,
             };
+            use core_graphics::event_source::CGEventSourceStateID;
             use std::sync::{
                 atomic::{AtomicBool, AtomicU64, Ordering},
                 Arc, Mutex,
@@ -46,6 +47,21 @@ fn install_floating_voice_fn_listener(app: tauri::AppHandle) {
             use tauri::{Emitter, Manager};
 
             const FN_KEYCODE: i64 = 63;
+            const POLL_INTERVAL_MS: u64 = 25;
+
+            extern "C" {
+                fn CGEventSourceFlagsState(state_id: CGEventSourceStateID) -> CGEventFlags;
+            }
+
+            fn is_fn_modifier_down() -> bool {
+                let hid_flags =
+                    unsafe { CGEventSourceFlagsState(CGEventSourceStateID::HIDSystemState) };
+                let session_flags =
+                    unsafe { CGEventSourceFlagsState(CGEventSourceStateID::CombinedSessionState) };
+
+                hid_flags.contains(CGEventFlags::CGEventFlagSecondaryFn)
+                    || session_flags.contains(CGEventFlags::CGEventFlagSecondaryFn)
+            }
 
             let fn_down = Arc::new(AtomicBool::new(false));
             let fn_down_for_tap = Arc::clone(&fn_down);
@@ -86,23 +102,49 @@ fn install_floating_voice_fn_listener(app: tauri::AppHandle) {
                         let press_sequence_for_hold = Arc::clone(&press_sequence_for_tap);
 
                         std::thread::spawn(move || {
-                            std::thread::sleep(Duration::from_millis(LONG_PRESS_THRESHOLD_MS));
-                            if fn_down_for_hold.load(Ordering::Relaxed)
-                                && press_sequence_for_hold.load(Ordering::Relaxed) == sequence
-                                && !hold_started_for_hold.swap(true, Ordering::Relaxed)
-                            {
-                                if app_for_hold.get_webview_window("voice-input").is_some() {
-                                    let _ = app_for_hold.emit_to(
-                                        "voice-input",
-                                        "floating-voice:hold-start",
-                                        (),
-                                    );
-                                } else {
-                                    let _ = app_for_hold.emit_to(
-                                        "main",
-                                        "floating-voice:hold-start",
-                                        (),
-                                    );
+                            let started_at = Instant::now();
+                            loop {
+                                std::thread::sleep(Duration::from_millis(POLL_INTERVAL_MS));
+                                if press_sequence_for_hold.load(Ordering::Relaxed) != sequence {
+                                    break;
+                                }
+
+                                let is_still_down = is_fn_modifier_down();
+                                if !is_still_down {
+                                    if hold_started_for_hold.swap(false, Ordering::Relaxed) {
+                                        let _ = app_for_hold
+                                            .emit_to("main", "floating-voice:hold-stop", ());
+                                        let _ = app_for_hold.emit_to(
+                                            "voice-input",
+                                            "floating-voice:hold-stop",
+                                            (),
+                                        );
+                                        fn_down_for_hold.store(false, Ordering::Relaxed);
+                                        press_sequence_for_hold.fetch_add(1, Ordering::Relaxed);
+                                    }
+                                    break;
+                                }
+
+                                if started_at.elapsed()
+                                    < Duration::from_millis(LONG_PRESS_THRESHOLD_MS)
+                                {
+                                    continue;
+                                }
+
+                                if !hold_started_for_hold.swap(true, Ordering::Relaxed) {
+                                    if app_for_hold.get_webview_window("voice-input").is_some() {
+                                        let _ = app_for_hold.emit_to(
+                                            "voice-input",
+                                            "floating-voice:hold-start",
+                                            (),
+                                        );
+                                    } else {
+                                        let _ = app_for_hold.emit_to(
+                                            "main",
+                                            "floating-voice:hold-start",
+                                            (),
+                                        );
+                                    }
                                 }
                             }
                         });
@@ -118,9 +160,9 @@ fn install_floating_voice_fn_listener(app: tauri::AppHandle) {
                             let _ = app_for_tap.emit_to("main", "floating-voice:hold-stop", ());
                             let _ =
                                 app_for_tap.emit_to("voice-input", "floating-voice:hold-stop", ());
-                        } else if press_duration
-                            .is_some_and(|duration| duration.as_millis() >= LONG_PRESS_THRESHOLD_MS as u128)
-                        {
+                        } else if press_duration.is_some_and(|duration| {
+                            duration >= Duration::from_millis(LONG_PRESS_THRESHOLD_MS)
+                        }) {
                             let _ = app_for_tap.emit_to("main", "floating-voice:hold-stop", ());
                             let _ =
                                 app_for_tap.emit_to("voice-input", "floating-voice:hold-stop", ());
