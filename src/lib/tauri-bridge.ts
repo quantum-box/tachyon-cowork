@@ -286,6 +286,7 @@ async function openAndEmitFloatingVoiceInputEvent(
   const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
   const existing = await WebviewWindow.getByLabel(FLOATING_VOICE_WINDOW_LABEL);
   if (existing) {
+    await openFloatingVoiceInputWindow();
     if (shouldEmit()) {
       await emitFloatingVoiceEvent(event);
     }
