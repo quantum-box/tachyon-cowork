@@ -53,6 +53,8 @@ fn install_floating_voice_fn_listener(app: tauri::AppHandle) {
             let fn_down_for_tap = Arc::clone(&fn_down);
             let waiting_for_second_press = Arc::new(AtomicBool::new(false));
             let waiting_for_second_press_for_tap = Arc::clone(&waiting_for_second_press);
+            let second_press_armed = Arc::new(AtomicBool::new(false));
+            let second_press_armed_for_tap = Arc::clone(&second_press_armed);
             let tap_sequence = Arc::new(AtomicU64::new(0));
             let tap_sequence_for_tap = Arc::clone(&tap_sequence);
             let last_release_at = Arc::new(Mutex::new(None::<Instant>));
@@ -75,7 +77,31 @@ fn install_floating_voice_fn_listener(app: tauri::AppHandle) {
                         .contains(CGEventFlags::CGEventFlagSecondaryFn);
                     let was_down = fn_down_for_tap.swap(is_down, Ordering::Relaxed);
 
-                    if !is_down && was_down {
+                    if is_down && !was_down {
+                        let release_interval_ms = last_release_at_for_tap
+                            .lock()
+                            .ok()
+                            .and_then(|last_release_at| {
+                                last_release_at
+                                    .as_ref()
+                                    .map(|last| Instant::now().duration_since(*last).as_millis())
+                            });
+
+                        if waiting_for_second_press_for_tap.load(Ordering::Relaxed)
+                            && release_interval_ms.is_some_and(|interval| {
+                                (MIN_SECOND_PRESS_INTERVAL_MS..=DOUBLE_PRESS_WINDOW_MS as u128)
+                                    .contains(&interval)
+                            })
+                        {
+                            second_press_armed_for_tap.store(true, Ordering::Relaxed);
+                            tap_sequence_for_tap.fetch_add(1, Ordering::Relaxed);
+                            #[cfg(debug_assertions)]
+                            eprintln!(
+                                "Voice Dot Fn shortcut: armed double tap after {:?}ms",
+                                release_interval_ms
+                            );
+                        }
+                    } else if !is_down && was_down {
                         let release_interval_ms = last_release_at_for_tap
                             .lock()
                             .ok()
@@ -91,19 +117,27 @@ fn install_floating_voice_fn_listener(app: tauri::AppHandle) {
                         if release_interval_ms
                             .is_some_and(|interval| interval < DUPLICATE_RELEASE_IGNORE_MS)
                         {
+                            #[cfg(debug_assertions)]
+                            eprintln!(
+                                "Voice Dot Fn shortcut: ignored duplicate release after {:?}ms",
+                                release_interval_ms
+                            );
                             return CallbackResult::Keep;
                         }
 
-                        if waiting_for_second_press_for_tap.load(Ordering::Relaxed)
-                            && release_interval_ms
-                                .is_some_and(|interval| interval < MIN_SECOND_PRESS_INTERVAL_MS)
-                        {
-                            return CallbackResult::Keep;
-                        }
-
-                        if waiting_for_second_press_for_tap.swap(false, Ordering::Relaxed) {
+                        if second_press_armed_for_tap.swap(false, Ordering::Relaxed) {
+                            waiting_for_second_press_for_tap.store(false, Ordering::Relaxed);
                             tap_sequence_for_tap.fetch_add(1, Ordering::Relaxed);
+                            #[cfg(debug_assertions)]
+                            eprintln!("Voice Dot Fn shortcut: emitted double tap conversation");
                             let _ = app_for_tap.emit_to("main", "voice-conversation:toggle", ());
+                        } else if waiting_for_second_press_for_tap.load(Ordering::Relaxed) {
+                            #[cfg(debug_assertions)]
+                            eprintln!(
+                                "Voice Dot Fn shortcut: ignored unarmed second release after {:?}ms",
+                                release_interval_ms
+                            );
+                            return CallbackResult::Keep;
                         } else {
                             waiting_for_second_press_for_tap.store(true, Ordering::Relaxed);
                             let sequence =
@@ -119,6 +153,8 @@ fn install_floating_voice_fn_listener(app: tauri::AppHandle) {
                                     && waiting_for_second_press_for_single
                                         .swap(false, Ordering::Relaxed)
                                 {
+                                    #[cfg(debug_assertions)]
+                                    eprintln!("Voice Dot Fn shortcut: emitted single tap Voice Dot");
                                     let _ =
                                         app_for_single.emit_to("main", "floating-voice:toggle", ());
                                 }
