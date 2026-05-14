@@ -30,6 +30,7 @@ fn ensure_input_monitoring_permission_requested() {
 fn install_floating_voice_fn_listener(app: tauri::AppHandle) {
     const DOUBLE_PRESS_WINDOW_MS: u64 = 320;
     const DUPLICATE_RELEASE_IGNORE_MS: u128 = 100;
+    const MIN_SECOND_PRESS_INTERVAL_MS: u128 = 180;
 
     std::thread::Builder::new()
         .name("floating-voice-fn-listener".to_string())
@@ -75,21 +76,28 @@ fn install_floating_voice_fn_listener(app: tauri::AppHandle) {
                     let was_down = fn_down_for_tap.swap(is_down, Ordering::Relaxed);
 
                     if !is_down && was_down {
-                        let is_duplicate_release = last_release_at_for_tap
+                        let release_interval_ms = last_release_at_for_tap
                             .lock()
                             .ok()
                             .map(|mut last_release_at| {
                                 let now = Instant::now();
-                                let is_duplicate = last_release_at.is_some_and(|last| {
-                                    now.duration_since(last).as_millis()
-                                        < DUPLICATE_RELEASE_IGNORE_MS
-                                });
+                                let interval =
+                                    last_release_at.map(|last| now.duration_since(last).as_millis());
                                 *last_release_at = Some(now);
-                                is_duplicate
+                                interval
                             })
-                            .unwrap_or(false);
+                            .flatten();
 
-                        if is_duplicate_release {
+                        if release_interval_ms
+                            .is_some_and(|interval| interval < DUPLICATE_RELEASE_IGNORE_MS)
+                        {
+                            return CallbackResult::Keep;
+                        }
+
+                        if waiting_for_second_press_for_tap.load(Ordering::Relaxed)
+                            && release_interval_ms
+                                .is_some_and(|interval| interval < MIN_SECOND_PRESS_INTERVAL_MS)
+                        {
                             return CallbackResult::Keep;
                         }
 
