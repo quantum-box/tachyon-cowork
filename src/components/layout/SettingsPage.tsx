@@ -48,6 +48,8 @@ type Props = {
 
 function getShortcuts(sendKey: SendKeyMode) {
   return [
+    { key: "Fn", description: "Voice Dot / Whisper" },
+    { key: "Fn x2", description: "音声会話" },
     { key: "⌘/Ctrl + N", description: "新しいチャット" },
     { key: "⌘/Ctrl + F", description: "チャット内検索" },
     { key: "Escape", description: "検索を閉じる" },

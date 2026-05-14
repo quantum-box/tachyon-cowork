@@ -29,6 +29,7 @@ fn ensure_input_monitoring_permission_requested() {
 #[cfg(target_os = "macos")]
 fn install_floating_voice_fn_listener(app: tauri::AppHandle) {
     const DOUBLE_PRESS_WINDOW_MS: u64 = 320;
+    const DUPLICATE_RELEASE_IGNORE_MS: u128 = 100;
 
     std::thread::Builder::new()
         .name("floating-voice-fn-listener".to_string())
@@ -40,9 +41,9 @@ fn install_floating_voice_fn_listener(app: tauri::AppHandle) {
             };
             use std::sync::{
                 atomic::{AtomicBool, AtomicU64, Ordering},
-                Arc,
+                Arc, Mutex,
             };
-            use std::time::Duration;
+            use std::time::{Duration, Instant};
             use tauri::Emitter;
 
             const FN_KEYCODE: i64 = 63;
@@ -53,6 +54,8 @@ fn install_floating_voice_fn_listener(app: tauri::AppHandle) {
             let waiting_for_second_press_for_tap = Arc::clone(&waiting_for_second_press);
             let tap_sequence = Arc::new(AtomicU64::new(0));
             let tap_sequence_for_tap = Arc::clone(&tap_sequence);
+            let last_release_at = Arc::new(Mutex::new(None::<Instant>));
+            let last_release_at_for_tap = Arc::clone(&last_release_at);
             let app_for_tap = app.clone();
 
             let result = CGEventTap::with_enabled(
@@ -72,6 +75,24 @@ fn install_floating_voice_fn_listener(app: tauri::AppHandle) {
                     let was_down = fn_down_for_tap.swap(is_down, Ordering::Relaxed);
 
                     if !is_down && was_down {
+                        let is_duplicate_release = last_release_at_for_tap
+                            .lock()
+                            .ok()
+                            .map(|mut last_release_at| {
+                                let now = Instant::now();
+                                let is_duplicate = last_release_at.is_some_and(|last| {
+                                    now.duration_since(last).as_millis()
+                                        < DUPLICATE_RELEASE_IGNORE_MS
+                                });
+                                *last_release_at = Some(now);
+                                is_duplicate
+                            })
+                            .unwrap_or(false);
+
+                        if is_duplicate_release {
+                            return CallbackResult::Keep;
+                        }
+
                         if waiting_for_second_press_for_tap.swap(false, Ordering::Relaxed) {
                             tap_sequence_for_tap.fetch_add(1, Ordering::Relaxed);
                             let _ = app_for_tap.emit_to("main", "voice-conversation:toggle", ());
