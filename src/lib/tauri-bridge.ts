@@ -117,6 +117,7 @@ const FLOATING_VOICE_TOGGLE_EVENT = "floating-voice:toggle";
 const FLOATING_VOICE_HOLD_START_EVENT = "floating-voice:hold-start";
 const FLOATING_VOICE_HOLD_STOP_EVENT = "floating-voice:hold-stop";
 const FLOATING_VOICE_STOP_AND_HIDE_EVENT = "floating-voice:stop-and-hide";
+const VOICE_CONVERSATION_TOGGLE_EVENT = "voice-conversation:toggle";
 const VOICE_DOT_NEW_CHAT_EVENT = "voice-dot:new-chat";
 const VOICE_DOT_OPEN_SETTINGS_EVENT = "voice-dot:open-settings";
 let floatingVoiceOpenRequestInFlight = false;
@@ -356,6 +357,10 @@ export async function emitFloatingVoiceStart(): Promise<void> {
   await emitFloatingVoiceEvent(FLOATING_VOICE_START_EVENT);
 }
 
+export async function stopAndHideFloatingVoiceInput(): Promise<void> {
+  await emitFloatingVoiceEvent(FLOATING_VOICE_STOP_AND_HIDE_EVENT);
+}
+
 async function emitFloatingVoiceEvent(event: string): Promise<void> {
   if (!isTauriDesktop()) {
     return;
@@ -471,6 +476,19 @@ export async function listenFloatingVoiceStopAndHide(
 
   const { getCurrentWindow } = await import("@tauri-apps/api/window");
   return getCurrentWindow().listen(FLOATING_VOICE_STOP_AND_HIDE_EVENT, () =>
+    handler(),
+  );
+}
+
+export async function listenVoiceConversationToggle(
+  handler: () => void,
+): Promise<() => void> {
+  if (!isTauriDesktop()) {
+    return () => undefined;
+  }
+
+  const { getCurrentWindow } = await import("@tauri-apps/api/window");
+  return getCurrentWindow().listen(VOICE_CONVERSATION_TOGGLE_EVENT, () =>
     handler(),
   );
 }

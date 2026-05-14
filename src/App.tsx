@@ -63,14 +63,11 @@ import {
   isTauri,
   isTauriDesktop,
   isTauriMacOS,
-  listenFloatingVoiceHoldStart,
-  listenFloatingVoiceHoldStop,
   listenFloatingVoiceStart,
   listenFloatingVoiceToggle,
+  listenVoiceConversationToggle,
   listenVoiceDotNewChat,
   listenVoiceDotOpenSettings,
-  notifyFloatingVoiceHoldStopped,
-  openAndHoldStartFloatingVoiceInput,
   openAndStartFloatingVoiceInput,
   openAndToggleFloatingVoiceInput,
   openFloatingVoiceInputWindow,
@@ -78,6 +75,7 @@ import {
   registerFloatingVoiceShortcut,
   replaceTextInFocusedApp,
   setVoiceDotMenuBarIconVisible,
+  stopAndHideFloatingVoiceInput,
   type ProjectContext,
   type ProjectEntry,
   setTauriRuntimeAuth,
@@ -634,16 +632,21 @@ export default function App() {
         console.warn("Failed to toggle floating voice input from Fn.", error);
       });
     };
-    const holdStartFromFn = () => {
-      void openAndHoldStartFloatingVoiceInput().catch((error) => {
-        console.warn(
-          "Failed to start floating voice input from Fn hold.",
-          error,
-        );
+    const toggleConversationFromFn = () => {
+      void stopAndHideFloatingVoiceInput().catch((error) => {
+        console.warn("Failed to stop Voice Dot before conversation.", error);
       });
-    };
-    const holdStopFromFn = () => {
-      notifyFloatingVoiceHoldStopped();
+      if (
+        realtimeVoiceStatus === "connecting" ||
+        realtimeVoiceStatus === "connected"
+      ) {
+        stopRealtimeVoice();
+        return;
+      }
+      if (!realtimeVoiceEnabled) {
+        setRealtimeVoiceEnabled(true);
+      }
+      void startRealtimeVoice();
     };
     let disposed = false;
     const unlisteners: Array<() => void> = [];
@@ -651,8 +654,7 @@ export default function App() {
     const listeners = [
       listenFloatingVoiceStart(openFromShortcut),
       listenFloatingVoiceToggle(toggleFromFn),
-      listenFloatingVoiceHoldStart(holdStartFromFn),
-      listenFloatingVoiceHoldStop(holdStopFromFn),
+      listenVoiceConversationToggle(toggleConversationFromFn),
     ];
 
     for (const listener of listeners) {
@@ -680,7 +682,14 @@ export default function App() {
         unlisten();
       }
     };
-  }, [isFloatingVoiceInput]);
+  }, [
+    isFloatingVoiceInput,
+    realtimeVoiceEnabled,
+    realtimeVoiceStatus,
+    setRealtimeVoiceEnabled,
+    startRealtimeVoice,
+    stopRealtimeVoice,
+  ]);
 
   useEffect(() => {
     if (

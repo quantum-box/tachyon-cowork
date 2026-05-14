@@ -28,7 +28,7 @@ fn ensure_input_monitoring_permission_requested() {
 
 #[cfg(target_os = "macos")]
 fn install_floating_voice_fn_listener(app: tauri::AppHandle) {
-    const LONG_PRESS_THRESHOLD_MS: u64 = 450;
+    const DOUBLE_PRESS_WINDOW_MS: u64 = 320;
 
     std::thread::Builder::new()
         .name("floating-voice-fn-listener".to_string())
@@ -38,39 +38,21 @@ fn install_floating_voice_fn_listener(app: tauri::AppHandle) {
                 CallbackResult, CGEventFlags, CGEventTap, CGEventTapLocation, CGEventTapOptions,
                 CGEventTapPlacement, CGEventType, EventField,
             };
-            use core_graphics::event_source::CGEventSourceStateID;
             use std::sync::{
                 atomic::{AtomicBool, AtomicU64, Ordering},
-                Arc, Mutex,
+                Arc,
             };
-            use std::time::{Duration, Instant};
+            use std::time::Duration;
             use tauri::Emitter;
 
             const FN_KEYCODE: i64 = 63;
-            const POLL_INTERVAL_MS: u64 = 25;
-
-            extern "C" {
-                fn CGEventSourceFlagsState(state_id: CGEventSourceStateID) -> CGEventFlags;
-            }
-
-            fn is_fn_modifier_down() -> bool {
-                let hid_flags =
-                    unsafe { CGEventSourceFlagsState(CGEventSourceStateID::HIDSystemState) };
-                let session_flags =
-                    unsafe { CGEventSourceFlagsState(CGEventSourceStateID::CombinedSessionState) };
-
-                hid_flags.contains(CGEventFlags::CGEventFlagSecondaryFn)
-                    || session_flags.contains(CGEventFlags::CGEventFlagSecondaryFn)
-            }
 
             let fn_down = Arc::new(AtomicBool::new(false));
             let fn_down_for_tap = Arc::clone(&fn_down);
-            let hold_started = Arc::new(AtomicBool::new(false));
-            let hold_started_for_tap = Arc::clone(&hold_started);
-            let press_started_at = Arc::new(Mutex::new(None::<Instant>));
-            let press_started_at_for_tap = Arc::clone(&press_started_at);
-            let press_sequence = Arc::new(AtomicU64::new(0));
-            let press_sequence_for_tap = Arc::clone(&press_sequence);
+            let waiting_for_second_press = Arc::new(AtomicBool::new(false));
+            let waiting_for_second_press_for_tap = Arc::clone(&waiting_for_second_press);
+            let tap_sequence = Arc::new(AtomicU64::new(0));
+            let tap_sequence_for_tap = Arc::clone(&tap_sequence);
             let app_for_tap = app.clone();
 
             let result = CGEventTap::with_enabled(
@@ -89,77 +71,29 @@ fn install_floating_voice_fn_listener(app: tauri::AppHandle) {
                         .contains(CGEventFlags::CGEventFlagSecondaryFn);
                     let was_down = fn_down_for_tap.swap(is_down, Ordering::Relaxed);
 
-                    if is_down && !was_down {
-                        hold_started_for_tap.store(false, Ordering::Relaxed);
-                        if let Ok(mut started_at) = press_started_at_for_tap.lock() {
-                            *started_at = Some(Instant::now());
-                        }
-                        let sequence =
-                            press_sequence_for_tap.fetch_add(1, Ordering::Relaxed) + 1;
-                        let app_for_hold = app_for_tap.clone();
-                        let fn_down_for_hold = Arc::clone(&fn_down_for_tap);
-                        let hold_started_for_hold = Arc::clone(&hold_started_for_tap);
-                        let press_sequence_for_hold = Arc::clone(&press_sequence_for_tap);
-
-                        std::thread::spawn(move || {
-                            let started_at = Instant::now();
-                            loop {
-                                std::thread::sleep(Duration::from_millis(POLL_INTERVAL_MS));
-                                if press_sequence_for_hold.load(Ordering::Relaxed) != sequence {
-                                    break;
-                                }
-
-                                let is_still_down = is_fn_modifier_down();
-                                if !is_still_down {
-                                    if hold_started_for_hold.swap(false, Ordering::Relaxed) {
-                                        let _ = app_for_hold
-                                            .emit_to("main", "floating-voice:hold-stop", ());
-                                        let _ = app_for_hold.emit_to(
-                                            "voice-input",
-                                            "floating-voice:hold-stop",
-                                            (),
-                                        );
-                                        fn_down_for_hold.store(false, Ordering::Relaxed);
-                                        press_sequence_for_hold.fetch_add(1, Ordering::Relaxed);
-                                    }
-                                    break;
-                                }
-
-                                if started_at.elapsed()
-                                    < Duration::from_millis(LONG_PRESS_THRESHOLD_MS)
-                                {
-                                    continue;
-                                }
-
-                                if !hold_started_for_hold.swap(true, Ordering::Relaxed) {
-                                    let _ = app_for_hold.emit_to(
-                                        "main",
-                                        "floating-voice:hold-start",
-                                        (),
-                                    );
-                                }
-                            }
-                        });
-                    } else if !is_down && was_down {
-                        press_sequence_for_tap.fetch_add(1, Ordering::Relaxed);
-                        let press_duration = press_started_at_for_tap
-                            .lock()
-                            .ok()
-                            .and_then(|mut started_at| started_at.take())
-                            .map(|started_at| started_at.elapsed());
-
-                        if hold_started_for_tap.swap(false, Ordering::Relaxed) {
-                            let _ = app_for_tap.emit_to("main", "floating-voice:hold-stop", ());
-                            let _ =
-                                app_for_tap.emit_to("voice-input", "floating-voice:hold-stop", ());
-                        } else if press_duration.is_some_and(|duration| {
-                            duration >= Duration::from_millis(LONG_PRESS_THRESHOLD_MS)
-                        }) {
-                            let _ = app_for_tap.emit_to("main", "floating-voice:hold-stop", ());
-                            let _ =
-                                app_for_tap.emit_to("voice-input", "floating-voice:hold-stop", ());
+                    if !is_down && was_down {
+                        if waiting_for_second_press_for_tap.swap(false, Ordering::Relaxed) {
+                            tap_sequence_for_tap.fetch_add(1, Ordering::Relaxed);
+                            let _ = app_for_tap.emit_to("main", "voice-conversation:toggle", ());
                         } else {
-                            let _ = app_for_tap.emit_to("main", "floating-voice:toggle", ());
+                            waiting_for_second_press_for_tap.store(true, Ordering::Relaxed);
+                            let sequence =
+                                tap_sequence_for_tap.fetch_add(1, Ordering::Relaxed) + 1;
+                            let app_for_single = app_for_tap.clone();
+                            let waiting_for_second_press_for_single =
+                                Arc::clone(&waiting_for_second_press_for_tap);
+                            let tap_sequence_for_single = Arc::clone(&tap_sequence_for_tap);
+
+                            std::thread::spawn(move || {
+                                std::thread::sleep(Duration::from_millis(DOUBLE_PRESS_WINDOW_MS));
+                                if tap_sequence_for_single.load(Ordering::Relaxed) == sequence
+                                    && waiting_for_second_press_for_single
+                                        .swap(false, Ordering::Relaxed)
+                                {
+                                    let _ =
+                                        app_for_single.emit_to("main", "floating-voice:toggle", ());
+                                }
+                            });
                         }
                     }
 
