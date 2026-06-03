@@ -689,6 +689,15 @@ export type ProjectContext = {
   has_agent_dir: boolean;
   custom_instructions?: string | null;
   prompt_context: string;
+  skills: ProjectSkill[];
+};
+
+export type ProjectSkill = {
+  name: string;
+  description: string;
+  path: string;
+  directory: string;
+  source: string;
 };
 
 // ── MCP Bridge Functions ───────────────────────────────────────────

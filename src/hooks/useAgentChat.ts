@@ -269,8 +269,7 @@ function buildClientTools(
           },
           timeout_secs: {
             type: "integer",
-            description:
-              "実行タイムアウト秒数（デフォルト: 30、最大: 300）。",
+            description: "実行タイムアウト秒数（デフォルト: 30、最大: 300）。",
           },
         },
         required: ["language", "code"],
@@ -378,7 +377,8 @@ function buildClientTools(
           },
           is_base64: {
             type: "boolean",
-            description: "true の場合、content は base64 エンコード済みバイナリデータです。",
+            description:
+              "true の場合、content は base64 エンコード済みバイナリデータです。",
           },
         },
         required: ["path", "content"],
@@ -437,11 +437,22 @@ function buildClientTools(
   ];
 }
 
-function buildAgentCustomInstructions(
+export function buildAgentCustomInstructions(
   globalCustomInstructions: string,
   activeProjectPath?: string | null,
   activeProjectContext?: ProjectContext | null,
 ): string {
+  const projectSkills = activeProjectContext?.skills ?? [];
+  const skillCatalog = projectSkills.length
+    ? [
+        "このワークスペースで利用可能な agent skill:",
+        ...projectSkills.map(
+          (skill) =>
+            `- ${skill.name}: ${skill.description}\n  SKILL.md: ${skill.path}`,
+        ),
+      ].join("\n")
+    : null;
+
   const sections = [
     "推測を減らせる場合や、ユーザーに聞かなくても自分で確認できる場合は、利用可能な client_tools を積極的に使ってください。",
     "現在のローカル環境や連携フォルダの状態確認では、ディレクトリ一覧、ファイル検索、ファイル読み取り、メタデータ確認、PDF/DOCX 読み取り、安全なホストコマンド実行、サンドボックスコード実行などに client_tools を優先してください。",
@@ -462,6 +473,15 @@ function buildAgentCustomInstructions(
       : null,
     activeProjectContext?.prompt_context?.trim()
       ? `AGENTS.md 由来のワークスペース指示:\n${activeProjectContext.prompt_context.trim()}`
+      : null,
+    skillCatalog,
+    projectSkills.length
+      ? [
+          "agent skill の利用ルール:",
+          "- ユーザーの依頼や作業内容が skill の description に合う場合、作業開始前に対応する SKILL.md を client tool で読んでください。",
+          "- SKILL.md に references/、scripts/、assets/、templates/ などの補助ファイルが書かれている場合、必要なものだけを同じディレクトリ基準で読んでください。",
+          "- skill はツールそのものではなく、作業手順と判断基準です。読んだ内容に従い、必要な client_tools や MCP tools を使って作業してください。",
+        ].join("\n")
       : null,
   ].filter(Boolean);
 
@@ -731,7 +751,9 @@ function normalizeIncomingChunk(chunk: AgentChunk): AgentChunk {
       typeof messageValue === "string" ? messageValue : undefined;
     return {
       ...chunk,
-      id: chunk.id || `error-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+      id:
+        chunk.id ||
+        `error-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
       created_at: chunk.created_at || new Date().toISOString(),
       text: chunk.text || errorMessage || "Agent API でエラーが発生しました。",
     };

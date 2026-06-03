@@ -13,6 +13,14 @@ const STORE_FILE: &str = "project-state.json";
 const MAX_RECENT_PROJECTS: usize = 8;
 const AGENTS_FILE: &str = "AGENTS.md";
 const AGENT_DIR: &str = ".agent";
+const SKILL_ROOTS: &[&str] = &[
+    ".agent/skills",
+    ".codex/skills",
+    ".claude/skills",
+    ".agents/skills",
+];
+const MAX_SKILLS: usize = 50;
+const MAX_SKILL_DESCRIPTION_CHARS: usize = 1024;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ProjectEntry {
@@ -38,6 +46,16 @@ pub struct ProjectContext {
     pub has_agent_dir: bool,
     pub custom_instructions: Option<String>,
     pub prompt_context: String,
+    pub skills: Vec<ProjectSkill>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ProjectSkill {
+    pub name: String,
+    pub description: String,
+    pub path: String,
+    pub directory: String,
+    pub source: String,
 }
 
 pub struct ProjectManager {
@@ -354,6 +372,7 @@ fn load_project_context(root: &Path) -> Result<ProjectContext, String> {
     let has_agent_dir = paths.agent_dir.is_dir();
     let custom_instructions = read_optional_workspace_file(&paths.agents_path)?;
     let prompt_context = custom_instructions.clone().unwrap_or_default();
+    let skills = discover_project_skills(root)?;
 
     Ok(ProjectContext {
         root_path: root.to_string_lossy().to_string(),
@@ -369,6 +388,7 @@ fn load_project_context(root: &Path) -> Result<ProjectContext, String> {
         has_agent_dir,
         custom_instructions,
         prompt_context,
+        skills,
     })
 }
 
@@ -411,6 +431,136 @@ fn read_optional_workspace_file(path: &Path) -> Result<Option<String>, String> {
     Ok(Some(trimmed.to_string()))
 }
 
+fn discover_project_skills(root: &Path) -> Result<Vec<ProjectSkill>, String> {
+    let mut skills = Vec::new();
+
+    for skill_root in SKILL_ROOTS {
+        let skill_root_path = root.join(skill_root);
+        if !skill_root_path.is_dir() {
+            continue;
+        }
+
+        let entries = fs::read_dir(&skill_root_path).map_err(|e| {
+            format!(
+                "Failed to read skill directory '{}': {}",
+                skill_root_path.display(),
+                e
+            )
+        })?;
+
+        for entry in entries {
+            if skills.len() >= MAX_SKILLS {
+                return Ok(skills);
+            }
+
+            let entry = entry.map_err(|e| {
+                format!(
+                    "Failed to read skill directory entry '{}': {}",
+                    skill_root_path.display(),
+                    e
+                )
+            })?;
+            let skill_dir = entry.path();
+            if !skill_dir.is_dir() {
+                continue;
+            }
+
+            let skill_path = skill_dir.join("SKILL.md");
+            if !skill_path.is_file() {
+                continue;
+            }
+
+            let content = fs::read_to_string(&skill_path).map_err(|e| {
+                format!(
+                    "Failed to read skill file '{}': {}",
+                    skill_path.display(),
+                    e
+                )
+            })?;
+
+            if let Some((name, description)) = parse_skill_frontmatter(&content) {
+                skills.push(ProjectSkill {
+                    name,
+                    description,
+                    path: skill_path.to_string_lossy().to_string(),
+                    directory: skill_dir.to_string_lossy().to_string(),
+                    source: skill_root.to_string(),
+                });
+            }
+        }
+    }
+
+    skills.sort_by(|a, b| a.name.cmp(&b.name).then_with(|| a.path.cmp(&b.path)));
+    Ok(skills)
+}
+
+fn parse_skill_frontmatter(content: &str) -> Option<(String, String)> {
+    let mut lines = content.lines();
+    if lines.next()?.trim() != "---" {
+        return None;
+    }
+
+    let mut name = None;
+    let mut description = None;
+
+    for line in lines {
+        let trimmed = line.trim();
+        if trimmed == "---" {
+            break;
+        }
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+
+        let Some((key, value)) = trimmed.split_once(':') else {
+            continue;
+        };
+        let normalized_value = normalize_yaml_scalar(value);
+        match key.trim() {
+            "name" => name = Some(normalized_value),
+            "description" => {
+                description = Some(truncate_chars(
+                    normalized_value.trim(),
+                    MAX_SKILL_DESCRIPTION_CHARS,
+                ))
+            }
+            _ => {}
+        }
+    }
+
+    let name = name?.trim().to_string();
+    let description = description?.trim().to_string();
+    if !is_valid_skill_name(&name) || description.is_empty() {
+        return None;
+    }
+
+    Some((name, description))
+}
+
+fn normalize_yaml_scalar(value: &str) -> String {
+    let trimmed = value.trim();
+    if trimmed.len() >= 2 {
+        let first = trimmed.as_bytes()[0] as char;
+        let last = trimmed.as_bytes()[trimmed.len() - 1] as char;
+        if (first == '"' && last == '"') || (first == '\'' && last == '\'') {
+            return trimmed[1..trimmed.len() - 1].trim().to_string();
+        }
+    }
+    trimmed.to_string()
+}
+
+fn is_valid_skill_name(name: &str) -> bool {
+    !name.is_empty()
+        && name.len() <= 64
+        && name
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+}
+
+fn truncate_chars(value: &str, max_chars: usize) -> String {
+    value.chars().take(max_chars).collect()
+}
+
 fn update_workspace_custom_instructions(
     root: &Path,
     custom_instructions: &str,
@@ -445,4 +595,78 @@ fn update_workspace_custom_instructions(
             e
         )
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temp_project_dir(name: &str) -> PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after unix epoch")
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!("tachyon-cowork-{}-{}", name, nonce));
+        fs::create_dir_all(&path).expect("temp project dir should be created");
+        path
+    }
+
+    #[test]
+    fn parses_skill_frontmatter_name_and_description() {
+        let content = r#"---
+name: example-skill
+description: "Use when an example workflow is needed."
+---
+
+# Example Skill
+"#;
+
+        let parsed = parse_skill_frontmatter(content);
+
+        assert_eq!(
+            parsed,
+            Some((
+                "example-skill".to_string(),
+                "Use when an example workflow is needed.".to_string()
+            ))
+        );
+    }
+
+    #[test]
+    fn ignores_invalid_skill_names() {
+        let content = r#"---
+name: Example Skill
+description: Use when an example workflow is needed.
+---
+"#;
+
+        assert_eq!(parse_skill_frontmatter(content), None);
+    }
+
+    #[test]
+    fn discovers_project_skills_from_supported_roots() {
+        let root = temp_project_dir("skills");
+        let skill_dir = root.join(".codex/skills/example-skill");
+        fs::create_dir_all(&skill_dir).expect("skill dir should be created");
+        fs::write(
+            skill_dir.join("SKILL.md"),
+            r#"---
+name: example-skill
+description: Use when an example workflow is needed.
+---
+
+# Example Skill
+"#,
+        )
+        .expect("skill file should be written");
+
+        let skills = discover_project_skills(&root).expect("skills should be discovered");
+
+        assert_eq!(skills.len(), 1);
+        assert_eq!(skills[0].name, "example-skill");
+        assert_eq!(skills[0].source, ".codex/skills");
+
+        let _ = fs::remove_dir_all(root);
+    }
 }
