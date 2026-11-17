@@ -2,8 +2,9 @@ import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentChatClient } from "../../lib/api-client";
 import type { AgentChunk } from "../../lib/types";
+import type { ProjectContext } from "../../lib/tauri-bridge";
 import { executeClientTool } from "../../lib/tauri-bridge";
-import { useAgentChat } from "../useAgentChat";
+import { buildAgentCustomInstructions, useAgentChat } from "../useAgentChat";
 
 type ToolResultResponse = AgentChunk | AgentChunk[] | Response;
 
@@ -142,6 +143,43 @@ describe("useAgentChat tool flow", () => {
     );
   });
 
+  it("adds discovered project skills to agent custom instructions", () => {
+    const projectContext: ProjectContext = {
+      root_path: "/workspace",
+      name: "workspace",
+      workspace_path: "/workspace",
+      agents_path: "/workspace/AGENTS.md",
+      agent_dir: "/workspace/.agent",
+      has_agents_file: true,
+      has_agent_dir: true,
+      custom_instructions: "Prefer tests.",
+      prompt_context: "Prefer tests.",
+      skills: [
+        {
+          name: "example-skill",
+          description: "Use when an example workflow is needed.",
+          path: "/workspace/.agent/skills/example-skill/SKILL.md",
+          directory: "/workspace/.agent/skills/example-skill",
+          source: ".agent/skills",
+        },
+      ],
+    };
+
+    const instructions = buildAgentCustomInstructions(
+      "",
+      "/workspace",
+      projectContext,
+    );
+
+    expect(instructions).toContain("example-skill");
+    expect(instructions).toContain(
+      "/workspace/.agent/skills/example-skill/SKILL.md",
+    );
+    expect(instructions).toContain(
+      "対応する SKILL.md を client tool で読んでください",
+    );
+  });
+
   it("executes a streamed client tool call and submits the tool result", async () => {
     vi.mocked(executeClientTool).mockResolvedValue({
       tool_id: "tool-1",
@@ -190,14 +228,17 @@ describe("useAgentChat tool flow", () => {
       tool_id: "tool-1",
       result: { entries: ["dist", "docs", "node_modules"] },
     });
-    const client = buildClient([toolCallChunk], [
-      {
-        id: "chunk-say-1",
-        type: "say",
-        text: "Listed the workspace root.",
-        created_at: "2026-04-20T00:00:01.000Z",
-      },
-    ]);
+    const client = buildClient(
+      [toolCallChunk],
+      [
+        {
+          id: "chunk-say-1",
+          type: "say",
+          text: "Listed the workspace root.",
+          created_at: "2026-04-20T00:00:01.000Z",
+        },
+      ],
+    );
 
     const { result } = renderHook(() => useAgentChat(client));
 
@@ -298,15 +339,18 @@ describe("useAgentChat tool flow", () => {
       args: { path: "package.json" },
       created_at: "2026-04-20T00:00:01.000Z",
     };
-    const client = buildClient([toolCallChunk], [
-      secondToolCall,
-      {
-        id: "chunk-say-2",
-        type: "say",
-        text: "Both tools completed.",
-        created_at: "2026-04-20T00:00:02.000Z",
-      },
-    ]);
+    const client = buildClient(
+      [toolCallChunk],
+      [
+        secondToolCall,
+        {
+          id: "chunk-say-2",
+          type: "say",
+          text: "Both tools completed.",
+          created_at: "2026-04-20T00:00:02.000Z",
+        },
+      ],
+    );
 
     const { result } = renderHook(() => useAgentChat(client));
 
@@ -339,9 +383,10 @@ describe("useAgentChat tool flow", () => {
       tool_id: "tool-1",
       result: { ok: true },
     });
-    const client = buildClient([toolCallChunk], [
-      new Response(null, { status: 204 }),
-    ]);
+    const client = buildClient(
+      [toolCallChunk],
+      [new Response(null, { status: 204 })],
+    );
 
     const { result } = renderHook(() => useAgentChat(client));
 
@@ -367,11 +412,14 @@ describe("useAgentChat tool flow", () => {
       tool_id: "tool-1",
       result: { ok: true },
     });
-    const client = buildClient([toolCallChunk], [
-      buildRawSseResponse([
-        `data: ${JSON.stringify({ error: { message: "Agent execute failed after tool result" } })}\n\n`,
-      ]),
-    ]);
+    const client = buildClient(
+      [toolCallChunk],
+      [
+        buildRawSseResponse([
+          `data: ${JSON.stringify({ error: { message: "Agent execute failed after tool result" } })}\n\n`,
+        ]),
+      ],
+    );
 
     const { result } = renderHook(() => useAgentChat(client));
 
@@ -382,7 +430,8 @@ describe("useAgentChat tool flow", () => {
     expect(result.current.error).toEqual(
       expect.objectContaining({
         kind: "server",
-        message: "Agent API が応答できませんでした。少し待ってから再試行してください。",
+        message:
+          "Agent API が応答できませんでした。少し待ってから再試行してください。",
       }),
     );
   });
@@ -429,17 +478,20 @@ describe("useAgentChat tool flow", () => {
       tool_id: "tool-1",
       result: { ok: true },
     });
-    const client = buildClient([toolCallChunk], [
-      buildRawSseResponse([
-        "data: {not-json}\n\n",
-        `data: ${JSON.stringify({
-          id: "chunk-say-valid",
-          type: "say",
-          text: "Recovered after malformed event.",
-          created_at: "2026-04-20T00:00:03.000Z",
-        })}\n\n`,
-      ]),
-    ]);
+    const client = buildClient(
+      [toolCallChunk],
+      [
+        buildRawSseResponse([
+          "data: {not-json}\n\n",
+          `data: ${JSON.stringify({
+            id: "chunk-say-valid",
+            type: "say",
+            text: "Recovered after malformed event.",
+            created_at: "2026-04-20T00:00:03.000Z",
+          })}\n\n`,
+        ]),
+      ],
+    );
 
     const { result } = renderHook(() => useAgentChat(client));
 

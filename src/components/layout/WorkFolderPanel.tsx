@@ -1,4 +1,4 @@
-import { ArrowLeft, FolderOpen, PencilLine } from "lucide-react";
+import { ArrowLeft, BookOpen, FolderOpen, PencilLine } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useWindowDrag } from "../../hooks/useWindowDrag";
 import type { SessionSummary } from "../../lib/types";
@@ -116,6 +116,36 @@ export function WorkFolderPanel({
                         ? ".agent/ は利用可能です"
                         : "まだ .agent/ は作成されていません"}
                     </div>
+                  </div>
+                  <div className="rounded-2xl bg-stone-50/80 px-3 py-3 dark:bg-stone-950/40">
+                    <div className="font-medium text-stone-700 dark:text-stone-200">
+                      Agent Skills
+                    </div>
+                    {projectContext?.skills?.length ? (
+                      <div className="mt-2 space-y-2">
+                        {projectContext.skills.map((skill) => (
+                          <div key={skill.path} className="min-w-0">
+                            <div className="flex items-center gap-1.5 text-stone-700 dark:text-stone-200">
+                              <BookOpen size={13} />
+                              <span className="truncate font-medium">
+                                {skill.name}
+                              </span>
+                            </div>
+                            <div className="mt-0.5 line-clamp-2 text-[11px] text-stone-500 dark:text-stone-400">
+                              {skill.description}
+                            </div>
+                            <div className="mt-0.5 break-all text-[10px] text-stone-400 dark:text-stone-500">
+                              {skill.path}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="mt-1 text-[11px] text-stone-400 dark:text-stone-500">
+                        `.agent/skills`, `.codex/skills`, `.claude/skills`,
+                        `.agents/skills` の SKILL.md を検出します
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

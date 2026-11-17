@@ -6,7 +6,7 @@
 
 - 作業ディレクトリを切り替えるだけで、対象 workspace の前提に入れる
 - workspace 固有の指示を `AGENTS.md` で管理する
-- 将来の agent 資産を `.agent/` で管理できる
+- agent skill を `.agent/skills` などで管理できる
 - 人間にもエージェントにも読みやすい最小構成にする
 
 ## 推奨構成
@@ -39,6 +39,32 @@ projects/
 - `workspace/`
   - その project で使う作業用ディレクトリ
   - 生成物や一時ファイルを置く場所として使える
+
+## Agent Skills
+
+連携フォルダに次のいずれかのディレクトリがある場合、Cowork は直下の
+`*/SKILL.md` を agent skill として検出します。
+
+- `.agent/skills`
+- `.codex/skills`
+- `.claude/skills`
+- `.agents/skills`
+
+`SKILL.md` は YAML frontmatter で `name` と `description` を持つ必要があります。
+`name` は小文字英数字とハイフンのみ、`description` は agent がいつ使うべきかを判断できる文章にします。
+
+```markdown
+---
+name: release-check
+description: Use when preparing or verifying a Tachyon Cowork release.
+---
+
+# Release Check
+
+Follow the release verification workflow...
+```
+
+Cowork は常時コンテキストには `name`、`description`、`SKILL.md` のパスだけを渡します。作業内容が一致したとき、agent は client tool で `SKILL.md` 本文を読み、必要な補助ファイルだけを追加で読みます。
 
 ## 運用ルール
 
